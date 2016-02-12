@@ -16,7 +16,7 @@ OPTIONS
     Upload files to gist
 
   --P=mode or --public=mode
-    [upload] 's' mode make gist to be secret, 'p' - public.
+    [upload] 's' mode makes gist to be secret, 'p' - public.
   
   --d=description or --description=description
     [upload] Set a description for a gist.
