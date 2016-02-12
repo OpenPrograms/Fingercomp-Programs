@@ -53,7 +53,7 @@ This program allows the player to control their's nanomachines.
   * Get combinatoric test results
 * `group`
   * `group set <name> <input> [other inputs...]`
-    * Add a group or modify group settings with the name `<name>`.
+    * Add a group or modify group's settings with the name `<name>`.
   * `group del <name>`
     * Remove a group.
   * `group save`

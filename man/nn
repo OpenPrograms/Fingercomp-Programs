@@ -65,14 +65,14 @@ ACTIONS
     Get turned on effects.
   
   combo [exclude...]
-    Run combinatoric test (1-1, 8-14, etc). Type the input nums to exclude them for testing. If you want to exclude a specific combination, type <first input>-<second input>. Right part should be greater than left.
+    Run combinatoric test (1-1, 8-14, etc). Type the input nums to exclude them for testing. If you want to exclude a specific combination, type <first input>-<second input>. Right part should be greater than left one.
   
   getcombo
     Show combinatoric test results.
   
   group
     group set <name> <input 1> [other inputs...]
-      Add a group or modify a group settings with the name <name>.
+      Add a group or modify group's settings with the name <name>.
     
     group del <name>
       Remove a group.
@@ -81,10 +81,10 @@ ACTIONS
       Save the group settings to a file.
     
     group on <name>
-      Turns on all the inputs in the group with the name <name>.
+      Turn on all the inputs in the group with the name <name>.
     
     group off <name>
-      Turns off all the inputs in the group with the name <name>.
+      Turn off all the inputs in the group with the name <name>.
     
     group list
       List groups and their inputs.
