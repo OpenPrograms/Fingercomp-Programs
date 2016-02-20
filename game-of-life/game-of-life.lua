@@ -114,7 +114,7 @@ local function render()
   gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen [<] Slow [>] Fast")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
-  gpu.set(w - 22, 1, "Spd " .. speeds[speed] .. "s")
+  gpu.set(w - 28, 1, "Upd rate " .. speeds[speed] .. "s")
   gpu.setForeground(0xffffff)
   if pause then
     gpu.setBackground(0x808000)
