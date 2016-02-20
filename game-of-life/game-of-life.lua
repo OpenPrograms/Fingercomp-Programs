@@ -15,7 +15,6 @@ local bw, bh = w, (h - 2) * 2
 
 local pause = true
 local firstUpd = true
-local speed = 20
 local gen = 0
 
 local blocks = {
@@ -35,6 +34,9 @@ local blocks = {
   uldl = 0x258c,
   urdr = 0x2590
 }
+
+local speeds = {0.05, 0.1, 0.2, 0.25, 0.4, 0.5, 0.8, 1, 2, 3, 4, 5, 7, 10}
+local speed = 2
 
 screen.setPrecise(true)
 
@@ -109,9 +111,10 @@ local function render()
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
-  gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen")
+  gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen [<] Slow [>] Fast")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
+  gpu.set(w - 22, 1, "Spd " .. speeds[speed] .. "s")
   gpu.setForeground(0xffffff)
   if pause then
     gpu.setBackground(0x808000)
@@ -175,7 +178,7 @@ while noExit do
     gen = gen + 1
   end
   render()
-  local data = {event.pull(.1, "key_down")}
+  local data = {event.pull(speeds[speed], "key_down")}
   if data[1] then
     if data[1] == "key_down" then
       if data[3] == 32 then
@@ -185,6 +188,12 @@ while noExit do
       elseif data[3] == 13 and pause then
         updateField()
         gen = gen + 1
+      elseif data[3] == 62 then
+        local sp = speed - 1
+        speed = sp == 0 and 1 or sp
+      elseif data[3] == 61 then
+        local sp = speed + 1
+        speed = sp > #speeds and #speeds or sp
       end
     end
   end
