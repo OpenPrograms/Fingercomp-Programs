@@ -105,7 +105,6 @@ local function updateField()
 end
 
 local function render()
-  gen = gen + 1
   gpu.setBackground(0xffffff)
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
@@ -173,6 +172,7 @@ noExit = true
 while noExit do
   if not pause then
     updateField()
+    gen = gen + 1
   end
   render()
   local data = {event.pull(.1, "key_down")}
