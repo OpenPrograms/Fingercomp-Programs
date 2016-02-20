@@ -182,7 +182,7 @@ while noExit do
         pause = not pause
       elseif data[4] == 16 then
         noExit = false
-      elseif data[3] == 13 and paused then
+      elseif data[3] == 13 and pause then
         updateField()
         gen = gen + 1
       end
