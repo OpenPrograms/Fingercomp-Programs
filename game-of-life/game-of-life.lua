@@ -191,7 +191,7 @@ while noExit do
       elseif data[3] == 62 then
         local sp = speed - 1
         speed = sp == 0 and 1 or sp
-      elseif data[3] == 61 then
+      elseif data[3] == 60 then
         local sp = speed + 1
         speed = sp > #speeds and #speeds or sp
       end
