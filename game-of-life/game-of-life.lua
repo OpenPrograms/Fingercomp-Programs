@@ -15,6 +15,8 @@ local bw, bh = w, (h - 2) * 2
 
 local pause = true
 local firstUpd = true
+local speed = 20
+local gen = 0
 
 local blocks = {
   dl = 0x2596,
@@ -103,12 +105,14 @@ local function updateField()
 end
 
 local function render()
+  gen = gen + 1
   gpu.setBackground(0xffffff)
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
   gpu.set(1, h, "[Space] Pause/Unpause   [q] Quit")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
+  gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
   gpu.setForeground(0xffffff)
   if pause then
     gpu.setBackground(0x808000)
