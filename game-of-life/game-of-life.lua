@@ -109,7 +109,7 @@ local function render()
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
-  gpu.set(1, h, "[Space] Pause/Unpause   [q] Quit")
+  gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
   gpu.setForeground(0xffffff)
@@ -182,6 +182,9 @@ while noExit do
         pause = not pause
       elseif data[4] == 16 then
         noExit = false
+      elseif data[3] == 13 and paused then
+        updateField()
+        gen = gen + 1
       end
     end
   end
