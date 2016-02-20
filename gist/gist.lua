@@ -134,7 +134,7 @@ end
 local function isIDValid(id)
   local gitio = false
   local url = id
-  if not url:match("https?://git.io/%w+") then
+  if not url:match("https?://git.io/%w+") and not url:match("gist.github.com/%w*/?%x+") then
     url = format{base=URLS.basic, id=id}
   else
     gitio = true
