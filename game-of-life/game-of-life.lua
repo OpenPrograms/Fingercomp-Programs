@@ -174,7 +174,8 @@ local function onTouch(event, address, x, y, btn, user)
   end
 end
 
-local function onKey(event, address, char, code, user)
+local function onKey(...)
+  data = {...}
   if data[3] == 32 then
     pause = not pause
   elseif data[4] == 16 then
