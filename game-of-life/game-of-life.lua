@@ -97,8 +97,8 @@ end
 
 local function getCell(x, y)
   y = y % 2 == 0 and y - 1 or y
-  local gridColorUpper = x % 2 == 0 and 0x000000 or 0x202020
-  local gridColorLower = x % 2 == 0 and 0x202020 or 0x000000
+  local gridColorUpper = x % 2 == 0 and 0x000000 or 0x1e1e1e
+  local gridColorLower = x % 2 == 0 and 0x1e1e1e or 0x000000
   local sc = {}
   sc.u = {getPixel(x, y), getScsrPixel(x, y)}
   sc.d = {getPixel(x, y + 1), getScsrPixel(x, y + 1)}
