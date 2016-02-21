@@ -64,6 +64,13 @@ local function getSymbol(u, d)
 end
 
 local function getPixel(x, y)
+  x = x % bw
+  y = y % bh
+  if x % bw == 0 then
+    x = bw
+  end if y % bh == 0 then
+    y = bh
+  end
   return cells[x][y]
 end
 
@@ -76,8 +83,8 @@ end
 
 local function neighbors(x, y)
   local nb = 0
-  for i = math.max(1, x - 1), math.min(x + 1, bw), 1 do
-    for j = math.max(1, y - 1), math.min(y + 1, bh), 1 do
+  for i = x - 1, x + 1, 1 do
+    for j = y - 1, y + 1, 1 do
       if not (i == x and j == y) then
         if getPixel(i, j) then
           nb = nb + 1
