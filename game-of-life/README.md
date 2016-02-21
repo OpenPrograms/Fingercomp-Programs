@@ -30,7 +30,8 @@
 * `[Enter]` Display the *next* generation (only works if **the simulation is paused**).
 * `[<]` *Descrease* the speed of the game.
 * `[>]` *Increase* the speed of the game.
-* `[c]` Toggle the *highlighting*
+* `[c]` Toggle the *highlighting*.
+* `[Backspace]` *Clear* the board.
 
 ## Requirements
 * T3 screen.
