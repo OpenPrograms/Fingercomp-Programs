@@ -89,7 +89,7 @@ local function getPixel(x, y)
 end
 
 local function getScsrPixel(x, y)
-  if scsr[x] and scsr[x][y] then
+  if scsr[x] and scsr[x][y] ~= nil then
     return scsr[x][y]
   end
   return nil
