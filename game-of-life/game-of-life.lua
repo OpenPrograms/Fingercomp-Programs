@@ -44,7 +44,7 @@ local patterns = {
   [34] = {"glider", {" x ", "  x", "xxx"}}, -- g
   [48] = {"box", {"xx","xx"}}, -- b
   [35] = {"hive", {" xx ","x  x"," xx "}}, -- h
-  [50] = {"beams" = {"xx  ","x   ","   x","  xx"}} -- m
+  [50] = {"beams", {"xx  ","x   ","   x","  xx"}} -- m
 }
 
 local speeds = {0.05, 0.1, 0.2, 0.25, 0.4, 0.5, 0.8, 1, 2, 3, 4, 5, 7, 10}
@@ -217,12 +217,12 @@ local function onTouch(event, address, x, y, btn, user)
       scsr = updateField()
     else
       local px, py = math.floor(x) + 1, math.floor(y * 2) - 1
-      local pw = #patterns[pattern][1]
+      local pw = #patterns[pattern][2]
       local ph = #patterns
       for i = 1, pw, 1 do
         for j = 1, ph, 1 do
           if px + i - 1 <= bw and py + j - 1 <= bh then
-            local str = patterns[pattern][i]:sub(j, j)
+            local str = patterns[pattern][2][j]:sub(i, i)
             if str == "x" then
               cells[px + i - 1][py + j - 1] = true
             end
