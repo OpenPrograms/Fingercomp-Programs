@@ -243,6 +243,8 @@ local function onKey(...)
   elseif data[3] == 13 and pause then
     updBoard()
     gen = gen + 1
+  elseif data[4] == 46 then
+    cellHL = not cellHL
   end
   if showPtrns then
     if data[4] == 14 then
@@ -256,8 +258,6 @@ local function onKey(...)
   elseif data[3] == 60 then
     local sp = speed + 1
     speed = sp > #speeds and #speeds or sp
-  elseif data[4] == 46 then
-    cellHL = not cellHL
   elseif data[4] == 14 then
     cells = {}
     scsr = {}
