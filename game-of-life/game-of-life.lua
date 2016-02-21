@@ -19,6 +19,8 @@ local firstUpd = true
 local gen = 0
 local updScsr = true
 local cellHL = false
+local showPtrns = false
+local pattern = 0
 
 local blocks = {
   dl = 0x2596,
@@ -36,6 +38,13 @@ local blocks = {
   dldr = 0x2584,
   uldl = 0x258c,
   urdr = 0x2590
+}
+
+local patterns = {
+  [34] = {"glider", {" x ", "  x", "xxx"}}, -- g
+  [48] = {"box", {"xx","xx"}}, -- b
+  [35] = {"hive", {" xx ","x  x"," xx "}}, -- h
+  [50] = {"beams" = {"xx  ","x   ","   x","  xx"}} -- m
 }
 
 local speeds = {0.05, 0.1, 0.2, 0.25, 0.4, 0.5, 0.8, 1, 2, 3, 4, 5, 7, 10}
@@ -159,7 +168,7 @@ local function render()
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
-  gpu.set(1, h, "[␣] Pause [q] Quit [↵] Next gen [<] Slower [>] Faster [c] Highlight")
+  gpu.set(1, h, "[␣] Pause [q] Quit [↵] Step [<][>] Spd [c] Clr [p] Ptrns [←] Clr")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
   gpu.set(w - 28, 1, "Upd rate " .. speeds[speed] .. "s")
@@ -203,8 +212,24 @@ end
 
 local function onTouch(event, address, x, y, btn, user)
   if y > 1 and y < h and pause then
-    cells[math.floor(x) + 1][math.floor(y * 2) - 1] = btn == 0
-    scsr = updateField()
+    if not showPtrns then
+      cells[math.floor(x) + 1][math.floor(y * 2) - 1] = btn == 0
+      scsr = updateField()
+    else
+      local px, py = math.floor(x) + 1, math.floor(y * 2) - 1
+      local pw = #patterns[pattern][1]
+      local ph = #patterns
+      for i = 1, pw, 1 do
+        for j = 1, ph, 1 do
+          if px + i - 1 <= bw and py + j - 1 <= bh then
+            local str = patterns[pattern][i]:sub(j, j)
+            if str == "x" then
+              cells[px + i - 1][py + j - 1] = true
+            end
+          end
+        end
+      end
+    end
   end
 end
 
@@ -217,6 +242,13 @@ local function onKey(...)
   elseif data[3] == 13 and pause then
     updBoard()
     gen = gen + 1
+  end
+  if showPtrns then
+    if data[4] == 14 then
+      showPtrns = false
+    elseif patterns[data[4]] then
+      pattern = data[4]
+    end
   elseif data[3] == 62 then
     local sp = speed - 1
     speed = sp == 0 and 1 or sp
@@ -225,6 +257,19 @@ local function onKey(...)
     speed = sp > #speeds and #speeds or sp
   elseif data[4] == 46 then
     cellHL = not cellHL
+  elseif data[4] == 14 then
+    cells = {}
+    scsr = {}
+    for i = 1, bw, 1 do
+      cells[i] = {}
+      scsr[i] = {}
+      for j = 1, bh, 1 do
+        cells[i][j] = false
+        scsr[i][j] = false
+      end
+    end
+  elseif data[4] == 25 then
+    showPtrns = true
   end
 end
 
