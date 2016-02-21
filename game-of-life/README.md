@@ -1,5 +1,5 @@
 # Conway's Game of Life implementation for OpenComputers
-![Screenshot of the game with the simulation paused and the "Hello :-)" text in the middle.](http://i.imgur.com/eAINaIq.png)
+![Screenshot of the game.](http://i.imgur.com/J7enOnc.png)
 
 ## What you should do in this game
 * With the simulation paused, use the controls below to place or kill cells.
