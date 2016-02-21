@@ -174,9 +174,27 @@ local function onTouch(event, address, x, y, btn, user)
   end
 end
 
+local function onKey(event, address, char, code, user)
+  if data[3] == 32 then
+    pause = not pause
+  elseif data[4] == 16 then
+    noExit = false
+  elseif data[3] == 13 and pause then
+    updateField()
+    gen = gen + 1
+  elseif data[3] == 62 then
+    local sp = speed - 1
+    speed = sp == 0 and 1 or sp
+  elseif data[3] == 60 then
+    local sp = speed + 1
+    speed = sp > #speeds and #speeds or sp
+  end
+end
+
 event.listen("touch", onTouch)
 event.listen("drag", onTouch)
 event.listen("drop", onTouch)
+event.listen("key_down", onKey)
 
 noExit = true
 while noExit do
@@ -185,30 +203,13 @@ while noExit do
     gen = gen + 1
   end
   render()
-  local data = {event.pull(speeds[speed], "key_down")}
-  if data[1] then
-    if data[1] == "key_down" then
-      if data[3] == 32 then
-        pause = not pause
-      elseif data[4] == 16 then
-        noExit = false
-      elseif data[3] == 13 and pause then
-        updateField()
-        gen = gen + 1
-      elseif data[3] == 62 then
-        local sp = speed - 1
-        speed = sp == 0 and 1 or sp
-      elseif data[3] == 60 then
-        local sp = speed + 1
-        speed = sp > #speeds and #speeds or sp
-      end
-    end
-  end
+  os.sleep(speeds[speed])
 end
 
 event.ignore("touch", onTouch)
 event.ignore("drag", onTouch)
 event.ignore("drop", onTouch)
+event.ignore("key_down", onKey)
 
 gpu.fill(1, 1, w, h, " ")
 screen.setPrecise(false)
