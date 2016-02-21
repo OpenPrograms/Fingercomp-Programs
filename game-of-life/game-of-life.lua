@@ -196,6 +196,7 @@ event.listen("touch", onTouch)
 event.listen("drag", onTouch)
 event.listen("drop", onTouch)
 event.listen("key_down", onKey)
+local renderTimer = event.timer(0.05, render, math.huge)
 
 noExit = true
 while noExit do
@@ -203,7 +204,6 @@ while noExit do
     updateField()
     gen = gen + 1
   end
-  render()
   os.sleep(speeds[speed])
 end
 
@@ -211,6 +211,7 @@ event.ignore("touch", onTouch)
 event.ignore("drag", onTouch)
 event.ignore("drop", onTouch)
 event.ignore("key_down", onKey)
+event.cancel(renderTimer)
 
 gpu.fill(1, 1, w, h, " ")
 screen.setPrecise(false)
