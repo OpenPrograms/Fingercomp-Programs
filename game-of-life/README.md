@@ -1,4 +1,4 @@
-# Conway's Game of Life implemention for OpenComputers
+# Conway's Game of Life implementation for OpenComputers
 ![Screenshot of the game with the simulation paused and the "Hello :-)" text in the middle.](http://i.imgur.com/eAINaIq.png)
 
 ## What you should do in this game
@@ -6,9 +6,9 @@
 * Press `[Space]` and observe the magic evolution of these cells.
 
 ## Rules
-* The board updates at least every 1/10 s.
+* The board updates at specific rate.
 * Every update the new generation is displayed.
-* The board is finite, there's no anything like a toroidal array or such.
+* The board is a toroidal array (the borders are "glued").
 * The board is filled with cells.
 * Cells may be either *dead* or *alive*.
 * Every cell may have up to 8 neighbors.
@@ -17,11 +17,20 @@
 * Any live cell with more than **3 neighbors** *dies*.
 * **_Any_** cell with **exactly 3 neighbors** *becomes a live one* (if it was dead) and *stays alive* in the next generation.
 
+### Highlighting
+* If cell will *die* on the next generation, it'll be red.
+* If cell will *be born* on the next generation, it'll be dark green.
+* If cell is *alive* in current and next generations, it will be white.
+
 ## Controls
 * `[Space]` *Start* or *pause* simulation.
 * `[q]` *Quit* the game.
 * `[Left Mouse Button]` *Place* a cell (only works if **the simulation is paused**).
 * `[Right Mouse Button]` *Kill* a cell (only works if **the simulation is paused**).
+* `[Enter]` Display the *next* generation (only works if **the simulation is paused**).
+* `[<]` *Descrease* the speed of the game.
+* `[>]` *Increase* the speed of the game.
+* `[c]` Toggle the *highlighting*
 
 ## Requirements
 * T3 screen.
