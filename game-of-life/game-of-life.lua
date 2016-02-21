@@ -215,10 +215,10 @@ local function onTouch(event, address, x, y, btn, user)
     if not showPtrns then
       cells[math.floor(x) + 1][math.floor(y * 2) - 1] = btn == 0
       scsr = updateField()
-    else
+    elseif pause then
       local px, py = math.floor(x) + 1, math.floor(y * 2) - 1
       local pw = #patterns[pattern][2]
-      local ph = #patterns
+      local ph = #patterns[pattern]
       for i = 1, pw, 1 do
         for j = 1, ph, 1 do
           if px + i - 1 <= bw and py + j - 1 <= bh then
@@ -229,6 +229,7 @@ local function onTouch(event, address, x, y, btn, user)
           end
         end
       end
+      scsr = updateField()
     end
   end
 end
