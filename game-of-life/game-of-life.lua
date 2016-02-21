@@ -103,13 +103,13 @@ local function getCell(x, y)
   sc.u = {getPixel(x, y), getScsrPixel(x, y)}
   sc.d = {getPixel(x, y + 1), getScsrPixel(x, y + 1)}
   for k, v in pairs(sc) do
-    if v[2] ~= nil then
+    if v[2] ~= nil and cellHL then
       if v[1] and v[2] then
         sc[k][3] = 0xffffff
       elseif v[1] and v[2] == false then
-        sc[k][3] = 0x800000
+        sc[k][3] = 0xff0000
       elseif v[1] == false and v[2] then
-        sc[k][3] = 0x008000
+        sc[k][3] = 0x004000
       elseif v[1] == false and v[2] == false then
         sc[k][3] = false
       end
@@ -223,6 +223,8 @@ local function onKey(...)
   elseif data[3] == 60 then
     local sp = speed + 1
     speed = sp > #speeds and #speeds or sp
+  elseif data[4] == 46 then
+    cellHL = not cellHL
   end
 end
 
