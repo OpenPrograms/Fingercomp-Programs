@@ -107,7 +107,7 @@ local function getCell(x, y)
       if v[1] and v[2] then
         sc[k][3] = 0xffffff
       elseif v[1] and v[2] == false then
-        sc[k][3] = 0xff0000
+        sc[k][3] = 0xff4040
       elseif v[1] == false and v[2] then
         sc[k][3] = 0x004000
       elseif v[1] == false and v[2] == false then
@@ -159,7 +159,7 @@ local function render()
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
-  gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen [<] Slower [>] Faster")
+  gpu.set(1, h, "[␣] Pause [q] Quit [↵] Next gen [<] Slower [>] Faster [c] Highlight")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
   gpu.set(w - 28, 1, "Upd rate " .. speeds[speed] .. "s")
