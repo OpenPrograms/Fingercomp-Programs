@@ -217,8 +217,8 @@ local function onTouch(event, address, x, y, btn, user)
       scsr = updateField()
     elseif pause then
       local px, py = math.floor(x) + 1, math.floor(y * 2) - 1
-      local pw = #patterns[pattern][2]
-      local ph = #patterns[pattern]
+      local pw = #patterns[pattern][2][1]
+      local ph = #patterns[pattern][2]
       for i = 1, pw, 1 do
         for j = 1, ph, 1 do
           if px + i - 1 <= bw and py + j - 1 <= bh then
