@@ -10,12 +10,15 @@ local gpu = com.gpu
 local w, h = gpu.getResolution()
 
 local cells = {}
+local scsr = {}
 
 local bw, bh = w, (h - 2) * 2
 
 local pause = true
 local firstUpd = true
 local gen = 0
+local updScsr = true
+local cellHL = false
 
 local blocks = {
   dl = 0x2596,
@@ -42,13 +45,24 @@ screen.setPrecise(true)
 
 for i = 1, bw, 1 do
   cells[i] = {}
+  scsr[i] = {}
   for j = 1, bh, 1 do
     cells[i][j] = false
+    scsr[i][j] = false
   end
 end
 
 for k, v in pairs(blocks) do
   blocks[k] = unicode.char(v)
+end
+
+local function copy(tbl)
+  if type(tbl) ~= "table" then return tbl end
+  local result = {}
+  for k, v in pairs(tbl) do
+    result[k] = copy(v)
+  end
+  return result
 end
 
 local function getSymbol(u, d)
@@ -74,11 +88,38 @@ local function getPixel(x, y)
   return cells[x][y]
 end
 
+local function getScsrPixel(x, y)
+  if scsr[x] and scsr[x][y] then
+    return scsr[x][y]
+  end
+  return nil
+end
+
 local function getCell(x, y)
   y = y % 2 == 0 and y - 1 or y
-  local u = getPixel(x, y)
-  local d = getPixel(x, y + 1)
-  return getSymbol(u, d)
+  local gridColorUpper = x % 2 == 0 and 0x000000 or 0x202020
+  local gridColorLower = x % 2 == 0 and 0x202020 or 0x000000
+  local sc = {}
+  sc.u = {getPixel(x, y), getScsrPixel(x, y)}
+  sc.d = {getPixel(x, y + 1), getScsrPixel(x, y + 1)}
+  for k, v in pairs(sc) do
+    if v[2] ~= nil then
+      if v[1] and v[2] then
+        sc[k][3] = 0xffffff
+      elseif v[1] and v[2] == false then
+        sc[k][3] = 0x800000
+      elseif v[1] == false and v[2] then
+        sc[k][3] = 0x008000
+      elseif v[1] == false and v[2] == false then
+        sc[k][3] = false
+      end
+    else
+      sc[k][3] = v[1] and 0xffffff or false
+    end
+  end
+  sc.u[3] = sc.u[3] or gridColorUpper
+  sc.d[3] = sc.d[3] or gridColorLower
+  return sc.u[3], sc.d[3]
 end
 
 local function neighbors(x, y)
@@ -110,7 +151,7 @@ local function updateField()
       successor[i][j] = cell
     end
   end
-  cells = successor
+  return successor
 end
 
 local function render()
@@ -118,7 +159,7 @@ local function render()
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
-  gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen [<] Slow [>] Fast")
+  gpu.set(1, h, "[␣] Pause/Unpause [q] Quit [↵] Next gen [<] Slower [>] Faster")
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
   gpu.set(w - 28, 1, "Upd rate " .. speeds[speed] .. "s")
@@ -130,47 +171,40 @@ local function render()
     gpu.setBackground(0x008000)
     gpu.set(w - 13, 1, " " .. unicode.char(0x25ba) .. " Simulation ")
   end
-  gpu.setBackground(0x000000)
-  gpu.setForeground(0xffffff)
   for i = 1, bw, 1 do
     for j = 1, bh, 2 do
-      local fg = i % 2 == 0 and 0x000000 or 0x202020
-      local bg = i % 2 == 0 and 0x202020 or 0x000000
-      local cell = getCell(i, j)
+      local colorU, colorD = getCell(i, j)
       local pixel = {gpu.get(i, (j + 1) / 2 + 1)}
-      if pixel[1] == blocks.ulur and pixel[2] ~= 0xffffff and pixel[3] ~= 0xffffff then
-        pixel[1] = " "
-      end
-      if pixel[1] ~= cell or firstUpd then
-        if cell == " " then
-          gpu.setForeground(fg)
-          gpu.setBackground(bg)
-          gpu.set(i, (j + 1) / 2 + 1, blocks.ulur)
-          gpu.setForeground(0xffffff)
-          gpu.setBackground(0x000000)
-        else
-          if cell == blocks.ulur then
-            gpu.setForeground(0xffffff)
-            gpu.setBackground(bg)
-          elseif cell == blocks.dldr then
-            gpu.setForeground(0xffffff)
-            gpu.setBackground(fg)
-          end
-          gpu.set(i, (j + 1) / 2 + 1, cell)
-          gpu.setBackground(0x000000)
-          gpu.setForeground(0xffffff)
-          if firstUpd then
-            firstUpd = false
-          end
+      if pixel[1] ~= blocks.ulur or pixel[2] ~= colorU or pixel[3] ~= colorD or firstUpd then
+        if gpu.getForeground() ~= colorU then
+          gpu.setForeground(colorU)
+        end if gpu.getBackground() ~= colorD then
+          gpu.setBackground(colorD)
+        end
+        gpu.set(i, (j + 1) / 2 + 1, blocks.ulur)
+        if firstUpd then
+          firstUpd = false
         end
       end
     end
   end
 end
 
+local function updBoard()
+  if updScsr then
+    cells = updateField()
+    scsr = updateField()
+    updScsr = false
+  else
+    cells = copy(scsr)
+    scsr = updateField()
+  end
+end
+
 local function onTouch(event, address, x, y, btn, user)
   if y > 1 and y < h and pause then
     cells[math.floor(x) + 1][math.floor(y * 2) - 1] = btn == 0
+    scsr = updateField()
   end
 end
 
@@ -181,7 +215,7 @@ local function onKey(...)
   elseif data[4] == 16 then
     noExit = false
   elseif data[3] == 13 and pause then
-    updateField()
+    updBoard()
     gen = gen + 1
   elseif data[3] == 62 then
     local sp = speed - 1
@@ -201,7 +235,7 @@ local renderTimer = event.timer(0.05, render, math.huge)
 noExit = true
 while noExit do
   if not pause then
-    updateField()
+    updBoard()
     gen = gen + 1
   end
   os.sleep(speeds[speed])
@@ -213,6 +247,8 @@ event.ignore("drop", onTouch)
 event.ignore("key_down", onKey)
 event.cancel(renderTimer)
 
+gpu.setForeground(0xffffff)
+gpu.setBackground(0x000000)
 gpu.fill(1, 1, w, h, " ")
 screen.setPrecise(false)
 term.setCursor(1, 1)
