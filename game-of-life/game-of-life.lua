@@ -258,7 +258,7 @@ local function onKey(...)
   elseif data[3] == 60 then
     local sp = speed + 1
     speed = sp > #speeds and #speeds or sp
-  elseif data[4] == 14 then
+  elseif data[4] == 14 and pause then
     cells = {}
     scsr = {}
     for i = 1, bw, 1 do

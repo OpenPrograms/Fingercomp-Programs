@@ -27,11 +27,11 @@
 * `[q]` *Quit* the game.
 * `[Left Mouse Button]` *Place* a cell (only works if **the simulation is paused**).
 * `[Right Mouse Button]` *Kill* a cell (only works if **the simulation is paused**).
-* `[Enter]` Display the *next* generation (only works if **the simulation is paused**).
-* `[<]` *Descrease* the speed of the game.
-* `[>]` *Increase* the speed of the game.
+* `[Enter]` *Next* generation (only works if **the simulation is paused**).
+* `[<]` *Descrease* the speed of the simulation.
+* `[>]` *Increase* the speed of the simulation.
 * `[c]` Toggle the *highlighting*.
-* `[Backspace]` *Clear* the board.
+* `[Backspace]` *Clear* the board (only works if **the simulation is paused**).
 
 ## Requirements
 * T3 screen.
