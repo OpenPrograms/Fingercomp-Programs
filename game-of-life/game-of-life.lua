@@ -178,7 +178,7 @@ local function render()
       end
     end
     local name = patterns[pattern] and patterns[pattern][1] or "None"
-    gpu.set(1, h, "[←] Back |" .. name .. " | " .. table.concat(ptrnsTbl, " "))
+    gpu.set(1, h, "[←] Back | " .. name .. " | " .. table.concat(ptrnsTbl, " "))
   end
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
