@@ -283,6 +283,7 @@ local function onKey(...)
         scsr[i][j] = false
       end
     end
+    gen = 0
   elseif data[4] == 25 then
     showPtrns = true
   end
