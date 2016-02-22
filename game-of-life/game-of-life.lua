@@ -41,10 +41,10 @@ local blocks = {
 }
 
 local patterns = {
-  [34] = {"g", {" x ", "  x", "xxx"}}, -- g
-  [48] = {"b", {"xx","xx"}}, -- b
-  [35] = {"h", {" xx ","x  x"," xx "}}, -- h
-  [50] = {"m", {"xx  ","x   ","   x","  xx"}} -- m
+  [34] = {"glider", {" x ", "  x", "xxx"}, "g"}, -- g
+  [48] = {"box", {"xx","xx"}, "b"}, -- b
+  [35] = {"hive", {" xx ","x  x"," xx "}, "h"}, -- h
+  [50] = {"beams", {"xx  ","x   ","   x","  xx"}, "m"} -- m
 }
 
 local speeds = {0.05, 0.1, 0.2, 0.25, 0.4, 0.5, 0.8, 1, 2, 3, 4, 5, 7, 10}
@@ -174,10 +174,11 @@ local function render()
     ptrnsTbl = {}
     for k, v in pairs(patterns) do
       if k ~= pattern then
-        table.insert(ptrnsTbl, "[" .. v[1] .. "]")
+        table.insert(ptrnsTbl, "[" .. v[3] .. "]")
       end
     end
-    gpu.set(1, h, "[←] Back | " .. table.concat(ptrnsTbl, " "))
+    local name = patterns[pattern] and patterns[pattern][1] or "None"
+    gpu.set(1, h, "[←] Back | " .. name .. "|" .. table.concat(ptrnsTbl, " "))
   end
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
