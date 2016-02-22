@@ -41,10 +41,10 @@ local blocks = {
 }
 
 local patterns = {
-  [34] = {"glider", {" x ", "  x", "xxx"}}, -- g
-  [48] = {"box", {"xx","xx"}}, -- b
-  [35] = {"hive", {" xx ","x  x"," xx "}}, -- h
-  [50] = {"beams", {"xx  ","x   ","   x","  xx"}} -- m
+  [34] = {"g", {" x ", "  x", "xxx"}}, -- g
+  [48] = {"b", {"xx","xx"}}, -- b
+  [35] = {"h", {" xx ","x  x"," xx "}}, -- h
+  [50] = {"m", {"xx  ","x   ","   x","  xx"}} -- m
 }
 
 local speeds = {0.05, 0.1, 0.2, 0.25, 0.4, 0.5, 0.8, 1, 2, 3, 4, 5, 7, 10}
@@ -168,10 +168,23 @@ local function render()
   gpu.setForeground(0x000000)
   gpu.fill(1, 1, w, 1, " ")
   gpu.fill(1, h, w, 1, " ")
-  gpu.set(1, h, "[␣] Pause [q] Quit [↵] Step [<][>] Spd [c] Clr [p] Ptrns [←] Clr")
+  if not showPtrns then
+    gpu.set(1, h, "[␣] Pause [q] Quit [↵] Step [<][>] Spd [c] Color [p] Ptrns [←] Clear")
+  else
+    ptrnsTbl = {}
+    for k, v in pairs(patterns) do
+      if k ~= pattern then
+        table.insert(ptrnsTbl, "[" .. v[1] .. "]")
+      end
+    end
+    gpu.set(1, h, "[←] Back | " .. table.concat(ptrnsTbl, " "))
+  end
   gpu.set(1, 1, "CONWAY'S GAME OF LIFE")
   gpu.set(w - #tostring(gen) - 1, h, "G" .. gen)
   gpu.set(w - 28, 1, "Upd rate " .. speeds[speed] .. "s")
+  if cellHL then
+    gpu.set(w - 33, 1, "[HL]")
+  end
   gpu.setForeground(0xffffff)
   if pause then
     gpu.setBackground(0x808000)
