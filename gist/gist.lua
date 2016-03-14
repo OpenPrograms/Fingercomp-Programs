@@ -114,7 +114,7 @@ local function post(url, data, noDecode, checkGitio)
     if checkGitio and ({req.response()})[3]["Content-Type"][1]:find("text/html") then
       for i = 1, unicode.len(response), 256 do
         local bit = unicode.sub(response, i, i + 255)
-        local match = bit:match(".+https://gist.github.com/%w-/([0-9a-fA-F]+).+")
+        local match = bit:match("^.+https://gist.github.com/%w-/([0-9a-fA-F]+).+$")
         if match then
           return match
         end
