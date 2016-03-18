@@ -234,6 +234,7 @@ do
   local t = options.t or options.token
   if t then
     if t == true then
+      io.write("GitHub OAuth personal access token: ")
       local input = term.read({pwchar="*"})
       if input and type(input) == "string" then
         options.t = text.trim(input)
