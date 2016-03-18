@@ -10,7 +10,7 @@ DESCRIPTION
   This program requires an internet card with HTTP requests enabled in the mod's configuration.
 
 OPTIONS
-  If uploading, pass file list as arguments with the following format: <path to local file>=<gist filename with .extension>
+  If uploading, provide file list as arguments with the following format: <path to local file>=<gist filename with .extension>
   
   -p
     Upload files to gist
@@ -47,6 +47,20 @@ OPTIONS
   
   --f=filename or --file=filename
     Specify the gist file to work with.
+  
+  -t
+    Prompt for a GitHub OAuth personal access token (needs to have gist scope to work). Requires OpenComputers 1.6 and higher.
+  
+  --t=token or --token=token
+    Use the given token. Not recommended, since the token will be visible as a plain text. Requires OpenComputers 1.6 and higher.
+
+  --u=gistid
+    [upload] Instead of posing a new gist, update the existing one with the given ID. Provide the files to modify as if you were uploading them to Gist. Requires the correct token, see -t. Also requires OpenComputers 1.6 and higher.
+
+GITHUB OAUTH TOKENS
+  These tokens can be used to increase API limits to 5000 and to work with user's account. For example, if the token is provided when uploading, the gist will be in the user's account.
+  You can get these tokens here: https://github.com/settings/tokens
+  When you do so, do not forget to set the gist scope, otherwise the token will not have any effect for the program except increasing rate limits.
 
 EXAMPLES
   gist -s -p --P=s --d="Hello, world!" /examples/test.lua=test.lua
@@ -60,3 +74,9 @@ EXAMPLES
   
   gist --f=helloworld.c -r https://git.io/example helloworlds/hello.c
     Saves the contents of the file helloworld.c in the gist to helloworlds/hello.c, overrides the file if it exists.
+  
+  gist -t --u=12345678901234567890 -p --d="New description" /new/file=file.lua
+    Change the description of the gist with the ID 12345678901234567980 to "New description" and updates contents of the file file.lua. Prompts for the GitHub OAuth personal access token.
+  
+  gist -s -p --d="Hello, world!" --P=s -t /hello/hello.cpp=hello.cpp
+    Prompts for the GitHub OAuth personal access token and then uploads the file hello.cpp to Gist. Returns a short URL to the gist.

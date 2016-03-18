@@ -11,7 +11,7 @@ This program makes it easy to download and upload files to/from Gist.
 * Internet card (HTTP requests have to be enabled in mod's configuration).
 
 ## Options
-If uploading, pass file list as arguments with the following format: `<path to local file>=<gist filename with .extension>`
+If uploading, provide file list as arguments with the following format: `<path to local file>=<gist filename with .extension>`
 
 * `-p`
   * Upload files to gist.
@@ -37,6 +37,12 @@ If uploading, pass file list as arguments with the following format: `<path to l
   * Show the gist information.
 * `--f=filename` or `--file=filename`
   * Specify the file to work with.
+* `-t`
+  * Prompt for a GitHub OAuth [personal access token](https://github.com/settings/tokens) (needs to have *gist* scope to work). **Requires OpenComputers 1.6 and higher**.
+* `--t=token` or `--token=token`
+  * Use the given token. *Not recommended*, since the token will be visible as a plain text. **Requires OpenComputers 1.6 and higher**.
+* `--u=gistid`
+  * **Upload mode**. Instead of posting a new gist, update the existing one with the given ID. Provide the files to modify as if you were uploading to Gist. *Requires the correct token*, see `-t`. Also **requires OpenComputers 1.6 and higher**.
 
 ## Examples
 * `gist -s -p --P=s --d="Hello, world!" /examples/test.lua=test.lua`
@@ -47,3 +53,7 @@ If uploading, pass file list as arguments with the following format: `<path to l
   * Prints gist's file contents.
 * `gist --f=helloworld.c -r https://git.io/example helloworlds/hello.c`
   * Saves the contents of the file helloworld.c in the gist to helloworlds/hello.c, overrides the file if it exists.
+* `gist -t --u=12345678901234567890 -p --d="New description" /new/file=file.lua`
+  * Changes the description of the gist with the ID `12345678901234567890` to `New description` and updates contents of the file `file.lua`. Prompts for the GitHub OAuth [personal access token](https://github.com/settings/tokens).
+* `gist -s -p --d="Hello, world!" --P=s -t /hello/hello.cpp=hello.cpp`
+  * Prompts for the GitHub OAuth [personal access token](https://github.com/settings/tokens) and then uploads the file `hello.cpp` to Gist. Returns a short URL to the gist.
