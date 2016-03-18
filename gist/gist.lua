@@ -4,6 +4,8 @@ local fs = require("filesystem")
 local unicode = require("unicode")
 local shell = require("shell")
 local inetapi = require("internet")
+local term = require("term")
+local text = require("text")
 
 -- Components --
 local inet = com.internet
@@ -25,6 +27,7 @@ local json = loadfile("/usr/lib/json.lua")()
 -- Program Variables --
 local gResponse = {}
 local args, options = shell.parse(...)
+local auth = nil
 
 -- Program Constants --
 local URLS = {
@@ -56,12 +59,18 @@ local function format(args)
   return base
 end
 
-local function request(url)
+local function request(url, headers)
   if gResponse[url] then
     return gResponse[url]
   end
+  if headers == true and auth then
+    headers = {
+      Authorization = "token " .. auth,
+      ["User-Agent"] = "Fingercomp's OpenComputers Gist Client https://github.com/OpenPrograms/Fingercomp-Programs/gist/"
+    }
+  end
   local response = ""
-  local req, reason = inet.request(url)
+  local req, reason = inet.request(url, nil, headers)
   if req == nil then
     return {}
   end
@@ -88,9 +97,15 @@ local function request(url)
   return gResponse[url]
 end
 
-local function post(url, data, noDecode, checkGitio)
+local function post(url, data, noDecode, checkGitio, headers)
+  if headers == true and auth then
+    headers = {
+      Authorization = "token " .. auth,
+      ["User-Agent"] = "Fingercomp's OpenComputers Gist Client https://github.com/OpenPrograms/Fingercomp-Programs/gist/" -- is that valid?
+    }
+  end
   local response = ""
-  local req, reason = inet.request(url, data)
+  local req, reason = inet.request(url, data, headers)
   if req == nil then
     return not noDecode and {} or nil
   end
@@ -139,8 +154,8 @@ local function isIDValid(id)
   else
     gitio = true
   end
-  local response = post(url, nil, gitio, true)
-  if not response and not gitio and not response.url and (not response.message or response.message == "Not Found") then
+  local response = post(url, nil, gitio, gitio, true)
+  if not response or (not gitio and not response.url and (not response.message or response.message == "Not Found") or not response and gitio) then
     return false
   elseif gitio and not response then
     return false
@@ -152,7 +167,7 @@ local function isIDValid(id)
 end
 
 local function getFileList(id)
-  local response = request(format{base=URLS.basic, id=id})
+  local response = request(format{base=URLS.basic, id=id}, true)
   local files = {}
   for k, v in pairs(response.files) do
     table.insert(files, k)
@@ -161,12 +176,12 @@ local function getFileList(id)
 end
 
 local function getFileInfo(id, filename)
-  local response = request(format{base=URLS.basic, id=id})
+  local response = request(format{base=URLS.basic, id=id}, true)
   return response.files[filename]
 end
 
 local function getFullResponse(id)
-  return request(format{base=URLS.basic, id=id})
+  return request(format{base=URLS.basic, id=id}, true)
 end
 
 local function shorten(url, code)
@@ -175,13 +190,16 @@ local function shorten(url, code)
 end
 
 local function help()
-  print("USAGE: gist [-p] [--P=mode] [--d=desc] [-sRqQlriG] [--f=filename] <id> [file]")
+  print("USAGE: gist [--t=oauth_token] [-p] [--u=gist] [--P=mode] [--d=desc] [-sRqQlriG] [--f=filename] <id> [file]")
   print("\t\tUPLOAD:")
   print(" -p\tUpload file(s)")
   print(" --P=mode or --public=mode\n\tSet public/secret. Possible options: s (secret), p (public)")
   print(" --d=description or --desc=description\n\tSet gist description")
+  print(" --u=gist or --update=gist\n\tUpdates gist (needs correct token to work)")
   print("\tSpecify file(s) as arguments: <path/to/file>=<gistfile>")
   print("\t\tDOWNLOAD/OTHER:")
+  print(" --t=oauth_token or --token=oauth_token\n\tUse the provided token. Increases limits for API operations. If uploading, posts the gist into the user's account.")
+  print(" -t\tPrompt for a token")
   print(" -s\tShorten the URL via Git.io. Also can be used when uploading files.")
   print(" -R\tShow URL to the raw file contents")
   print(" -q\tQuiet mode")
@@ -210,6 +228,25 @@ end
 if #args < 1 then
   help()
   return
+end
+
+do
+  local t = options.t or options.token
+  if t then
+    if t == true then
+      local input = term.read({pwchar="*"})
+      if input and type(input) == "string" then
+        options.t = text.trim(input)
+        t = options.t
+      end
+    end
+    if type(t) == "string" and t:len() == 40 and t:match("^" .. ("%x"):rep(40) .. "$") then
+      auth = options.t
+    else
+      smout("Incorrect token!", true)
+      return
+    end
+  end
 end
 
 if options.p then
@@ -251,19 +288,31 @@ if options.p then
     public = public,
     files = files
   }
-  local response = post(URLS.post, json:encode(post_tbl))
+  local posturl = URLS.post
+  if (options.u or options.update) and type(options.u) == "string" and auth then
+    local ID, shouldRecheck = isIDValid(options.u or options.update)
+    if not ID or (ID and shouldRecheck and not isIDValid(ID)) then
+      smout("This gist ID is not valid!", true)
+      return
+    end
+    posturl = posturl .. "/" .. ID
+  elseif options.u or options.update then
+    smout("Expected --u=GISTID and --token=OAUTHTOKEN", true)
+    return
+  end
+  local response = post(posturl, json:encode(post_tbl), nil, nil, true)
   if response.html_url then
     if not options.s then
-      print((public and "Public " or "Secret ") .. "gist created! " .. response.html_url)
+      print((public and "Public " or "Secret ") .. "gist " .. (posturl == URLS.post and "create" or "update") .. "d! " .. response.html_url)
     else
       local code = type(options.s) == "string" and options.s
       local short, reason = shorten(response.html_url, code)
       if not short or short == "" then
         reason = reason or "unknown"
         smout("Could not shorten url: " .. reason, true)
-        print("Full gist URL: " .. response.html_url)
+        print("Gist URL: " .. response.html_url)
       else
-        print((public and "Public " or "Secret ") .. "gist created! https://git.io/" .. short)
+        print((public and "Public " or "Secret ") .. "gist " .. (posturl == URLS.post and "create" or "update") .. "d! https://git.io/" .. short)
       end
     end
   else
