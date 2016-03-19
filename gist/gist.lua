@@ -235,7 +235,7 @@ do
   if t then
     if t == true then
       io.write("GitHub OAuth personal access token: ")
-      local input = term.read({pwchar="*"})
+      local input = term.read({pwchar="*"}, nil, nil, "*")
       if input and type(input) == "string" then
         options.t = text.trim(input)
         t = options.t
