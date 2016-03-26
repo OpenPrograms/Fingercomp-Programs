@@ -369,24 +369,28 @@ local coreHandlers = {
                   table.insert(msglines, msgline)
                 end
                 if #msglines == 1 then
-                  table.insert(toShow, 1, {nick = userPrefix .. nick, msg = msg})
+                  table.insert(toShow, {nick = userPrefix .. nick, msg = msg})
                 else
+                  local wrapped = {}
                   for i = #msglines, 1, -1 do
                     msg = msglines[i]
                     local nickText = i == 1 and (userPrefix .. nick) or ""
-                    table.insert(toShow, 1, {nick = nickText, msg = msg})
+                    table.insert(wrapped, {nick = nickText, msg = msg})
+                  end
+                  for wrI = #wrapped, 1, -1 do
+                    table.insert(toShow, wrapped[wrI])
                   end
                 end
               else
                 msg = notifications[notify[1]].pattern:format(table.unpack(notify[2]))
-                table.insert(toShow, 1, {nick = notifications[notify[1]].nick, msg = msg})
+                table.insert(toShow, {nick = notifications[notify[1]].nick, msg = msg})
               end
             end
           end
           
           -- 2.2. Show 'em all
-          for i = 1, 12, 1 do
-            local line = toShow[i]
+          for i = 12, 1, -1 do
+            local line = toShow[i + i - 12]
             if not line then break end
             local nick = surface.objects["chat.text.lines." .. i .. ".nick"]
             local msg = surface.objects["chat.text.lines." .. i .. ".msg"]
@@ -490,13 +494,6 @@ for eventName, hdlrs in pairs(coreHandlers) do
   end
 end
 
-for eventName, hdlrs in pairs(moduleHandlers) do
-  for name, hdlr in pairs(moduleHandlers) do
-    print("Starting module \"" .. eventName .. "\" listener [" .. name .. "]")
-    event.listen(eventName, hdlr)
-  end
-end
-
 print("init")
 event.push("chat_init", os.time())
 os.sleep(.5) -- Allow to process init
@@ -504,6 +501,13 @@ os.sleep(.5) -- Allow to process init
 print("load")
 event.push("chat_load", os.time())
 os.sleep(.5)
+
+for eventName, hdlrs in pairs(moduleHandlers) do
+  for name, hdlr in pairs(hdlrs) do
+    print("Starting module \"" .. eventName .. "\" listener [" .. name .. "]")
+    event.listen(eventName, hdlr)
+  end
+end
 
 print("start")
 event.push("chat_start", os.time())
