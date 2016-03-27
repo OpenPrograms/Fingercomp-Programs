@@ -221,8 +221,37 @@ local function sendPM(addressee, nick, msg)
   table.insert(pms[pmName], {date = date, nick, addressee, msg})
 end
 
-local moduleHandlers = {}
+local function joinN(chan, user)
+  join(chan, user)
+  sendNotifyChan(chan, "join_chan", {user, chan})
+end
 
+local function partN(chan, user)
+  part(chan, user)
+  sendNotifyChan(chan, "part_chan", {user, chan})
+end
+
+local function quitN(user)
+  for _, chan in pairs(users[user].channels) do
+    part(chan, user)
+    sendNotifyChan(chan, "quit", {user})
+  end
+end
+
+local function getActiveChannel(user)
+  local active = users[user].currentTab
+  local showTabUserdata = surfaces[user].objects["chat.text.chans." .. active].getUserdata()
+  if showTabUserdata and showTabUserdata.chan then
+    return showTabUserdata.chan
+  else
+    return false
+  end
+end
+
+local moduleHandlers = {}
+local commands = {}
+
+env.getActiveChannel = getActiveChannel
 env.createChannel = createChannel
 env.addUser = addUser
 env.join = join
@@ -230,12 +259,18 @@ env.part = part
 env.sendMsgChan = sendMsgChan
 env.sendNotifyChan = sendNotifyChan
 env.sendPM = sendPM
+env.joinN = joinN
+env.partN = partN
+env.quitN = quitN
 env.addObject = addObject
 env.bridge = bridge
 env.surfaces = surfaces
 env.users = users
 env.pms = pms
 env.channels = channels
+env.commands = commands
+env._MODULE = ""
+env._FILE = ""
 env.NORMAL = NORMAL
 env.VOICE = VOICE
 env.HALFOP = HALFOP
@@ -246,6 +281,9 @@ function env.addListener(eventName, name, func)
   checkArg(1, eventName, "string")
   checkArg(2, name, "string")
   checkArg(3, func, "function")
+  if moduleHandlers[eventName] and moduleHandlers[eventName][name] then
+    assert(false, "ununique name!")
+  end
   moduleHandlers[eventName] = moduleHandlers[eventName] or {}
   moduleHandlers[eventName][name] = func
 end
@@ -256,6 +294,25 @@ function env.delListener(eventName, name)
   if moduleHandlers[eventName][name] then
     event.ignore(eventName, moduleHandlers[eventName][name])
     moduleHandlers[eventName][name] = nil
+  end
+end
+
+function command(setEnv)
+  return function(args)
+    checkArg(1, args, "table")
+    local name, level, help, doc, aliases, func = args.name, args.level, args.help, args.doc, args.aliases, args.func
+    local errorPattern = "\"%s\": %s expected, %s given"
+    assert(type(name) == "string", errorPattern:format("name", "string", type(name)))
+    assert(type(level) == "number", errorPattern:format("level", "number", type(level)))
+    assert(isin({"nil", "string"}, type(help)), errorPattern:format("help", "string or nil", type(help)))
+    assert(isin({"nil", "string"}, type(doc)), errorPattern:format("doc", "string or nil", type(doc)))
+    assert(isin({"table", "nil"}, type(aliases)), errorPattern:format("aliases", "table or nil", type(aliases)))
+    assert(type(func) == "function", errorPattern:format("func", "function", type(func)))
+    commands[name] = {level = level, help = help, doc = doc, aliases = aliases, func = func}
+    local cmds = {name, table.unpack(aliases or {})}
+    for _, cmd in pairs(cmds) do
+      setEnv.addListener("chat_shash_cmd_" .. cmd, setEnv._MODULE .. ".commands." .. name .. "." .. cmd, func)
+    end
   end
 end
 
@@ -270,9 +327,9 @@ local coreHandlers = {
         user = user.name
         surfaces[user] = {surface = bridge.getSurfaceByName(user)}
         surfaces[user].objects = {}
-        addUser(user)
-        join("#main", user)
         drawChat(surfaces[user])
+        addUser(user)
+        joinN("#main", user)
       end
     end
   },
@@ -281,11 +338,11 @@ local coreHandlers = {
       surfaces[user] = {surface = bridge.getSurfaceByName(user)}
       surfaces[user].surface.clear()
       surfaces[user].objects = {}
+      drawChat(surfaces[user])
       if not users[user] then
         addUser(user)
       end
-      join("#main", user)
-      drawChat(surfaces[user])
+      joinN("#main", user)
     end
   },
   glasses_detach = {
@@ -293,9 +350,7 @@ local coreHandlers = {
       local _ = surfaces[user] and surfaces[user].surface and surfaces[user].surface.clear()
       surfaces[user] = nil
       if users[user] then
-        for _, chan in pairs(users[user].channels) do
-          part(chan, user)
-        end
+        quitN(user)
       end
     end
   },
@@ -325,6 +380,7 @@ local coreHandlers = {
                 textObj.setUserdata(userdata)
               end
               surface.objects["chat.poly.chans." .. i].setVisible(true)
+              surface.objects["chat.poly.chans." .. i .. ".active"].setVisible(false)
             end
           end
 
@@ -336,17 +392,17 @@ local coreHandlers = {
               local userdata = surface.objects["chat.text.chans." .. i].getUserdata() or {}
               userdata.chan = nil
               surface.objects["chat.text.chans." .. i].setUserdata(userdata)
+              surface.objects["chat.poly.chans." .. i .. ".active"].setVisible(false)
             end
           end
 
           -- 1.3. Select active tab
-          local active = userinfo.currentTab
-          surface.objects["chat.poly.chans." .. active .. ".active"].setVisible(true)
-          local showTabUserdata = surface.objects["chat.text.chans." .. active].getUserdata()
-          if not showTabUserdata or not showTabUserdata.chan then
+          local showTab = getActiveChannel(user)
+          if not showTab then
             goto nextUser
           end
-          local showTab = showTabUserdata.chan
+          local active = userinfo.currentTab
+          surface.objects["chat.poly.chans." .. active .. ".active"].setVisible(true)
 
 
           -- 2. MSG AREA
@@ -354,7 +410,8 @@ local coreHandlers = {
           local toShow = {}
           local lines = channels[showTab].lines
           local offset = userinfo.channelOffsets[showTab]
-          for pos, line in pairs(lines) do
+          for i = 1, #lines - offset + 1, 1 do
+            local line = lines[i]
             local date, nick, msg, rec, notify = line.date, nil, nil, nil, line.notify
             if not notify then
               nick, msg, rec = line[1], line[2], line[3]
@@ -390,7 +447,7 @@ local coreHandlers = {
           
           -- 2.2. Show 'em all
           for i = 12, 1, -1 do
-            local line = toShow[i + i - 12]
+            local line = toShow[#toShow + i - 12]
             if not line then break end
             local nick = surface.objects["chat.text.lines." .. i .. ".nick"]
             local msg = surface.objects["chat.text.lines." .. i .. ".msg"]
@@ -435,22 +492,27 @@ local coreHandlers = {
           end
 
 
-          -- 5. INPUT
-          local name = user:sub(1, 20)
-          if surface.objects["chat.text.input.nick"].getText() ~= name then
-            surface.objects["chat.text.input.nick"].setText(name)
-          end
-          local prompt = userinfo.prompt[showTab]
-          local inputLine = prompt[1]
-          local curPos, offset = prompt[2], prompt[3]
-          inputLine = unicode.sub(inputLine, offset, offset + 65)
-          inputLine = unicode.sub(inputLine, 1, curPos - 1) .. "§n" .. unicode.sub(inputLine, curPos, curPos) .. "§r" .. unicode.sub(inputLine, curPos + 1)
-          local input = surface.objects["chat.text.input.input"]
-          if input.getText() ~= inputLine then
-            input.setText(inputLine)
-          end
-
           ::nextUser::
+        end
+      end
+    end,
+    function(evt, time, tick)
+      for user, surface in pairs(surfaces) do
+        local showTab = getActiveChannel(user)
+        local userinfo = users[user]
+        local name = user:sub(1, 20)
+        if surface.objects["chat.text.input.nick"].getText() ~= name then
+          surface.objects["chat.text.input.nick"].setText(name)
+        end
+        local prompt = userinfo.prompt[showTab] or {"", 1, 1}
+        local inputLine = prompt[1] .. " "
+        local curPos, offset = prompt[2], prompt[3]
+        curPos = curPos - offset + 1
+        inputLine = unicode.sub(inputLine, offset, offset + 65)
+        inputLine = unicode.sub(inputLine, 1, curPos - 1) .. "§n" .. unicode.sub(inputLine, curPos, curPos) .. "§r" .. unicode.sub(inputLine, curPos + 1)
+        local input = surface.objects["chat.text.input.input"]
+        if input.getText() ~= inputLine then
+          input.setText(inputLine)
         end
       end
     end,
@@ -469,17 +531,24 @@ local coreHandlers = {
   chat_load = {
     function(evt, time)
       for file in fs.list(modulesPath) do
-        local chunk, reason = loadfile(fs.concat(modulesPath, file), nil, setmetatable(env, {__index = _G}))
-        if not chunk then
-          io.stderr:write("Failed to load module \"" .. file .. "\": " .. (reason or "no reason") .. "\n")
-        else
-          local success, reason = xpcall(chunk, function(exception)
-            return "Exception in module \"" .. file .. "\": " .. exception .. "!\n" .. debug.traceback() .. "\n"
-          end)
-          if not success then
-            io.stderr:write(reason)
+        if file:match("%.([^.]+)$") == "module" then
+          local module = file:match("^[^.]+")
+          local moduleEnv = setmetatable(env, {__index = _G})
+          moduleEnv._MODULE = module
+          moduleEnv._FILE = file
+          moduleEnv.command = command(moduleEnv)
+          local chunk, reason = loadfile(fs.concat(modulesPath, file), nil, moduleEnv)
+          if not chunk then
+            io.stderr:write("Failed to load module \"" .. file .. "\": " .. (reason or "no reason") .. "\n")
           else
-            event.push("chat_loaded_module", file, os.time())
+            local success, reason = xpcall(chunk, function(exception)
+              return "Exception in module \"" .. file .. "\": " .. exception .. "!\n" .. debug.traceback() .. "\n"
+            end)
+            if not success then
+              io.stderr:write(reason)
+            else
+              event.push("chat_loaded_module", file, os.time())
+            end
           end
         end
       end
@@ -521,7 +590,7 @@ end, math.huge)
 
 repeat
   local keyDownData = {event.pull("key_down")}
-until keyDownData[1]
+until keyDownData[1] == "key_down"
 
 print("stop")
 event.push("chat_stop", os.time())
