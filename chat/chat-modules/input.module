@@ -46,10 +46,10 @@ local function move(prompt, step)
   else
     prompt[2] = prompt[2] + step
   end
-  if prompt[2] - 100 < 1 then
+  if prompt[2] - 65 < 1 then
     prompt[3] = 1
   else
-    prompt[3] = prompt[2] - 100
+    prompt[3] = prompt[2] - 65
   end
 end
 

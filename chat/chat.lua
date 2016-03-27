@@ -72,7 +72,7 @@ end
 
 local surfaces = {}
 
-local NORMAL, VOICE, HALFOP, OP = 0, 1, 2, 3
+local NORMAL, VOICE, HALFOP, OP, ADMIN, SERVER = 0, 1, 2, 3, 4, 5
 
 local PREFIXES = {
   [0] = "",
@@ -86,10 +86,11 @@ local notifications = {
   part_chan = {pattern = "§6%s§f left %s", nick = "§4<--"},
   quit = {pattern = "§6%s§f quit the server", nick = "§4<--"},
   pm = {pattern = "§3%s§6 → §3%s§f: %s", nick = "§3--"},
-  topic = {pattern = "§6%s§f changed topic to: \"%s\"", nick = "§5*"}
+  topic = {pattern = "§6%s§f changed topic to: \"%s\"", nick = "§5**"},
+  mode = {pattern = "§6%s§f set modes [%s %s]", nick = "§5**"}
 }
 
-local pms = {}
+local modes = {}
 local users = {}
 local channels = {}
 
@@ -176,6 +177,7 @@ local function createChannel(chan, nick)
     topic = ""
   }
   table.insert(users[nick].channels, chan)
+  event.push("chat_event_createChannel", os.time(), chan, nick)
 end
 
 local function addUser(user)
@@ -197,7 +199,7 @@ local function join(chan, user)
   checkArg(2, user, "string")
   assert(chan:sub(1, 1) == "#", "not a channel")
   assert(users[user], "no such nickname")
-  assert(not isin(users[user].channels, chan), "alreay in the channel")
+  assert(not isin(users[user].channels, chan), "already in the channel")
   if not channels[chan] then
     createChannel(chan, user)
   else
@@ -252,6 +254,72 @@ local function sendPM(addressee, nick, msg)
   assert(users[addressee], "no such user")
   assert(users[nick], "no such nickname")
   sendNotifyChan("#main", "pm", {addressee, nick, msg}, {nick})
+  event.push("chat_event_pm", os.time(), addressee, nick, msg)
+end
+
+modes.o = function(chan, user, set, arg)
+  if not arg then return false end
+  assert(channels[chan].users[arg], "no such user")
+  assert(isin(cfg.admins, user) or cfg.server == user or channels[chan].users[user] and channels[chan].users[user] >= OP, "no permission")
+  local was = channels[chan].users[arg]
+  channels[chan].users[arg] = set and OP or NORMAL
+  if was ~= channels[chan].users[arg] then
+    return true
+  end
+end
+
+modes.h = function(chan, user, set, arg)
+  if not arg then return false end
+  assert(channels[chan].users[arg], "no such user")
+  assert(isin(cfg.admins, user) or cfg.server == user or channels[chan].users[user] and channels[chan].users[user] >= HALFOP, "no permission")
+  local was = channels[chan].users[arg]
+  channels[chan].users[arg] = set and HALFOP or NORMAL
+  if was ~= channels[chan].users[arg] then
+    return true
+  end
+end
+
+modes.v = function(chan, user, set, arg)
+  if not arg then return false end
+  assert(channels[chan].users[arg], "no such user")
+  assert(isin(cfg.admins, user) or cfg.server == user or channels[chan].users[user] and (channels[chan].users[user] > VOICE or channels[chan].users[user] == VOICE and user == arg), "no permission")
+  local was = channels[chan].users[arg]
+  channels[chan].users[arg] = set and VOICE or NORMAL
+  if was ~= channels[chan].users[arg] then
+    return true
+  end
+end
+
+modes.t = function(chan, user, set)
+  assert(not channels[chan].users[user] and (isin(cfg.admins, user) or cfg.server == user) or channels[chan].users[user] >= OP, "no permission")
+  if set and not isin(channels[chan].modes, "t") then
+    table.insert(channels[chan].modes, "t")
+  else
+    local _, pos = isin(channels[chan].modes, "t")
+    if pos then
+      table.remove(channels[chan].modes, pos)
+    else
+      return false
+    end
+  end
+  return true
+end
+
+local function setMode(chan, user, mode, arg)
+  checkArg(1, chan, "string")
+  checkArg(2, user, "string")
+  checkArg(3, mode, "string")
+  checkArg(4, arg, "string", "nil")
+  assert(channels[chan], "no such channel")
+  assert(mode:match("^[+-].$"), "wrong mode")
+  local set = mode:sub(1, 1) == "+"
+  mode = mode:sub(2)
+  assert(modes[mode], "unknown mode")
+  local success = modes[mode](chan, user, set, arg)
+  if success then
+    local modeStr = (set and "+" or "-") .. mode .. (arg and " " .. arg or "")
+    sendNotifyChan(chan, "mode", {user, chan, modeStr})
+  end
 end
 
 local function joinN(chan, user)
@@ -307,6 +375,8 @@ env.channels = channels
 env.commands = commands
 env.isin = isin
 env.cfg = cfg
+env.setMode = setMode
+env.modes = modes
 env._MODULE = ""
 env._FILE = ""
 env.NORMAL = NORMAL
@@ -405,6 +475,12 @@ local coreHandlers = {
         surfaces[user] = {surface = bridge.getSurfaceByName(user)}
         surfaces[user].objects = {}
         drawChat(surfaces[user])
+      end
+    end
+  },
+  chat_start = {
+    function(evt, time)
+      for user in pairs(surfaces) do
         addUser(user)
         joinN("#main", user)
       end
@@ -488,7 +564,7 @@ local coreHandlers = {
           local toShow = {}
           local lines = channels[showTab].lines
           local offset = userinfo.channelOffsets[showTab]
-          for i = 1, #lines - offset + 1, 1 do
+          for i = 1, #lines, 1 do
             local line = lines[i]
             local date, nick, msg, rec, notify = line.date, nil, nil, nil, line.notify
             if not notify then
@@ -505,7 +581,7 @@ local coreHandlers = {
                 msg = notifications[notify[1]].pattern:format(table.unpack(notify[2]))
                 name = notifications[notify[1]].nick
               end
-              local msglines = wrap(msg, 67)
+              local msglines = wrap(msg, 66)
               if #msglines == 1 then
                 table.insert(toShow, {nick = name, msg = msg})
               else
@@ -520,6 +596,9 @@ local coreHandlers = {
                 end
               end
             end
+          end
+          for i = #lines - offset + 2, #lines, 1 do
+            table.remove(toShow, #lines - offset + 2)
           end
           
           -- 2.2. Show 'em all
