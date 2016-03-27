@@ -83,8 +83,8 @@ local PREFIXES = {
 
 local notifications = {
   join_chan = {pattern = "§6%s§f joined %s", nick = "§2-->"},
-  part_chan = {pattern = "§6%s§f left %s", nick = "§4<--"},
-  quit = {pattern = "§6%s§f quit the server", nick = "§4<--"},
+  part_chan = {pattern = "§6%s§f left %s (%s)", nick = "§4<--"},
+  quit = {pattern = "§6%s§f quit the server (%s)", nick = "§4<--"},
   pm = {pattern = "§3%s§6 → §3%s§f: %s", nick = "§3--"},
   topic = {pattern = "§6%s§f changed topic to: \"%s\"", nick = "§5**"},
   mode = {pattern = "§6%s§f set modes [%s %s]", nick = "§5**"}
@@ -328,18 +328,20 @@ local function joinN(chan, user)
   event.push("chat_event_join", os.time(), chan, user)
 end
 
-local function partN(chan, user)
+local function partN(chan, user, reason)
+  reason = reason or ""
   part(chan, user)
-  sendNotifyChan(chan, "part_chan", {user, chan})
-  event.push("chat_event_part", os.time(), chan, user)
+  sendNotifyChan(chan, "part_chan", {user, chan, reason})
+  event.push("chat_event_part", os.time(), chan, user, reason)
 end
 
-local function quitN(user)
+local function quitN(user, reason)
+  reason = reason or ""
   for _, chan in pairs(users[user].channels) do
     part(chan, user)
-    sendNotifyChan(chan, "quit", {user})
+    sendNotifyChan(chan, "quit", {user, reason})
   end
-  event.push("chat_event_quit", os.time(), user)
+  event.push("chat_event_quit", os.time(), user, reason)
 end
 
 local function getActiveChannel(user)

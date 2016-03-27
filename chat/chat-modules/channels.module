@@ -25,10 +25,11 @@ command {
   name = "part",
   level = 0,
   help = "Leave a channel",
-  func = function(evt, chan, user, cmd, channel)
+  func = function(evt, chan, user, cmd, channel, msg)
+    msg = msg or ""
     if type(channel) == "string" and channel ~= "#main" then
       local _, was = isin(users[user].channels, channel)
-      local success, reason = pcall(partN, channel, user)
+      local success, reason = apcall(partN, channel, user, msg)
       if not success then
         sendPM(cfg.server, user, "Could not leave the channel: " .. reason)
       else
@@ -60,6 +61,7 @@ command {
         users[user].currentTab = tab
       else
         sendPM(cfg.server, user, "Wrong tab num")
+        return 1
       end
     elseif type(tab) == "string" then
       local exists, pos = isin(users[user].channels, tab)
@@ -67,6 +69,7 @@ command {
         users[user].currentTab = pos
       else
         sendPM(cfg.server, user, "No such channel")
+        return 1
       end
     else
       help(user, "tab")
@@ -82,17 +85,62 @@ command {
   name = "topic",
   level = 0,
   help = "Set channel's topic",
-  func = function(evt, chan, user, cmd, ...)
+  func = function(evt, chan, user, cmd, channel, ...)
     local topic = table.concat({...}, " ")
-    if not channels[chan] or not channels[chan].users[user] then
+    if channel:sub(1, 1) ~= "#" then
+      table.insert(topic, 1, channel)
+      channel = chan
+    end
+    if not channels[channel] or not channels[channel].users[user] then
       sendPM(cfg.server, user, "You are not in channel")
       return -1
     end
-    if not isin(channels[chan].modes, "t") or channels[chan].users[user] >= OP then
-      channels[chan].topic = topic
-      sendNotifyChan(chan, "topic", {user, topic})
+    if not isin(channels[channel].modes, "t") or channels[channel].users[user] >= OP then
+      channels[channel].topic = topic
+      sendNotifyChan(channel, "topic", {user, topic})
     else
       sendPM(cfg.server, user, "You are not allowed to do this")
+    end
+  end
+}
+
+command {
+  name = "kick",
+  level = HALFOP,
+  help = "Kick a user from channel",
+  func = function(evt, chan, user, cmd, channel, arg, msg)
+    if not channel then
+      help(user, "kick")
+      return -1
+    end
+    if channel:sub(1, 1) ~= "#" then
+      msg = arg
+      arg = channel
+      channel = chan
+    end
+    msg = msg or user
+    if not arg then
+      help(user, "kick")
+      return -1
+    end
+    if not users[arg] then
+      sendPM(cfg.server, user, "No such user")
+      return 1
+    end
+    if not channels[channel] or not channels[channel].users[user] then
+      sendPM(cfg.server, user, "You are not in the channel")
+      return 1
+    end
+    if channel == "#main" then
+      sendPM(cfg.server, user, "You can't kick the user from #main")
+      return 1
+    end
+    if isin(cfg.admins, arg) or cfg.server == arg then
+      sendPM(cfg.server, user, "You are not allowed to kick the admin")
+    end
+    local success, reason = apcall(partN, channel, arg, "Kicked by " .. user .. ": " .. msg)
+    if not success then
+      sendPM(cfg.server, user, "Could not kick a user: " .. reason)
     end
   end
 }
