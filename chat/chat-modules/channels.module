@@ -1,0 +1,100 @@
+command {
+  name = "join",
+  level = 0,
+  help = "Join a channel",
+  aliases = {"j"},
+  func = function(evt, chan, user, cmd, channel)
+    if type(channel) == "string" then
+      local success, reason = apcall(joinN, channel, user)
+      if not success then
+        sendPM(cfg.server, user, "Could not join the channel: " .. reason)
+      else
+        local _, pos = isin(users[user].channels, channel)
+        users[user].currentTab = pos
+        if #users[user].channels > 9 then
+          users[user].tabStart = #users[user].channels - 9
+        end
+      end
+    else
+      help(user, "join")
+    end
+  end
+}
+
+command {
+  name = "part",
+  level = 0,
+  help = "Leave a channel",
+  func = function(evt, chan, user, cmd, channel)
+    if type(channel) == "string" and channel ~= "#main" then
+      local _, was = isin(users[user].channels, channel)
+      local success, reason = pcall(partN, channel, user)
+      if not success then
+        sendPM(cfg.server, user, "Could not leave the channel: " .. reason)
+      else
+        if users[user].currentTab == was then
+          users[user].currentTab = users[user].currentTab - 1
+          users[user].startTab = users[user].currentTab - 9
+          if users[user].startTab < 1 then
+            users[user].startTab = 1
+          end
+        end
+      end
+    elseif channel == "#main" then
+      sendPM(cfg.server, user, "You can't leave #main!")
+    else
+      help(user, "part")
+    end
+  end
+}
+
+command {
+  name = "tab",
+  level = 0,
+  help = "Open tab",
+  aliases = {"t"},
+  func = function(evt, chan, user, cmd, tab)
+    if tonumber(tab) then
+      tab = tonumber(tab)
+      if tab > 0 and tab <= #users[user].channels then
+        users[user].currentTab = tab
+      else
+        sendPM(cfg.server, user, "Wrong tab num")
+      end
+    elseif type(tab) == "string" then
+      local exists, pos = isin(users[user].channels, tab)
+      if exists then
+        users[user].currentTab = pos
+      else
+        sendPM(cfg.server, user, "No such channel")
+      end
+    else
+      help(user, "tab")
+    end
+    users[user].startTab = users[user].currentTab - 9
+    if users[user].startTab < 1 then
+      users[user].startTab = 1
+    end
+  end
+}
+
+command {
+  name = "topic",
+  level = 0,
+  help = "Set channel's topic",
+  func = function(evt, chan, user, cmd, ...)
+    local topic = table.concat({...}, " ")
+    if not channels[chan] or not channels[chan].users[user] then
+      sendPM(cfg.server, user, "You are not in channel")
+      return -1
+    end
+    if not isin(channels[chan].modes, "t") or channels[chan].users[user] >= OP then
+      channels[chan].topic = topic
+      sendNotifyChan(chan, "topic", {user, topic})
+    else
+      sendPM(cfg.server, user, "You are not allowed to do this")
+    end
+  end
+}
+
+-- vim: autoindent expandtab tabstop=2 shiftwidth=2 syntax=lua :

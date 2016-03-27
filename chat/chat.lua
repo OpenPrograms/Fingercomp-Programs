@@ -8,6 +8,7 @@ local text = require("text")
 
 local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
+local config = "/etc/chat.json"
 
 local function reqcom(componentName, req, msg)
   if not com.isAvailable(componentName) then
@@ -40,7 +41,34 @@ local function reqcom(componentName, req, msg)
   return com[componentName]
 end
 
+if not fs.exists("/usr/lib/json.lua") then
+  local inet = reqcom("internet", true, "This program need an internet card to install json lib!")
+  if not fs.exists("/usr/lib") then
+    fs.makeDirectory("/usr/lib")
+  end
+  local request = inet.request("http://regex.info/code/JSON.lua")
+  local file = io.open("/usr/lib/json.lua", "w")
+  while true do
+    local chunk = request.read()
+    if not chunk then break end
+    file:write(chunk)
+  end
+  file:close()
+end
+
 local bridge = reqcom("openperipheral_bridge", true, "This program needs Openperipheral bridge to work!")
+
+local json = require("json")
+
+-- Let's load the config right here to be sure
+-- program can access it if I'd need it somewhere in program init
+local cfg = {}
+do
+  local f = io.open(config, "r")
+  local all = f:read("*a")
+  f:close()
+  cfg = json:decode(all)
+end
 
 local surfaces = {}
 
@@ -56,7 +84,9 @@ local PREFIXES = {
 local notifications = {
   join_chan = {pattern = "§6%s§f joined %s", nick = "§2-->"},
   part_chan = {pattern = "§6%s§f left %s", nick = "§4<--"},
-  quit = {pattern = "§6%s§f quit the server", nick = "§4<--"}
+  quit = {pattern = "§6%s§f quit the server", nick = "§4<--"},
+  pm = {pattern = "§3%s§6 → §3%s§f: %s", nick = "§3--"},
+  topic = {pattern = "§6%s§f changed topic to: \"%s\"", nick = "§5*"}
 }
 
 local pms = {}
@@ -70,6 +100,14 @@ local function isin(tbl, value)
     end
   end
   return false
+end
+
+local function wrap(line, width)
+  local result = {}
+  for i = 1, unicode.len(line), width do
+    table.insert(result, text.trim(unicode.sub(line, i, i + width - 1)))
+  end
+  return result
 end
 
 local function addObject(surface, name, func, ...)
@@ -213,22 +251,19 @@ local function sendPM(addressee, nick, msg)
   checkArg(3, msg, "string")
   assert(users[addressee], "no such user")
   assert(users[nick], "no such nickname")
-  local date = os.date("%Y-%m-%d %H:%M:%S")
-  local pmList = {addressee, nick}
-  table.sort(pmList)
-  local pmName = table.concat(pmList, "\0")
-  pms[pmName] = pms[pmName] or {members = {addressee, nick}}
-  table.insert(pms[pmName], {date = date, nick, addressee, msg})
+  sendNotifyChan("#main", "pm", {addressee, nick, msg}, {nick})
 end
 
 local function joinN(chan, user)
   join(chan, user)
   sendNotifyChan(chan, "join_chan", {user, chan})
+  event.push("chat_event_join", os.time(), chan, user)
 end
 
 local function partN(chan, user)
   part(chan, user)
   sendNotifyChan(chan, "part_chan", {user, chan})
+  event.push("chat_event_part", os.time(), chan, user)
 end
 
 local function quitN(user)
@@ -236,6 +271,7 @@ local function quitN(user)
     part(chan, user)
     sendNotifyChan(chan, "quit", {user})
   end
+  event.push("chat_event_quit", os.time(), user)
 end
 
 local function getActiveChannel(user)
@@ -269,6 +305,8 @@ env.users = users
 env.pms = pms
 env.channels = channels
 env.commands = commands
+env.isin = isin
+env.cfg = cfg
 env._MODULE = ""
 env._FILE = ""
 env.NORMAL = NORMAL
@@ -276,6 +314,19 @@ env.VOICE = VOICE
 env.HALFOP = HALFOP
 env.OP = OP
 env.PREFIXES = PREFIXES
+
+function env.apcall(func, ...)
+  local data = {pcall(func, ...)}
+  if data[1] then
+    return true, table.unpack(data, 2)
+  end
+  local reason = data[2]
+  reason = reason:match("^.+:%d+:%s(.+)$")
+  if reason then
+    return false, reason, table.unpack(data, 3)
+  end
+  return false, table.unpack(data, 2)
+end
 
 function env.addListener(eventName, name, func)
   checkArg(1, eventName, "string")
@@ -297,7 +348,25 @@ function env.delListener(eventName, name)
   end
 end
 
-function command(setEnv)
+local function cmdWrapper(cmdInfo)
+  return function(evt, chan, user, cmd, ...)
+    if cmdInfo.level <= OP then
+      if channels[chan].users[user] < cmdInfo.level then
+        sendPM(cfg.server, user, "You are not allowed to run this command")
+        return -2
+      end
+    else
+      if cmdInfo.level == SERVER and not cfg.server == user or
+         cmdInfo.level == ADMINS and (not isin(cfg.admins, user) or not cfg.servers == user) then
+        sendPM(cfg.server, user, "You are not allowed to run this command")
+        return -2
+      end
+    end
+    cmdInfo.func(evt, chan, user, cmd, ...)
+  end
+end
+
+local function command(setEnv)
   return function(args)
     checkArg(1, args, "table")
     local name, level, help, doc, aliases, func = args.name, args.level, args.help, args.doc, args.aliases, args.func
@@ -311,17 +380,25 @@ function command(setEnv)
     commands[name] = {level = level, help = help, doc = doc, aliases = aliases, func = func}
     local cmds = {name, table.unpack(aliases or {})}
     for _, cmd in pairs(cmds) do
-      setEnv.addListener("chat_shash_cmd_" .. cmd, setEnv._MODULE .. ".commands." .. name .. "." .. cmd, func)
+      env.addListener("chat_slash_cmd_" .. cmd, setEnv._MODULE .. ".commands." .. name .. "." .. cmd, cmdWrapper(commands[name]))
     end
   end
+end
+
+function env.help(user, cmd)
+  checkArg(1, user, "string")
+  checkArg(2, cmd, "string")
+  assert(users[user], "no such user")
+  assert(commands[cmd], "no such command")
+  sendPM(cfg.server, user, "Help (" .. cmd .. "): " .. (commands[cmd].help or ""))
 end
 
 local coreHandlers = {
   chat_init = {
     function(evt, time)
-      addUser("%SERVER")
-      join("#main", "%SERVER")
-      channels["#main"].users["%SERVER"] = OP
+      addUser(cfg.server)
+      join("#main", cfg.server)
+      channels["#main"].users[cfg.server] = OP
       bridge.clear()
       for _, user in pairs(bridge.getUsers()) do
         user = user.name
@@ -356,7 +433,7 @@ local coreHandlers = {
   },
   chat_update = {
     function(evt, time, tick)
-      if tick % 10 == 0 then
+      if tick % 5 == 0 then
         for user, surface in pairs(surfaces) do
           local userinfo = users[user]
           if not userinfo then goto nextUser end
@@ -392,6 +469,7 @@ local coreHandlers = {
               local userdata = surface.objects["chat.text.chans." .. i].getUserdata() or {}
               userdata.chan = nil
               surface.objects["chat.text.chans." .. i].setUserdata(userdata)
+              surface.objects["chat.text.chans." .. i].setText("")
               surface.objects["chat.poly.chans." .. i .. ".active"].setVisible(false)
             end
           end
@@ -419,28 +497,27 @@ local coreHandlers = {
               rec = line[1]
             end
             if rec == "all" or isin(rec, user) then
+              local name = ""
               if not notify then
                 local userPrefix = PREFIXES[channels[showTab].users[nick] or NORMAL]
-                local msglines = {}
-                for msgline in text.wrappedLines(msg, 67, 67) do
-                  table.insert(msglines, msgline)
-                end
-                if #msglines == 1 then
-                  table.insert(toShow, {nick = userPrefix .. nick, msg = msg})
-                else
-                  local wrapped = {}
-                  for i = #msglines, 1, -1 do
-                    msg = msglines[i]
-                    local nickText = i == 1 and (userPrefix .. nick) or ""
-                    table.insert(wrapped, {nick = nickText, msg = msg})
-                  end
-                  for wrI = #wrapped, 1, -1 do
-                    table.insert(toShow, wrapped[wrI])
-                  end
-                end
+                name = (userPrefix or "") .. nick
               else
                 msg = notifications[notify[1]].pattern:format(table.unpack(notify[2]))
-                table.insert(toShow, {nick = notifications[notify[1]].nick, msg = msg})
+                name = notifications[notify[1]].nick
+              end
+              local msglines = wrap(msg, 67)
+              if #msglines == 1 then
+                table.insert(toShow, {nick = name, msg = msg})
+              else
+                local wrapped = {}
+                for i = #msglines, 1, -1 do
+                  local nickText = i == 1 and name or ""
+                  msg = msglines[i]
+                  table.insert(wrapped, {nick = nickText, msg = msg})
+                end
+                for wrI = #wrapped, 1, -1 do
+                  table.insert(toShow, wrapped[wrI])
+                end
               end
             end
           end
@@ -448,13 +525,13 @@ local coreHandlers = {
           -- 2.2. Show 'em all
           for i = 12, 1, -1 do
             local line = toShow[#toShow + i - 12]
-            if not line then break end
+            line = line or {}
+            line.nick = line.nick or ""
+            line.msg = line.msg or ""
             local nick = surface.objects["chat.text.lines." .. i .. ".nick"]
             local msg = surface.objects["chat.text.lines." .. i .. ".msg"]
             if #line.nick > 20 then
               line.nick = line.nick:sub(1, 19) .. "…"
-            end if #line.msg > 67 then -- Should not ever happen, just to be on the safe side
-              line.msg = line.msg:sub(1, 67)
             end
             if nick.getText() ~= line.nick then
               nick.setText(line.nick)
@@ -517,9 +594,7 @@ local coreHandlers = {
       end
     end,
     function(evt, time, tick)
-      if (tick + 5) % 10 == 0 then
-        bridge.sync()
-      end
+      bridge.sync()
     end
   },
   chat_stop = {
