@@ -126,17 +126,26 @@ local function subLine(line, p1, p2)
     if prev and (prev .. sym):match(codePtn) then
       code = prev .. sym
     elseif not (sym .. nxt):match(codePtn) then
-      result[#result] = code .. sym
+      table.insert(result, code .. sym)
       code = ""
     end
+  end
+  for i = 1, p1 - 1, 1 do
+    table.remove(result, 1)
+  end
+  for i = p2 + 1, #result, 1 do
+    table.remove(result)
   end
   return table.concat(result, "")
 end
 
 local function wrap(line, width)
   local result = {}
-  for i = 1, unicode.len(line), width do
-    table.insert(result, text.trim(unicode.sub(line, i, i + width - 1)))
+  for i = 1, getLineLen(line), width do
+    local wrappedLine = text.trim(subLine(line, i, i + width - 1))
+    if wrappedLine ~= "" then
+      table.insert(result, wrappedLine)
+    end
   end
   return result
 end

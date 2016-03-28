@@ -27,16 +27,19 @@ command {
   help = "Leave a channel",
   func = function(evt, chan, user, cmd, channel, msg)
     msg = msg or ""
-    if type(channel) == "string" then
+    if isin({"string", "nil"}, type(channel)) then
       if tonumber(channel) then
         local tn = tonumber(channel)
         channel = users[user].channels[tn]
         if not channel then
           sendPM(user, cfg.server, "Wrong tab")
         end
+      else
+        channel = chan
       end
       if channel == "#main" then
         sendPM(cfg.server, user, "You can't leave #main!")
+        return -1
       end
       local _, was = isin(users[user].channels, channel)
       local success, reason = apcall(partN, channel, user, msg)
