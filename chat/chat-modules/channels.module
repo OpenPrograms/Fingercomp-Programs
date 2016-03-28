@@ -1,6 +1,6 @@
 command {
   name = "join",
-  level = 0,
+  level = NORMAL,
   help = "Join a channel",
   aliases = {"j"},
   func = function(evt, chan, user, cmd, channel)
@@ -23,11 +23,21 @@ command {
 
 command {
   name = "part",
-  level = 0,
+  level = NORMAL,
   help = "Leave a channel",
   func = function(evt, chan, user, cmd, channel, msg)
     msg = msg or ""
-    if type(channel) == "string" and channel ~= "#main" then
+    if type(channel) == "string" then
+      if tonumber(channel) then
+        local tn = tonumber(channel)
+        channel = users[user].channels[tn]
+        if not channel then
+          sendPM(user, cfg.server, "Wrong tab")
+        end
+      end
+      if channel == "#main" then
+        sendPM(cfg.server, user, "You can't leave #main!")
+      end
       local _, was = isin(users[user].channels, channel)
       local success, reason = apcall(partN, channel, user, msg)
       if not success then
@@ -41,8 +51,6 @@ command {
           end
         end
       end
-    elseif channel == "#main" then
-      sendPM(cfg.server, user, "You can't leave #main!")
     else
       help(user, "part")
     end
@@ -51,7 +59,7 @@ command {
 
 command {
   name = "tab",
-  level = 0,
+  level = NORMAL,
   help = "Open tab",
   aliases = {"t"},
   func = function(evt, chan, user, cmd, tab)
@@ -83,19 +91,20 @@ command {
 
 command {
   name = "topic",
-  level = 0,
+  level = NORMAL,
   help = "Set channel's topic",
   func = function(evt, chan, user, cmd, channel, ...)
     local topic = table.concat({...}, " ")
+    channel = channel or ""
     if channel:sub(1, 1) ~= "#" then
-      table.insert(topic, 1, channel)
+      topic = channel .. (topic and topic ~= "" and " " .. topic or "")
       channel = chan
     end
     if not channels[channel] or not channels[channel].users[user] then
       sendPM(cfg.server, user, "You are not in channel")
       return -1
     end
-    if not isin(channels[channel].modes, "t") or channels[channel].users[user] >= OP then
+    if not isin(channels[channel].modes, "t") or checkLevel(chan, user, {HALFOP, OP}, true) then
       channels[channel].topic = topic
       sendNotifyChan(channel, "topic", {user, topic})
     else

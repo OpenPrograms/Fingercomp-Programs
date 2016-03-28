@@ -1,0 +1,25 @@
+-- Toggle chat visibility
+
+command {
+  name = "toggle",
+  level = NORMAL,
+  help = "Toggles chat visibility",
+  func = function(evt, chan, user, cmd)
+    users[user].shown = not users[user].shown
+    for _, obj in pairs(surfaces[user].surface.getAllObjects()) do
+      local userdata = obj.getUserdata() or {}
+      if not users[user].shown then
+        userdata.visible = obj.getVisible()
+        obj.setUserdata(userdata)
+        obj.setVisible(false)
+      else
+        local visible = userdata.visible
+        userdata.visible = nil
+        obj.setUserdata(userdata)
+        obj.setVisible(visible)
+      end
+    end
+  end
+}  
+
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :

@@ -13,7 +13,6 @@ addListener("chat_event_part", "admin.event.onUserPart", function(evt, time, cha
 end)
 
 addListener("chat_event_join", "admin.event.onUserJoin", function(evt, time, chan, user)
-  print(evt, time, chan, user)
   if isin(cfg.admins, user) or cfg.server == user then
     setMode(chan, cfg.server, "+o", user)
   end
@@ -21,7 +20,7 @@ end)
 
 command {
   name = "mode",
-  level = 0,
+  level = NORMAL,
   help = "Sets channel's modes",
   func = function(evt, chan, user, cmd, channel, mode, arg)
     if not mode then

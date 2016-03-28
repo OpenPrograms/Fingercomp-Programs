@@ -72,13 +72,18 @@ end
 
 local surfaces = {}
 
-local NORMAL, VOICE, HALFOP, OP, ADMIN, SERVER = 0, 1, 2, 3, 4, 5
+local NORMAL  = 0x0
+local VOICE   = 0x1
+local HALFOP  = 0x2
+local OP      = 0x4
+local ADMIN   = 0x8
+local SERVER  = 0x10
 
 local PREFIXES = {
-  [0] = "",
-  "§e+§f",
-  "§2!§f",
-  "§a@§f"
+  [NORMAL] = "",
+  [VOICE] = "§e+§f",
+  [HALFOP] = "§2!§f",
+  [OP] = "§a@§f"
 }
 
 local notifications = {
@@ -94,6 +99,8 @@ local modes = {}
 local users = {}
 local channels = {}
 
+local codePtn = "§[%xoklmn]"
+
 local function isin(tbl, value)
   for k, v in pairs(tbl) do
     if v == value then
@@ -103,12 +110,65 @@ local function isin(tbl, value)
   return false
 end
 
+local function stripCodes(line)
+  return line:gsub(codePtn, "")
+end
+
+local function getLineLen(line)
+  return unicode.len(stripCodes(line))
+end
+
+local function subLine(line, p1, p2)
+  local result = {}
+  local code = ""
+  for i = 1, unicode.len(line), 1 do
+    local prev, sym, nxt = unicode.sub(line, i - 1, i - 1), unicode.sub(line, i, i), unicode.sub(line, i + 1, i + 1)
+    if prev and (prev .. sym):match(codePtn) then
+      code = prev .. sym
+    elseif not (sym .. nxt):match(codePtn) then
+      result[#result] = code .. sym
+      code = ""
+    end
+  end
+  return table.concat(result, "")
+end
+
 local function wrap(line, width)
   local result = {}
   for i = 1, unicode.len(line), width do
     table.insert(result, text.trim(unicode.sub(line, i, i + width - 1)))
   end
   return result
+end
+
+local function getLevel(chan, user)
+  local level = NORMAL
+  if not users[user] then return level end
+  if cfg.server == user then
+    level = level + SERVER
+  end
+  if isin(cfg.admins, user) then
+    level = level + ADMIN
+  end
+  if not channels[chan] or not channels[chan].users[user] then
+    return level
+  end
+  return level + channels[chan].users[user]
+end
+
+local function checkLevel(chan, user, levels, any)
+  local proceed = true
+  local userLevel = getLevel(chan, user)
+  for _, level in pairs(levels) do
+    if userLevel & level == level then
+      if any then
+        return true
+      end
+    else
+      proceed = false
+    end
+  end
+  return proceed
 end
 
 local function addObject(surface, name, func, ...)
@@ -143,21 +203,20 @@ local function drawChat(surface)
     addObject(surface, "chat.poly.chans." .. i, "addPolygon", 0x105888, .8, {x=start, y=45}, {x=start, y=37}, {x=start+2, y=35}, {x=start+38, y=35}, {x=start+40, y=37}, {x=start+40, y=45}).setVisible(false)
     addObject(surface, "chat.poly.chans." .. i .. ".active", "addPolygon", 0x101010, .8, {x=start, y=37}, {x=start, y=34}, {x=start+2, y=32}, {x=start+38, y=32}, {x=start+40, y=34}, {x=start+40, y=37}, {x=start+38, y=35}, {x=start+2, y=35}).setVisible(false)
     local chanText = addObject(surface, "chat.text.chans." .. i, "addText", start+2, 37, "", 0xffffff)
-    chanText.setScale(.75)
   end
-  addObject(surface, "chat.text.userlist", "addText", 412, 37, "Users:", 0x20afff).setScale(.75)
+  addObject(surface, "chat.text.userlist", "addText", 412, 37, "Users:", 0x20afff)
   for i = 1, 14 do
     local start = (i - 1) * 10 + 47
-    addObject(surface, "chat.text.users." .. i, "addText", 412, start, "", 0xffffff).setScale(.75)
+    addObject(surface, "chat.text.users." .. i, "addText", 412, start, "", 0xffffff)
   end
   for i = 1, 12 do
     local start = (i - 1) * 10 + 57
-    addObject(surface, "chat.text.lines." .. i .. ".nick", "addText", 7, start, "", 0xffffff).setScale(.75)
-    addObject(surface, "chat.text.lines." .. i .. ".msg", "addText", 107, start, "", 0xffffff).setScale(.75)
+    addObject(surface, "chat.text.lines." .. i .. ".nick", "addText", 7, start, "", 0xffffff)
+    addObject(surface, "chat.text.lines." .. i .. ".msg", "addText", 107, start, "", 0xffffff)
   end
-  addObject(surface, "chat.text.input.nick", "addText", 7, 177, "", 0xffffff).setScale(.75)
-  addObject(surface, "chat.text.input.input", "addText", 107, 177, "", 0xd3d3d3).setScale(.75)
-  addObject(surface, "chat.text.topic", "addText", 7, 47, "", 0xffffff).setScale(.75)
+  addObject(surface, "chat.text.input.nick", "addText", 7, 177, "", 0xffffff)
+  addObject(surface, "chat.text.input.input", "addText", 107, 177, "", 0xd3d3d3)
+  addObject(surface, "chat.text.topic", "addText", 7, 47, "", 0xffffff)
 end
 
 local function createChannel(chan, nick)
@@ -190,6 +249,7 @@ local function addUser(user)
     history = {},
     tabStart = 1,
     currentTab = 1,
+    shown = true,
     channelOffsets = {}
   }
 end
@@ -231,7 +291,7 @@ local function sendMsgChan(chan, nick, msg, rec)
   assert(users[nick], "no such nickname")
   local date = os.date("%Y-%m-%d %H:%M:%S")
   rec = rec or "all"
-  table.insert(channels[chan].lines, {date = date, nick, msg, rec})
+  table.insert(channels[chan].lines, {date = date, level = channels[chan].users[nick], nick, msg, rec})
 end
 
 local function sendNotifyChan(chan, notify, parts, rec)
@@ -260,7 +320,7 @@ end
 modes.o = function(chan, user, set, arg)
   if not arg then return false end
   assert(channels[chan].users[arg], "no such user")
-  assert(isin(cfg.admins, user) or cfg.server == user or channels[chan].users[user] and channels[chan].users[user] >= OP, "no permission")
+  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true), "no permission")
   local was = channels[chan].users[arg]
   channels[chan].users[arg] = set and OP or NORMAL
   if was ~= channels[chan].users[arg] then
@@ -271,7 +331,7 @@ end
 modes.h = function(chan, user, set, arg)
   if not arg then return false end
   assert(channels[chan].users[arg], "no such user")
-  assert(isin(cfg.admins, user) or cfg.server == user or channels[chan].users[user] and channels[chan].users[user] >= HALFOP, "no permission")
+  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true) or checkLevel(chan, user, {HALFOP}, true) and user == arg, "no permission")
   local was = channels[chan].users[arg]
   channels[chan].users[arg] = set and HALFOP or NORMAL
   if was ~= channels[chan].users[arg] then
@@ -282,7 +342,7 @@ end
 modes.v = function(chan, user, set, arg)
   if not arg then return false end
   assert(channels[chan].users[arg], "no such user")
-  assert(isin(cfg.admins, user) or cfg.server == user or channels[chan].users[user] and (channels[chan].users[user] > VOICE or channels[chan].users[user] == VOICE and user == arg), "no permission")
+  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true) or checkLevel(chan, user, {VOICE, HALFOP}, true) and user == arg)
   local was = channels[chan].users[arg]
   channels[chan].users[arg] = set and VOICE or NORMAL
   if was ~= channels[chan].users[arg] then
@@ -291,7 +351,7 @@ modes.v = function(chan, user, set, arg)
 end
 
 modes.t = function(chan, user, set)
-  assert(not channels[chan].users[user] and (isin(cfg.admins, user) or cfg.server == user) or channels[chan].users[user] >= OP, "no permission")
+  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true), "no permission")
   if set and not isin(channels[chan].modes, "t") then
     table.insert(channels[chan].modes, "t")
   else
@@ -379,12 +439,16 @@ env.isin = isin
 env.cfg = cfg
 env.setMode = setMode
 env.modes = modes
+env.getLevel = getLevel
+env.checkLevel = checkLevel
 env._MODULE = ""
 env._FILE = ""
 env.NORMAL = NORMAL
 env.VOICE = VOICE
 env.HALFOP = HALFOP
 env.OP = OP
+env.ADMIN = ADMIN
+env.SERVER = SERVER
 env.PREFIXES = PREFIXES
 
 function env.apcall(func, ...)
@@ -422,19 +486,11 @@ end
 
 local function cmdWrapper(cmdInfo)
   return function(evt, chan, user, cmd, ...)
-    if cmdInfo.level <= OP then
-      if channels[chan].users[user] < cmdInfo.level then
-        sendPM(cfg.server, user, "You are not allowed to run this command")
-        return -2
-      end
+    if checkLevel(chan, user, cmdInfo.level, true) then
+      cmdInfo.func(evt, chan, user, cmd, ...)
     else
-      if cmdInfo.level == SERVER and not cfg.server == user or
-         cmdInfo.level == ADMINS and (not isin(cfg.admins, user) or not cfg.servers == user) then
-        sendPM(cfg.server, user, "You are not allowed to run this command")
-        return -2
-      end
+      sendPM(user, cfg.server, "no permission")
     end
-    cmdInfo.func(evt, chan, user, cmd, ...)
   end
 end
 
@@ -444,11 +500,20 @@ local function command(setEnv)
     local name, level, help, doc, aliases, func = args.name, args.level, args.help, args.doc, args.aliases, args.func
     local errorPattern = "\"%s\": %s expected, %s given"
     assert(type(name) == "string", errorPattern:format("name", "string", type(name)))
-    assert(type(level) == "number", errorPattern:format("level", "number", type(level)))
+    assert(isin({"table", "number"}, type(level)), errorPattern:format("level", "table or number", type(level)))
     assert(isin({"nil", "string"}, type(help)), errorPattern:format("help", "string or nil", type(help)))
     assert(isin({"nil", "string"}, type(doc)), errorPattern:format("doc", "string or nil", type(doc)))
     assert(isin({"table", "nil"}, type(aliases)), errorPattern:format("aliases", "table or nil", type(aliases)))
     assert(type(func) == "function", errorPattern:format("func", "function", type(func)))
+    if type(level) == "number" then
+      local levels = {NORMAL, VOICE, HALFOP, OP, ADMIN, SERVER}
+      local _, pos = isin(levels, level)
+      assert(pos, "wrong level")
+      for i = 1, pos - 1, 1 do
+        table.remove(levels, 1)
+      end
+      level = levels
+    end
     commands[name] = {level = level, help = help, doc = doc, aliases = aliases, func = func}
     local cmds = {name, table.unpack(aliases or {})}
     for _, cmd in pairs(cmds) do
@@ -515,6 +580,7 @@ local coreHandlers = {
         for user, surface in pairs(surfaces) do
           local userinfo = users[user]
           if not userinfo then goto nextUser end
+          if not userinfo.shown then goto nextUser end
           
           -- 1. TABS
           -- 1.1. Set tabs
@@ -522,8 +588,8 @@ local coreHandlers = {
           chans = table.pack(table.unpack(chans, userinfo.tabStart, userinfo.tabStart + 10))
           for i, chan in pairs(chans) do
             if i ~= "n" then
-              if #chan > 11 then
-                chanLabel = chan:sub(1, 10) .. "…"
+              if #chan > 6 then
+                chanLabel = chan:sub(1, 5) .. "…"
               else
                 chanLabel = chan
               end
@@ -577,13 +643,13 @@ local coreHandlers = {
             if rec == "all" or isin(rec, user) then
               local name = ""
               if not notify then
-                local userPrefix = PREFIXES[channels[showTab].users[nick] or NORMAL]
+                local userPrefix = PREFIXES[line.level or NORMAL]
                 name = (userPrefix or "") .. nick
               else
                 msg = notifications[notify[1]].pattern:format(table.unpack(notify[2]))
                 name = notifications[notify[1]].nick
               end
-              local msglines = wrap(msg, 66)
+              local msglines = wrap(msg, 49)
               if #msglines == 1 then
                 table.insert(toShow, {nick = name, msg = msg})
               else
@@ -611,8 +677,8 @@ local coreHandlers = {
             line.msg = line.msg or ""
             local nick = surface.objects["chat.text.lines." .. i .. ".nick"]
             local msg = surface.objects["chat.text.lines." .. i .. ".msg"]
-            if #line.nick > 20 then
-              line.nick = line.nick:sub(1, 19) .. "…"
+            if getLineLen(line.nick) > 16 then
+              line.nick = subLine(line.nick, 1, 15) .. "…"
             end
             if nick.getText() ~= line.nick then
               nick.setText(line.nick)
@@ -624,8 +690,8 @@ local coreHandlers = {
 
           -- 3. TOPIC
           local topic = channels[showTab].topic
-          if unicode.len(topic) > 100 then
-            topic = unicode.sub(topic, 1, 99) .. "…"
+          if getLineLen(topic) > 66 then
+            topic = subLine(topic, 1, 65) .. "…"
           end
           if surface.objects["chat.text.topic"].getText() ~= topic then
             surface.objects["chat.text.topic"].setText(topic)
@@ -638,6 +704,9 @@ local coreHandlers = {
           for nick, prefix in pairs(users) do
             if i > 14 then break end
             local name = PREFIXES[prefix] .. nick
+            if getLineLen(name) > 16 then
+              name = subLine(name)
+            end
             if surface.objects["chat.text.users." .. i].getText() ~= name then
               surface.objects["chat.text.users." .. i].setText(name)
             end
@@ -656,9 +725,11 @@ local coreHandlers = {
     end,
     function(evt, time, tick)
       for user, surface in pairs(surfaces) do
-        local showTab = getActiveChannel(user)
         local userinfo = users[user]
-        local name = user:sub(1, 20)
+        if not userinfo then goto nextInputUser end
+        local showTab = getActiveChannel(user)
+        if not showTab then goto nextInputUser end
+        local name = unicode.sub(user, 1, 16)
         if surface.objects["chat.text.input.nick"].getText() ~= name then
           surface.objects["chat.text.input.nick"].setText(name)
         end
@@ -666,12 +737,14 @@ local coreHandlers = {
         local inputLine = prompt[1] .. " "
         local curPos, offset = prompt[2], prompt[3]
         curPos = curPos - offset + 1
-        inputLine = unicode.sub(inputLine, offset, offset + 65)
+        inputLine = unicode.sub(inputLine, offset, offset + 48)
         inputLine = unicode.sub(inputLine, 1, curPos - 1) .. "§n" .. unicode.sub(inputLine, curPos, curPos) .. "§r" .. unicode.sub(inputLine, curPos + 1)
         local input = surface.objects["chat.text.input.input"]
         if input.getText() ~= inputLine then
           input.setText(inputLine)
         end
+
+        ::nextInputUser::
       end
     end,
     function(evt, time, tick)

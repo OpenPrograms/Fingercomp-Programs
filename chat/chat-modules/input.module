@@ -9,7 +9,7 @@ local function typeLine(evt, addr, user, uuid, msg)
     if chan then
       if msg:sub(1, 1) ~= "/" then
         sendMsgChan(chan, user, msg)
-      elseif msg:sub(1, 3):match("^//[^/]") then
+      elseif msg:sub(1, 3):match("^//") then
         sendMsgChan(chan, user, msg:sub(2, -1))
       else
         local args = {}
@@ -46,10 +46,10 @@ local function move(prompt, step)
   else
     prompt[2] = prompt[2] + step
   end
-  if prompt[2] - 65 < 1 then
+  if prompt[2] - 48 < 1 then
     prompt[3] = 1
   else
-    prompt[3] = prompt[2] - 65
+    prompt[3] = prompt[2] - 48
   end
 end
 
@@ -112,7 +112,7 @@ end)
 
 command {
   name = "page",
-  level = 0,
+  level = NORMAL,
   help = "Go up or down by specified amount of lines",
   aliases = {"pg"},
   func = function(evt, chan, user, cmd, pages)
