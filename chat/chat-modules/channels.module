@@ -37,7 +37,7 @@ command {
       else
         channel = chan
       end
-      if channel == "#main" then
+      if channel == cfg.main_channel then
         sendPM(cfg.server, user, "You can't leave #main!")
         return -1
       end
@@ -143,7 +143,7 @@ command {
       sendPM(cfg.server, user, "You are not in the channel")
       return 1
     end
-    if channel == "#main" then
+    if channel == cfg.main_channel then
       sendPM(cfg.server, user, "You can't kick the user from #main")
       return 1
     end

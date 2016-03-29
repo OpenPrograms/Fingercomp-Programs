@@ -7,7 +7,7 @@ addListener("chat_event_part", "admin.event.onUserPart", function(evt, time, cha
   for k, _ in pairs(channels[chan].users) do
     table.insert(users, k)
   end
-  if not users[1] and chan ~= "#main" then
+  if not users[1] and chan ~= cfg.main_channel then
     channels[chan] = nil -- ba-DOOOM
   end
 end)

@@ -82,7 +82,7 @@ local SERVER  = 0x10
 local PREFIXES = {
   [NORMAL] = "",
   [VOICE] = "§e+§f",
-  [HALFOP] = "§2!§f",
+  [HALFOP] = "§2%§f",
   [OP] = "§a@§f"
 }
 
@@ -180,6 +180,19 @@ local function checkLevel(chan, user, levels, any)
   return proceed
 end
 
+function env.apcall(func, ...)
+  local data = {pcall(func, ...)}
+  if data[1] then
+    return true, table.unpack(data, 2)
+  end
+  local reason = data[2]
+  reason = reason:match("^.+:%d+:%s(.+)$")
+  if reason then
+    return false, reason, table.unpack(data, 3)
+  end
+  return false, table.unpack(data, 2)
+end
+
 local function addObject(surface, name, func, ...)
   checkArg(1, surface, "table")
   checkArg(2, name, "string", "nil")
@@ -242,7 +255,9 @@ local function createChannel(chan, nick)
     },
     lines = {},
     modes = {},
-    topic = ""
+    topic = "",
+    banned = {},
+    exempt = {}
   }
   table.insert(users[nick].channels, chan)
   event.push("chat_event_createChannel", os.time(), chan, nick)
@@ -322,7 +337,7 @@ local function sendPM(addressee, nick, msg)
   checkArg(3, msg, "string")
   assert(users[addressee], "no such user")
   assert(users[nick], "no such nickname")
-  sendNotifyChan("#main", "pm", {addressee, nick, msg}, {nick})
+  sendNotifyChan(cfg.main_channel, "pm", {addressee, nick, msg}, {nick})
   event.push("chat_event_pm", os.time(), addressee, nick, msg)
 end
 
@@ -359,20 +374,29 @@ modes.v = function(chan, user, set, arg)
   end
 end
 
-modes.t = function(chan, user, set)
-  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true), "no permission")
-  if set and not isin(channels[chan].modes, "t") then
-    table.insert(channels[chan].modes, "t")
-  else
-    local _, pos = isin(channels[chan].modes, "t")
-    if pos then
-      table.remove(channels[chan].modes, pos)
+local function togglableMode(mode, level, soft)
+  checkArg(1, mode, "string")
+  checkArg(2, level, "table")
+  checkArg(3, soft, "boolean", "nil")
+  soft = soft or true
+  return function(chan, user, set, arg)
+    assert(checkLevel(chan, user, level, soft), "no permission")
+    if set and not isin(channels[chan].modes, mode) then
+      table.insert(channels[chan].modes, mode)
     else
-      return false
+      local _, pos = isin(channels[chan].modes, mode)
+      if pos then
+        table.remove(channels[chan].modes, pos)
+      else
+        return false
+      end
     end
-  end
-  return true
+   return true
+ end
 end
+
+modes.t = togglableMode("t", {OP, ADMIN, SERVER})
+modes.m = togglableMode("m", {HALFOP, OP, ADMIN, SERVER})
 
 local function setMode(chan, user, mode, arg)
   checkArg(1, chan, "string")
@@ -413,6 +437,21 @@ local function quitN(user, reason)
   event.push("chat_event_quit", os.time(), user, reason)
 end
 
+local function sendMsgChanN(chan, user, msg)
+  if isin(channels[chan].modes, "m") and not checkLevel(chan, user, {VOICE, HALFOP, OP}, true) then
+    sendPM(user, cfg.server, "The channel is moderated")
+    return -1
+  end
+  if isin(channels[chan].banned, user) and not isin(channels[chan].exempt, user) and not checkLevel(chan, user, {HALFOP, OP, ADMIN, SERVER}) then
+    sendPM(user, cfg.server, "You are banned from the channel")
+    return -1
+  end
+  local success, reason = env.apcall(sendMsgChan, chan, user, msg)
+  if not success then
+    sendPM(user, cfg.server, "Could not send message: " .. reason)
+  end
+end
+
 local function getActiveChannel(user)
   local active = users[user].currentTab
   local showTabUserdata = surfaces[user].objects["chat.text.chans." .. active].getUserdata()
@@ -437,6 +476,7 @@ env.sendPM = sendPM
 env.joinN = joinN
 env.partN = partN
 env.quitN = quitN
+env.sendMsgChanN = sendMsgChanN
 env.addObject = addObject
 env.bridge = bridge
 env.surfaces = surfaces
@@ -459,19 +499,6 @@ env.OP = OP
 env.ADMIN = ADMIN
 env.SERVER = SERVER
 env.PREFIXES = PREFIXES
-
-function env.apcall(func, ...)
-  local data = {pcall(func, ...)}
-  if data[1] then
-    return true, table.unpack(data, 2)
-  end
-  local reason = data[2]
-  reason = reason:match("^.+:%d+:%s(.+)$")
-  if reason then
-    return false, reason, table.unpack(data, 3)
-  end
-  return false, table.unpack(data, 2)
-end
 
 function env.addListener(eventName, name, func)
   checkArg(1, eventName, "string")
@@ -543,8 +570,8 @@ local coreHandlers = {
   chat_init = {
     function(evt, time)
       addUser(cfg.server)
-      join("#main", cfg.server)
-      channels["#main"].users[cfg.server] = OP
+      join(cfg.main_channel, cfg.server)
+      channels[cfg.main_channel].users[cfg.server] = OP
       bridge.clear()
       for _, user in pairs(bridge.getUsers()) do
         user = user.name
@@ -558,7 +585,7 @@ local coreHandlers = {
     function(evt, time)
       for user in pairs(surfaces) do
         addUser(user)
-        joinN("#main", user)
+        joinN(cfg.main_channel, user)
       end
     end
   },
@@ -571,7 +598,7 @@ local coreHandlers = {
       if not users[user] then
         addUser(user)
       end
-      joinN("#main", user)
+      joinN(cfg.main_channel, user)
     end
   },
   glasses_detach = {

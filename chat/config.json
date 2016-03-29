@@ -1,4 +1,5 @@
 {
   "server": "%SERVER%",
-  "admins": ["Fingercomp"]
+  "admins": ["Fingercomp"],
+  "main_channel": "#main"
 }
