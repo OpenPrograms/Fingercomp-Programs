@@ -130,11 +130,11 @@ local function subLine(line, p1, p2)
       code = ""
     end
   end
-  for i = 1, p1 - 1, 1 do
-    table.remove(result, 1)
-  end
   for i = p2 + 1, #result, 1 do
     table.remove(result)
+  end
+  for i = 1, p1 - 1, 1 do
+    table.remove(result, 1)
   end
   return table.concat(result, "")
 end
@@ -292,6 +292,7 @@ local function join(chan, user)
   end
   users[user].channelOffsets[chan] = 1
   users[user].prompt[chan] = {"", 1, 1}
+  users[user].history[chan] = {pos = 0}
 end
 
 local function part(chan, user)
@@ -331,14 +332,14 @@ local function sendNotifyChan(chan, notify, parts, rec)
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
 end
 
-local function sendPM(addressee, nick, msg)
+local function sendPM(addressee, user, msg)
   checkArg(1, addressee, "string")
-  checkArg(2, nick, "string")
+  checkArg(2, user, "string")
   checkArg(3, msg, "string")
   assert(users[addressee], "no such user")
-  assert(users[nick], "no such nickname")
-  sendNotifyChan(cfg.main_channel, "pm", {addressee, nick, msg}, {nick})
-  event.push("chat_event_pm", os.time(), addressee, nick, msg)
+  assert(users[user], "no such nickname")
+  sendNotifyChan(cfg.main_channel, "pm", {user, addressee, msg}, {addressee})
+  event.push("chat_event_pm", os.time(), user, addressee, msg)
 end
 
 modes.o = function(chan, user, set, arg)
@@ -366,7 +367,7 @@ end
 modes.v = function(chan, user, set, arg)
   if not arg then return false end
   assert(channels[chan].users[arg], "no such user")
-  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true) or checkLevel(chan, user, {VOICE, HALFOP}, true) and user == arg)
+  assert(checkLevel(chan, user, {OP, ADMIN, SERVER}, true) or checkLevel(chan, user, {VOICE, HALFOP}, true) and user == arg, "no permission")
   local was = channels[chan].users[arg]
   channels[chan].users[arg] = set and VOICE or NORMAL
   if was ~= channels[chan].users[arg] then
@@ -564,6 +565,21 @@ function env.help(user, cmd)
   assert(users[user], "no such user")
   assert(commands[cmd], "no such command")
   sendPM(cfg.server, user, "Help (" .. cmd .. "): " .. (commands[cmd].help or ""))
+  if commands[cmd].doc then
+    local docStr = commands[cmd].doc
+    local doc = {""}
+    for i = 1, unicode.len(docStr), 1 do
+      local sym = unicode.sub(docStr, i, i)
+      if sym == "\n" then
+        doc[#doc+1] = ""
+      else
+        doc[#doc] = doc[#doc] .. sym
+      end
+    end
+    for _, line in ipairs(doc) do
+      sendPM(user, cfg.server, "> " .. line)
+    end
+  end
 end
 
 local coreHandlers = {
@@ -701,8 +717,12 @@ local coreHandlers = {
               end
             end
           end
+          if offset > #toShow - 11 then
+            users[user].channelOffsets[showTab] = #toShow - 11
+            offset = #toShow - 11
+          end
           for i = #lines - offset + 2, #lines, 1 do
-            table.remove(toShow, #lines - offset + 2)
+            table.remove(toShow, #toShow)
           end
           
           -- 2.2. Show 'em all

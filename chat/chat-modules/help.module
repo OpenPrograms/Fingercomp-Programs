@@ -1,0 +1,23 @@
+command {
+  name = "help",
+  level = NORMAL,
+  help = "Shows help",
+  doc = [[SYNTAX: help [command]
+If [command] is not specified, show all the command with their descriptions.
+Otherwise, show help for the specific command.]],
+  func = function(evt, chan, user, cmd, command)
+    if not command then
+      sendPM(user, cfg.server, "Commands:")
+      for cmd, cmdInfo in pairs(commands) do
+        sendPM(user, cfg.server, " * " .. cmd .. ": " .. (cmdInfo.help or ""))
+      end
+    else
+      local success, reason = apcall(help, user, cmd)
+      if not success then
+        sendPM(user, cfg.server, ("Could not display help for command %s: %s"):format(command, reason))
+      end
+    end
+  end
+}
+
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :

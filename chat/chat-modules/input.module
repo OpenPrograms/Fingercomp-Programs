@@ -54,20 +54,32 @@ local function move(prompt, step)
 end
 
 local function movePage(user, chan, step)
-  local lines = #channels[chan].lines
   local offset = users[user].channelOffsets[chan]
-  if offset + step > lines - 11 then
-    if lines <= 12 then
-      offset = 1
-    else
-      offset = lines - 11
-    end
-  elseif offset + step < 1 then
+  if offset + step < 1 then
     offset = 1
   else
     offset = offset + step
   end
   users[user].channelOffsets[chan] = offset
+end
+
+local function addToHistory(chan, user, text)
+  local hist = users[user].history[chan]
+  if hist[#hist] ~= text then
+    table.insert(hist, 1, text)
+  end
+  hist.pos = 0
+end
+
+local function history(chan, user, prompt, step)
+  local hist = users[user].history[chan]
+  local newPos = hist.pos + step
+  if newPos >= 0 and newPos <= #hist then
+    hist.pos = newPos
+    prompt[1] = hist[hist.pos] or ""
+    move(prompt, math.huge)
+    hist[0] = prompt[1]
+  end
 end
 
 addListener("glasses_key_down", "input.keys_down.down", toggleDown)
@@ -86,9 +98,10 @@ addListener("glasses_key_down", "input.input", function(evt, addr, user, uuid, c
     elseif kbd.keys[code] == "delete" then
       prompt[1] = unicode.sub(prompt[1], 1, prompt[2] - 1) .. unicode.sub(prompt[1], prompt[2] + 1)
     elseif kbd.keys[code] == "down" then
-      -- TODO history
+      history(chan, user, prompt, -1)
     elseif kbd.keys[code] == "enter" then
       typeLine(evt, addr, user, uuid, prompt[1])
+      addToHistory(chan, user, prompt[1])
       prompt[1] = ""
       prompt[2] = 1
       prompt[3] = 1
@@ -101,7 +114,7 @@ addListener("glasses_key_down", "input.input", function(evt, addr, user, uuid, c
     elseif kbd.keys[code] == "pageUp" then
       movePage(user, chan, 12)
     elseif kbd.keys[code] == "up" then
-      -- TODO history
+      history(chan, user, prompt, 1)
     elseif kbd.keys[code] == "right" then
       move(prompt, 1)
     elseif kbd.keys[code] == "end" then
