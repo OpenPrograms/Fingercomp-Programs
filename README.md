@@ -1,10 +1,10 @@
 # Fingercomp's programs
-This is a machine where brilliant ideas become the programs.
+This is a place where brilliant ideas become the programs.
 
 ## Programs
 *(go to programs' directories and see their READMEs for more info)*
 * `nn`
-  * Nanomachines controller.
+  * Nanomachines controlling program.
 * `gist`
   * Gist downloader and uploader.
 * `game-of-life`
