@@ -1,3 +1,5 @@
+local event = require("event")
+
 addListener("chat_event_createChannel", "admin.event.onChannelCreate", function(evt, time, chan, user)
   setMode(chan, cfg.server, "+o", user)
 end)
@@ -31,6 +33,16 @@ command {
     if not success then
       sendPM(cfg.server, user, "Could not set mode: " .. reason)
     end
+  end
+}
+
+command {
+  name = "stop",
+  level = ADMIN,
+  help = "Shut down the server",
+  aliases = {"shutdown", "halt"},
+  func = function(evt, chan, user, cmd)
+    event.push("chat_stop", os.time())
   end
 }
 

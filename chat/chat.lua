@@ -9,6 +9,7 @@ local text = require("text")
 local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
 local config = "/etc/chat.json"
+local exit = false
 
 local function reqcom(componentName, req, msg)
   if not com.isAvailable(componentName) then
@@ -833,6 +834,9 @@ local coreHandlers = {
   },
   chat_stop = {
     function(evt, time)
+      exit = true
+    end,
+    function(evt, time)
       bridge.clear()
       bridge.sync()
     end,
@@ -901,12 +905,10 @@ local upd = event.timer(.1, function()
   tick = tick + 1
 end, math.huge)
 
-repeat
-  local keyDownData = {event.pull("key_down")}
-until keyDownData[1] == "key_down"
+while not exit do
+  os.sleep(.1)
+end
 
-print("stop")
-event.push("chat_stop", os.time())
 os.sleep(.5)
 
 for eventName, hdlrs in pairs(moduleHandlers) do
