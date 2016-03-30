@@ -1,5 +1,14 @@
 {
   "server": "%SERVER%",
   "admins": ["Fingercomp"],
-  "main_channel": "#main"
+  "main_channel": "#main",
+  "net": {
+    "enabled": true,
+    "modemStrength": 400,
+    "ports": {
+      "6667": true,
+      "6666": ["244d"]
+    }
+  },
+  "users": {}
 }

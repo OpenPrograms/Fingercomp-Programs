@@ -25,7 +25,9 @@ local function typeLine(evt, addr, user, uuid, msg)
   end
 end
 
-addListener("glasses_chat_command", "input.input", typeLine)
+addListener("chat_chat_message", "input.input", typeLine)
+
+addListener("glasses_chat_command", "input.glassesinput", typeLine)
 
 local function toggleDown(evt, addr, user, uuid, code)
   keysDown[user] = keysDown[user] or {}

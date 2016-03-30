@@ -35,10 +35,10 @@ local function reqcom(componentName, req, msg)
             end
           end
         end
-      })
+      }), false
     end
   end
-  return com[componentName]
+  return com[componentName], true
 end
 
 if not fs.exists("/usr/lib/json.lua") then
@@ -263,9 +263,14 @@ local function createChannel(chan, nick)
   event.push("chat_event_createChannel", os.time(), chan, nick)
 end
 
-local function addUser(user)
+local function addUser(user, isNetUser)
   checkArg(1, user, "string")
+  checkArg(2, isNetUser, "boolean", "nil")
+  -- TODO kick net users if normal one tries to connect
   assert(not users[user], "user already exists")
+  cfg.users[user] = cfg.users[user] or {
+    pass = ""
+  }
   users[user] = {
     channels = {},
     modes = {},
@@ -274,7 +279,9 @@ local function addUser(user)
     tabStart = 1,
     currentTab = 1,
     shown = true,
-    channelOffsets = {}
+    channelOffsets = {},
+    cfg = cfg.users[user],
+    net = isNetUser or false
   }
 end
 
@@ -317,6 +324,7 @@ local function sendMsgChan(chan, nick, msg, rec)
   local date = os.date("%Y-%m-%d %H:%M:%S")
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, level = channels[chan].users[nick], nick, msg, rec})
+  event.push("chat_event_msg", os.time(), chan, nick, msg, rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec))
 end
 
 local function sendNotifyChan(chan, notify, parts, rec)
@@ -330,6 +338,7 @@ local function sendNotifyChan(chan, notify, parts, rec)
   local date = os.date("%Y-%m-%d %H:%M:%S")
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
+  event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec))
 end
 
 local function sendPM(addressee, user, msg)
@@ -430,12 +439,14 @@ local function partN(chan, user, reason)
 end
 
 local function quitN(user, reason)
+  local chans = users[user].channels
   reason = reason or ""
   for _, chan in pairs(users[user].channels) do
     part(chan, user)
     sendNotifyChan(chan, "quit", {user, reason})
   end
-  event.push("chat_event_quit", os.time(), user, reason)
+  users[user] = nil
+  event.push("chat_event_quit", os.time(), user, reason, table.unpack(chans))
 end
 
 local function sendMsgChanN(chan, user, msg)
@@ -455,16 +466,12 @@ end
 
 local function getActiveChannel(user)
   local active = users[user].currentTab
-  local showTabUserdata = surfaces[user].objects["chat.text.chans." .. active].getUserdata()
-  if showTabUserdata and showTabUserdata.chan then
-    return showTabUserdata.chan
-  else
-    return false
-  end
+  return users[user].channels[active] or false
 end
 
 local moduleHandlers = {}
 local commands = {}
+local storage = {}
 
 env.getActiveChannel = getActiveChannel
 env.createChannel = createChannel
@@ -491,6 +498,8 @@ env.setMode = setMode
 env.modes = modes
 env.getLevel = getLevel
 env.checkLevel = checkLevel
+env.storage = storage
+env.reqcom = reqcom
 env._MODULE = ""
 env._FILE = ""
 env.NORMAL = NORMAL
@@ -582,6 +591,18 @@ function env.help(user, cmd)
   end
 end
 
+local function saveCfg()
+  local content = json:encode_pretty(cfg)
+  local f = io.open(config, "r")
+  local backup = io.open(config .. ".backup", "w")
+  backup:write(f:read("*a"))
+  backup:close()
+  f:close()
+  f = io.open(config, "w")
+  f:write(content)
+  f:close()
+end
+
 local coreHandlers = {
   chat_init = {
     function(evt, time)
@@ -638,23 +659,21 @@ local coreHandlers = {
           -- 1.1. Set tabs
           local chans = userinfo.channels
           chans = table.pack(table.unpack(chans, userinfo.tabStart, userinfo.tabStart + 10))
-          for i, chan in pairs(chans) do
-            if i ~= "n" then
-              if #chan > 6 then
-                chanLabel = chan:sub(1, 5) .. "…"
-              else
-                chanLabel = chan
-              end
-              local textObj = surface.objects["chat.text.chans." .. i]
-              if textObj.getText() ~= chanLabel then
-                textObj.setText(chanLabel)
-                local userdata = textObj.getUserdata() or {}
-                userdata.chan = chan
-                textObj.setUserdata(userdata)
-              end
-              surface.objects["chat.poly.chans." .. i].setVisible(true)
-              surface.objects["chat.poly.chans." .. i .. ".active"].setVisible(false)
+          for i, chan in ipairs(chans) do
+            if #chan > 6 then
+              chanLabel = chan:sub(1, 5) .. "…"
+            else
+              chanLabel = chan
             end
+            local textObj = surface.objects["chat.text.chans." .. i]
+            if textObj.getText() ~= chanLabel then
+              textObj.setText(chanLabel)
+              local userdata = textObj.getUserdata() or {}
+              userdata.chan = chan
+              textObj.setUserdata(userdata)
+            end
+            surface.objects["chat.poly.chans." .. i].setVisible(true)
+            surface.objects["chat.poly.chans." .. i .. ".active"].setVisible(false)
           end
 
           -- 1.2. Hide unused tabs
@@ -805,12 +824,20 @@ local coreHandlers = {
     end,
     function(evt, time, tick)
       bridge.sync()
+    end,
+    function(evt, time, tick)
+      if tick % 600 == 0 then
+        saveCfg()
+      end
     end
   },
   chat_stop = {
     function(evt, time)
       bridge.clear()
       bridge.sync()
+    end,
+    function(evt, time)
+      saveCfg()
     end
   },
   chat_load = {
@@ -818,6 +845,7 @@ local coreHandlers = {
       for file in fs.list(modulesPath) do
         if file:match("%.([^.]+)$") == "module" then
           local module = file:match("^[^.]+")
+          storage.module = {}
           local moduleEnv = setmetatable(env, {__index = _G})
           moduleEnv._MODULE = module
           moduleEnv._FILE = file
