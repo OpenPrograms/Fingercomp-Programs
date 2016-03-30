@@ -1,0 +1,59 @@
+local com = require("component")
+
+local data = com.isAvailable("data")
+local datablock = com.isAvailable("os_datablock")
+
+command {
+  name = "msg",
+  level = NORMAL,
+  help = "Send private message to user",
+  aliases = {"m", "pm"},
+  func = function(evt, chan, user, cmd, addressee, ...)
+    local msg = table.concat({...}, " ")
+    if not addressee or msg == "" then
+      help(user, "msg")
+      return -1
+    end
+    local success, reason = apcall(sendPM, addressee, user, msg)
+    if not success then
+      sendPM(user, cfg.server, "Could not send a PM: " .. reason)
+    end
+  end
+}
+
+if not data and not datablock then
+  io.stderr:write("Neither data card nor OpenSecutiry data block are available, /register will not be available\n")
+else
+  local function hash(text)
+    checkArg(1, text, "string")
+    local hashed = ""
+    if data then
+      hashed = com.data.md5(text)
+    elseif datablock then
+      hashed = com.os_datablock.md5(text)
+    end
+    return hashed:gsub(".", function(char) return ("%02X"):format(string.byte(char)) end )
+  end
+
+  command {
+    name = "register",
+    level = NORMAL,
+    help = "Set password for your nickname",
+    doc = [[SYNTAX: register [pass]
+  If no pass given, remove password protection for your nick. Otherwise, set password to [pass].
+Password §cshould not§r contain spaces.
+]],
+    aliases = {"auth", "pass"},
+    func = function(evt, chan, user, cmd, pass)
+      if not pass then
+        users[user].cfg.pass = ""
+        sendPM(user, cfg.server, "You have unset you password!")
+      elseif type(pass) == "string" then
+        users[user].cfg.pass = hash(pass)
+        sendPM(user, cfg.server, "You have taken steps to protect your nickname from being used by network users!")
+      end
+    end
+  }
+end
+
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :

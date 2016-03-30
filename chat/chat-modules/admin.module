@@ -1,0 +1,49 @@
+local event = require("event")
+
+addListener("chat_event_createChannel", "admin.event.onChannelCreate", function(evt, time, chan, user)
+  setMode(chan, cfg.server, "+o", user)
+end)
+
+addListener("chat_event_part", "admin.event.onUserPart", function(evt, time, chan, user)
+  local users = {}
+  for k, _ in pairs(channels[chan].users) do
+    table.insert(users, k)
+  end
+  if not users[1] and chan ~= cfg.main_channel then
+    channels[chan] = nil -- ba-DOOOM
+  end
+end)
+
+addListener("chat_event_join", "admin.event.onUserJoin", function(evt, time, chan, user)
+  if isin(cfg.admins, user) or cfg.server == user then
+    setMode(chan, cfg.server, "+o", user)
+  end
+end)
+
+command {
+  name = "mode",
+  level = NORMAL,
+  help = "Sets channel's modes",
+  func = function(evt, chan, user, cmd, channel, mode, arg)
+    if not mode then
+      help(user, "mode")
+      return -1
+    end
+    local success, reason = apcall(setMode, channel, user, mode, arg)
+    if not success then
+      sendPM(cfg.server, user, "Could not set mode: " .. reason)
+    end
+  end
+}
+
+command {
+  name = "stop",
+  level = ADMIN,
+  help = "Shut down the server",
+  aliases = {"shutdown", "halt"},
+  func = function(evt, chan, user, cmd)
+    event.push("chat_stop", os.time())
+  end
+}
+
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :

@@ -9,3 +9,5 @@ This is a place where brilliant ideas become the programs.
   * Gist downloader and uploader.
 * `game-of-life`
   * My implementation of Life.
+* `opg-chat`
+  * IRC-like OpenPeripheral glasses chat.

@@ -1,0 +1,169 @@
+if not cfg.net.enabled then
+  return false, "disabled in config"
+end
+
+local com = require("component")
+local event = require("event")
+local srl = require("serialization")
+
+assert(com.isAvailable("os_datablock") or com.isAvailable("data"), "data card/block required")
+
+local modem = com.modem
+
+if modem.isWireless() then
+  modem.setStrength(cfg.net.modemStrength)
+end
+
+for port in pairs(cfg.net.ports) do
+  assert(type(port) == "string", "not a string: " .. tostring(port))
+  modem.open(tonumber(port))
+end
+
+local connections = {}
+storage.connections = {}
+
+local function hash(text)
+  local data = ""
+  if com.isAvailable("data") then
+    data = com.data.md5(text)
+  elseif com.isAvailable("os_datablock") then
+    data = com.os_datablock.md5(text)
+  end
+  return data:gsub(".", function(char) return ("%02X"):format(string.byte(char)) end)
+end
+
+addListener("modem_message", "network.modem", function(evt, addr, sender, port, distance, user, cmd, msg, ...)
+  port = math.tointeger(port)
+  local args = {...}
+  if cfg.net.ports[tostring(port)] == nil then
+    -- Ignore
+    return -1
+  end
+  if cfg.net.ports[tostring(port)] ~= true then
+    for _, allowed in pairs(cfg.net.ports[tostring(port)]) do
+      if not sender:sub(1, #allowed) == allowed then
+        modem.send(sender, port, false, "close", "address is not whitelisted")
+        return -1
+      end
+    end
+  end
+  if type(user) ~= "string" or type(cmd) ~= "string" then
+    modem.send(sender, port, false, "close", "wrong message format")
+    return -1
+  end
+  if cmd == "auth" then
+    if connections[sender] then
+      modem.send(sender, port, false, "close", "there is already an open connection for this address")
+      return -1
+    end
+    if users[user] then
+      modem.send(sender, port, false, "close", "nickname is already in use")
+      return -1
+    end
+    if not msg then
+      modem.send(sender, port, false, "close", "no password given")
+      return -1
+    end
+    if not cfg.users[user] then
+    elseif cfg.users[user].pass == "" and msg == "" then
+    elseif cfg.users[user].pass ~= hash(msg) then
+      modem.send(sender, port, false, "close", "wrong password")
+      return -1
+    end
+    local success, reason = apcall(addUser, user, true)
+    if not success then
+      modem.send(sender, port, false, "close", "could not auth: " .. reason)
+      return -1
+    end
+    connections[sender] = {user = user, port = port}
+    joinN(cfg.main_channel, user)
+    modem.send(sender, port, true, "keep", "ok")
+  else
+    if not users[user] then
+      modem.send(sender, port, false, "close", "not authenticated")
+      return -1
+    end
+    if not connections[sender] or connections[sender].user ~= user then
+      modem.send(sender, port, false, "close", "wrong auth")
+      return -1
+    end
+    if cmd == "msg" then
+      if not msg then
+        modem.send(sender, port, false, "keep", "no message given")
+        return -1
+      end
+      event.push("chat_chat_message", addr, user, sender, msg)
+      modem.send(sender, port, true, "keep", "ok")
+    elseif cmd == "quit" then
+      msg = msg or ""
+      quitN(connections[sender].user, msg)
+      connections[sender] = nil
+    end
+  end
+end)
+
+addListener("chat_event_msg", "network.chat.msg", function(evt, time, chan, nick, msg, all, ...)
+  local rec = all and "all" or {...}
+  for conn, value in pairs(connections) do
+    if rec == "all" or isin(rec, value.user) then
+      modem.send(conn, value.port, "event", "chat", chan, nick, msg, all, srl.serialize(...))
+    end
+  end
+end)
+
+addListener("chat_event_notice", "network.chat.notice", function(evt, time, chan, noticeType, notice, all, ...)
+  local rec = all and "all" or {...}
+  for conn, value in pairs(connections) do
+    if rec == "all" or isin(rec, value.user) then
+      modem.send(conn, value.port, "event", "notice", chan, noticeType, notice, srl.serialize(...))
+    end
+  end
+end)
+
+addListener("chat_event_pm", "network.chat.pm", function(evt, time, user, addressee, msg)
+  for conn, value in pairs(connections) do
+    if isin({addressee, user}, value.user) then
+      modem.send(conn, value.port, "event", "pm", user, addressee, msg)
+    end
+  end
+end)
+
+addListener("chat_event_join", "network.chat.join", function(evt, time, chan, user)
+  for conn, value in pairs(connections) do
+    if channels[chan].users[value.user] then
+      modem.send(conn, value.port, "event", "join", chan, user)
+    end
+  end
+end)
+
+addListener("chat_event_part", "network.chat.part", function(evt, time, chan, user, reason)
+  for conn, value in pairs(connections) do
+    if channels[chan] and channels[chan].users[value.user] then
+      modem.send(conn, value.port, "event", "part", chan, user, reason)
+    end
+  end
+end)
+
+addListener("chat_event_quit", "network.chat.quit", function(evt, time, user, reason, ...)
+  local chans = {...}
+  for conn, value in pairs(connections) do
+    for _, chan in pairs(chans) do
+      if channnels[chan] and channels[chan].users[value.user] then
+        modem.send(conn, value.port, "event", "quit", user, reason)
+        break
+      end
+    end
+  end
+end)
+
+addListener("chat_stop", "network.stop", function(evt, time)
+  for conn, value in pairs(connections) do
+    modem.send(conn, value.port, "close", "server is stopping")
+    connections[conn] = nil
+  end
+  for port in pairs(cfg.net.ports) do
+    modem.close(tonumber(port))
+  end
+end)
+
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :
