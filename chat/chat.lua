@@ -5,6 +5,7 @@ local guid = require("guid")
 local unicode = require("unicode")
 local fs = require("filesystem")
 local text = require("text")
+local srl = require("serialization")
 
 local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
@@ -109,6 +110,17 @@ local function isin(tbl, value)
     end
   end
   return false
+end
+
+local function copy(tbl)
+  if type(tbl) ~= "table" then
+    return tbl
+  end
+  local result = {}
+  for k, v in pairs(tbl) do
+    result[k] = copy(v)
+  end
+  return result
 end
 
 local function stripCodes(line)
@@ -244,7 +256,23 @@ end
 
 local function truncate(chan)
   while #channels[chan].lines > cfg.max_chan_lines do
-    table.remove(channels[chan].lines, 1)
+    local ntcs, msgs = 0, 0
+    for k, v in pairs(channels[chan].lines) do
+      if (v.notify and v[1] or v[3]) ~= "all" then
+        ntcs = ntcs + 1
+      else
+        msgs = msgs + 1
+      end
+    end
+    local rmMsg = msgs > ntcs
+    for i = 1, #channels[chan].lines, 1 do
+      local inV = channels[chan].lines[i]
+      if (inV.notify and inV[1] or inV[3]) ~= "all" and not rmMsg or
+          (inV.notify and inV[1] or inV[3]) == "all" and rmMsg then
+        table.remove(channels[chan].lines, i)
+        break
+      end
+    end
   end
 end
 
@@ -347,7 +375,7 @@ local function sendNotifyChan(chan, notify, parts, rec)
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
   truncate(chan)
-  event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec))
+  event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec), srl.serialize(parts))
 end
 
 local function sendPM(addressee, user, msg)
@@ -510,6 +538,7 @@ env.getLevel = getLevel
 env.checkLevel = checkLevel
 env.storage = storage
 env.reqcom = reqcom
+env.copy = copy
 env._MODULE = ""
 env._FILE = ""
 env.NORMAL = NORMAL
