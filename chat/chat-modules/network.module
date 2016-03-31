@@ -148,7 +148,7 @@ addListener("chat_event_quit", "network.chat.quit", function(evt, time, user, re
   local chans = {...}
   for conn, value in pairs(connections) do
     for _, chan in pairs(chans) do
-      if channnels[chan] and channels[chan].users[value.user] then
+      if channels[chan] and channels[chan].users[value.user] then
         modem.send(conn, value.port, "event", "quit", user, reason)
         break
       end

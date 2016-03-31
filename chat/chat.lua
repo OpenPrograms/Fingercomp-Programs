@@ -242,6 +242,12 @@ local function drawChat(surface)
   addObject(surface, "chat.text.topic", "addText", 7, 47, "", 0xffffff)
 end
 
+local function truncate(chan)
+  while #channels[chan].lines > cfg.max_chan_lines do
+    table.remove(channels[chan].lines, 1)
+  end
+end
+
 local function createChannel(chan, nick)
   checkArg(1, chan, "string")
   checkArg(2, nick, "string")
@@ -325,6 +331,7 @@ local function sendMsgChan(chan, nick, msg, rec)
   local date = os.date("%Y-%m-%d %H:%M:%S")
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, level = channels[chan].users[nick], nick, msg, rec})
+  truncate(chan)
   event.push("chat_event_msg", os.time(), chan, nick, msg, rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec))
 end
 
@@ -339,6 +346,7 @@ local function sendNotifyChan(chan, notify, parts, rec)
   local date = os.date("%Y-%m-%d %H:%M:%S")
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
+  truncate(chan)
   event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec))
 end
 
@@ -442,7 +450,8 @@ end
 local function quitN(user, reason)
   local chans = users[user].channels
   reason = reason or ""
-  for _, chan in pairs(users[user].channels) do
+  for i = #chans, 1, -1 do
+    local chan = chans[i]
     part(chan, user)
     sendNotifyChan(chan, "quit", {user, reason})
   end
