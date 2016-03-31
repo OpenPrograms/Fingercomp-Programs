@@ -267,6 +267,9 @@ if options.p then
       smout("Ex.: /test/helloworld.lua=helloworld.lua")
       return
     end
+    if not path:sub(1, 1) == "/" then
+      path = fs.concat(shell.getWorkingDirectory(), path)
+    end
     if not fs.exists(path) then
       smout("No such file: " .. path, true)
       return
