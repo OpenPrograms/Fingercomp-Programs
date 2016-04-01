@@ -24,7 +24,7 @@ command {
   name = "mode",
   level = NORMAL,
   help = "Sets channel's modes",
-  func = function(evt, chan, user, cmd, channel, mode, arg)
+  func = function(evt, chan, user, raw, cmd, channel, mode, arg)
     if not mode then
       help(user, "mode")
       return -1
@@ -41,7 +41,7 @@ command {
   level = ADMIN,
   help = "Shut down the server",
   aliases = {"shutdown", "halt"},
-  func = function(evt, chan, user, cmd)
+  func = function(evt, chan, user, raw, cmd)
     event.push("chat_stop", os.time())
   end
 }

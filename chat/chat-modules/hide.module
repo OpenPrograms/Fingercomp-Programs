@@ -4,7 +4,7 @@ command {
   name = "toggle",
   level = NORMAL,
   help = "Toggles chat visibility",
-  func = function(evt, chan, user, cmd)
+  func = function(evt, chan, user, raw, cmd)
     users[user].shown = not users[user].shown
     for _, obj in pairs(surfaces[user].surface.getAllObjects()) do
       local userdata = obj.getUserdata() or {}

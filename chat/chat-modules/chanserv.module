@@ -1,0 +1,133 @@
+local srl = require("serialization")
+
+cfg.chanserv = cfg.chanserv or {
+  nick = "ChanServ",
+  channels = {}
+}
+
+addUser(cfg.chanserv.nick)
+
+local function register(chan, user, channel)
+  local success, reason = apcall(joinN, channel, cfg.chanserv.nick)
+  if success then
+    setMode(chan, cfg.server, "+o", cfg.chanserv.nick)
+    cfg.chanserv.channels[channel] = {
+      founder = user,
+      op = {},
+      halfop = {},
+      voice = {},
+      ban = copy(channels[channel].banned),
+      exempt = copy(channels[channel].exempt),
+      modes = copy(channels[channel].modes),
+      topic = channels[channel].topic
+    }
+    sendPM(user, cfg.server, "The channel " .. channel .. " is now registered!")
+  else
+    sendPM(user, cfg.server, "Could not register the channel: " .. reason)
+  end
+end
+
+local function unregister(chan, user, channel)
+  cfg.chanserv.channels[channel] = nil
+  partN(channel, cfg.chanserv.nick)
+  sendPM(user, cfg.server, "The channel " .. channel .. " is now unregistered!")
+end
+
+command {
+  name = "chan",
+  level = NORMAL,
+  help = "Allows advanced channels management",
+  func = function(evt, chan, user, raw, cmd, ...)
+    local args = {...}
+    if not args[1] then
+      sendPM(user, cfg.server, "No arguments given, type /help chan for help")
+      return -1
+    end
+    if not args[2] then
+      sendPM(user, cfg.server, "Wrong arguments given")
+      return -1
+    end
+    if not channels[args[2]] or not channels[args[2]].users[user] then
+      sendPM(user, cfg.server, "You are not in the channel")
+      return -1
+    end
+    if args[1] == "register" then
+      register(chan, user, args[2])
+    end
+    if not cfg.chanserv.channels[args[2]] then
+      sendPM(user, cfg.server, "The channel is not registered!")
+      return -1
+    end
+    if args[1] == "unregister" then
+      unregister(chan, user, args[2])
+    end
+  end
+}
+
+addListener("chat_event_createChannel", "chanserv.event.create", function(evt, time, chan, user)
+  if cfg.chanserv.channels[chan] then
+    joinN(chan, cfg.chanserv.nick)
+    setMode(chan, cfg.server, "+o", cfg.chanserv.nick)
+    if cfg.chanserv.channels[chan].topic ~= "" then
+      channels[chan].topic = cfg.chanserv.channels[chan].topic
+      sendNotifyChan(chan, "topic", {cfg.chanserv.nick, cfg.chanserv.channels[chan].topic})
+    end
+    channels[chan].banned = copy(cfg.chanserv.channels[chan].ban)
+    channels[chan].exempt = copy(cfg.chanserv.channels[chan].exempt)
+    channels[chan].modes = copy(cfg.chanserv.channels[chan].modes)
+  end
+end)
+
+addListener("chat_event_join", "chanserv.event.join", function(evt, time, chan, user)
+  if cfg.chanserv.channels[chan] then
+    local mode = false
+    if cfg.chanserv.channels[chan].founder == user then
+      mode = "+o"
+    elseif isin(cfg.chanserv.channels[chan].op, user) then
+      mode = "+o"
+    elseif isin(cfg.chanserv.channels[chan].halfop, user) then
+      mode = "+h"
+    elseif isin(cfg.chanserv.channels[chan].voice, user) then
+      mode = "+v"
+    end
+    if mode then
+      setMode(chan, cfg.chanserv.nick, mode, user)
+    end
+  end
+end)
+
+addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, chan, notice, ...)
+  print(time, chan, notice, ...)
+  if cfg.chanserv.channels[chan] then
+    local args = {...}
+    local parts = srl.unserialize(args[#args])
+    if notice == "mode" then
+      cfg.chanserv.channels[chan].modes = copy(channels[chan].modes)
+      for user, level in pairs(channels[chan].users) do
+        if channels[chan].users[cfg.chanserv.nick] < OP then -- :P
+          setMode(chan, cfg.server, "+o", cfg.chanserv.nick)
+        end
+        local tbl = false
+        if isin({cfg.chanserv.channels[chan].founder, cfg.chanserv.nick}, user) then
+        elseif level == OP then
+          tbl = "op"
+        elseif level == HALFOP then
+          tbl = "halfop"
+        elseif level == VOICE then
+          tbl = "voice"
+        end
+        if tbl then
+          if not isin(cfg.chanserv.channels[chan][tbl], user) then
+            table.insert(cfg.chanserv.channels[chan][tbl], user)
+          end
+        end
+      end
+      cfg.chanserv.channels[chan].ban = copy(channels[chan].banned)
+      cfg.chanserv.channels[chan].exempt = copy(channels[chan].exempt)
+    elseif notice == "topic" then
+      cfg.chanserv.channels[chan].topic = parts[2]
+    end
+  end
+end)
+
+-- vim: autoindent expandtab tabstop=2 shiftwidth=2 syntax=lua :

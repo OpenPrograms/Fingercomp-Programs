@@ -8,7 +8,7 @@ command {
   level = NORMAL,
   help = "Send private message to user",
   aliases = {"m", "pm"},
-  func = function(evt, chan, user, cmd, addressee, ...)
+  func = function(evt, chan, user, raw, cmd, addressee, ...)
     local msg = table.concat({...}, " ")
     if not addressee or msg == "" then
       help(user, "msg")
@@ -44,7 +44,7 @@ else
 Password §cshould not§r contain spaces.
 ]],
     aliases = {"auth", "pass"},
-    func = function(evt, chan, user, cmd, pass)
+    func = function(evt, chan, user, raw, cmd, pass)
       if not pass then
         users[user].cfg.pass = ""
         sendPM(user, cfg.server, "You have unset you password!")

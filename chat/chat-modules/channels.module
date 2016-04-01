@@ -3,7 +3,7 @@ command {
   level = NORMAL,
   help = "Join a channel",
   aliases = {"j"},
-  func = function(evt, chan, user, cmd, channel)
+  func = function(evt, chan, user, raw, cmd, channel)
     if type(channel) == "string" then
       local success, reason = apcall(joinN, channel, user)
       if not success then
@@ -25,7 +25,7 @@ command {
   name = "part",
   level = NORMAL,
   help = "Leave a channel",
-  func = function(evt, chan, user, cmd, channel, msg)
+  func = function(evt, chan, user, raw, cmd, channel, msg)
     msg = msg or ""
     if isin({"string", "nil"}, type(channel)) then
       if tonumber(channel) then
@@ -65,7 +65,7 @@ command {
   level = NORMAL,
   help = "Open tab",
   aliases = {"t"},
-  func = function(evt, chan, user, cmd, tab)
+  func = function(evt, chan, user, raw, cmd, tab)
     if tonumber(tab) then
       tab = tonumber(tab)
       if tab > 0 and tab <= #users[user].channels then
@@ -96,7 +96,7 @@ command {
   name = "topic",
   level = NORMAL,
   help = "Set channel's topic",
-  func = function(evt, chan, user, cmd, channel, ...)
+  func = function(evt, chan, user, raw, cmd, channel, ...)
     local topic = table.concat({...}, " ")
     channel = channel or ""
     if channel:sub(1, 1) ~= "#" then
@@ -120,7 +120,7 @@ command {
   name = "kick",
   level = HALFOP,
   help = "Kick a user from channel",
-  func = function(evt, chan, user, cmd, channel, arg, msg)
+  func = function(evt, chan, user, raw, cmd, channel, arg, msg)
     if not channel then
       help(user, "kick")
       return -1

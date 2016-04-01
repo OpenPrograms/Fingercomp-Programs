@@ -5,7 +5,7 @@ command {
   doc = [[SYNTAX: help [command]
 If [command] is not specified, show all the command with their descriptions.
 Otherwise, show help for the specific command.]],
-  func = function(evt, chan, user, cmd, command)
+  func = function(evt, chan, user, raw, cmd, command)
     if not command then
       sendPM(user, cfg.server, "Commands:")
       for cmd, cmdInfo in pairs(commands) do
