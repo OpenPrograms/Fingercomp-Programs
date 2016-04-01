@@ -1,3 +1,4 @@
+local event = require("event")
 local srl = require("serialization")
 
 cfg.chanserv = cfg.chanserv or {
@@ -21,6 +22,20 @@ local function register(chan, user, channel)
       modes = copy(channels[channel].modes),
       topic = channels[channel].topic
     }
+    for user, level in pairs(channels[chan].users) do
+      local mode = false
+      if isin({cfg.server, cfg.chanserv.nick, cfg.chanserv.channels[chan].founder, table.unpack(cfg.admins)}, user) then
+      elseif level == OP then
+        mode = "op"
+      elseif level == HALFOP then
+        mode = "halfop"
+      elseif level == VOICE then
+        mode = "voice"
+      end
+      if mode then
+        table.insert(cfg.chanserv.channels[chan][mode], user)
+      end
+    end
     sendPM(user, cfg.server, "The channel " .. channel .. " is now registered!")
   else
     sendPM(user, cfg.server, "Could not register the channel: " .. reason)
@@ -66,8 +81,8 @@ command {
 
 addListener("chat_event_createChannel", "chanserv.event.create", function(evt, time, chan, user)
   if cfg.chanserv.channels[chan] then
-    joinN(chan, cfg.chanserv.nick)
-    setMode(chan, cfg.server, "+o", cfg.chanserv.nick)
+    apcall(joinN, chan, cfg.chanserv.nick)
+    apcall(setMode, chan, cfg.server, "+o", cfg.chanserv.nick)
     if cfg.chanserv.channels[chan].topic ~= "" then
       channels[chan].topic = cfg.chanserv.channels[chan].topic
       sendNotifyChan(chan, "topic", {cfg.chanserv.nick, cfg.chanserv.channels[chan].topic})
@@ -80,6 +95,10 @@ end)
 
 addListener("chat_event_join", "chanserv.event.join", function(evt, time, chan, user)
   if cfg.chanserv.channels[chan] then
+    if not channels[chan].users[cfg.chanserv.nick] then
+      apcall(joinN, chan, cfg.chanserv.nick)
+      apcall(setMode, chan, cfg.server, "+o", cfg.chanserv.nick)
+    end
     local mode = false
     if cfg.chanserv.channels[chan].founder == user then
       mode = "+o"
@@ -98,6 +117,10 @@ end)
 
 addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, chan, notice, ...)
   if cfg.chanserv.channels[chan] then
+    if not channels[chan].users[cfg.chanserv.nick] then
+      apcall(joinN, chan, cfg.chanserv.nick)
+      apcall(setMode, chan, cfg.server, "+o", cfg.chanserv.nick)
+    end
     local args = {...}
     local parts = srl.unserialize(args[#args])
     if notice == "mode" then
@@ -107,7 +130,7 @@ addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, ch
           setMode(chan, cfg.server, "+o", cfg.chanserv.nick)
         end
         local tbl = false
-        if isin({cfg.chanserv.channels[chan].founder, cfg.chanserv.nick}, user) then
+        if isin({cfg.server, cfg.chanserv.nick, cfg.chanserv.channels[chan].founder, table.unpack(cfg.admins)}, user) then
         elseif level == OP then
           tbl = "op"
         elseif level == HALFOP then
@@ -129,6 +152,8 @@ addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, ch
   end
 end)
 
-event.push("chat_event_createChannel", os.time(), "#main", cfg.server)
+addListener("chat_start", "chanserv.hack.#main", function()
+  event.push("chat_event_createChannel", os.time(), "#main", cfg.server)
+end)
 
 -- vim: autoindent expandtab tabstop=2 shiftwidth=2 syntax=lua :
