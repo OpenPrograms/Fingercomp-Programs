@@ -97,7 +97,6 @@ addListener("chat_event_join", "chanserv.event.join", function(evt, time, chan, 
 end)
 
 addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, chan, notice, ...)
-  print(time, chan, notice, ...)
   if cfg.chanserv.channels[chan] then
     local args = {...}
     local parts = srl.unserialize(args[#args])
@@ -129,5 +128,7 @@ addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, ch
     end
   end
 end)
+
+event.push("chat_event_createChannel", os.time(), "#main", cfg.server)
 
 -- vim: autoindent expandtab tabstop=2 shiftwidth=2 syntax=lua :
