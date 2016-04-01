@@ -385,7 +385,7 @@ local function sendPM(addressee, user, msg)
   checkArg(3, msg, "string")
   assert(users[addressee], "no such user")
   assert(users[user], "no such nickname")
-  sendNotifyChan(cfg.main_channel, "pm", {user, addressee, msg}, {addressee})
+  sendNotifyChan(cfg.main_channel, "pm", {user, addressee, msg}, {user, addressee})
   event.push("chat_event_pm", os.time(), user, addressee, msg)
 end
 
