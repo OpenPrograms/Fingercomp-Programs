@@ -528,7 +528,6 @@ env.addObject = addObject
 env.bridge = bridge
 env.surfaces = surfaces
 env.users = users
-env.pms = pms
 env.channels = channels
 env.commands = commands
 env.isin = isin
@@ -573,7 +572,7 @@ end
 local function cmdWrapper(cmdInfo)
   return function(evt, chan, user, cmd, ...)
     if checkLevel(chan, user, cmdInfo.level, true) then
-      cmdInfo.func(evt, chan, user, cmd, ...)
+      cmdInfo.func(evt, chan, user, raw, cmd, ...)
     else
       sendPM(user, cfg.server, "no permission")
     end
