@@ -26,7 +26,7 @@ When you're finally done, simply run `opg-chat`.
 
 ## Basic usage
 **To enter a message, type $$<msg here> in the chat and press [Enter]**.
-**To run a chat command, do the same, but with **`/`** before message**.
+**To run a chat command, do the same but with a slash before message**.
 (You can also use a wireless keyboard, no need to type `$$` then.)
 
 ### Some commands you should know:
