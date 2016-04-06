@@ -34,7 +34,7 @@ When you're finally done, simply run `opg-chat`.
 * `join <chan>` - join a channel.
 * `part [chan/tab]` - leave a channel. And yes, you can't leave a main channel. Sorry about that.
 * `help [command]` - request help. With no arguments given, list all the commands.
-* `page [lines]` - move in a channel history. Positive values move the chat up for the specific number of lines, negative values move the chat down.
+* `page <lines>` - move in a channel history. Positive values move the chat up for the specific number of lines, negative values move the chat down.
   * You can also press PgUp/PgDn keys if you use a wireless keyboard.
 
 # Advanced tweaking

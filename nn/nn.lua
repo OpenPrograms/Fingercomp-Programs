@@ -27,7 +27,12 @@ local function init(rqpt, prpt)
   event.pull(6, "modem_message")
   m.close(prpt)
   m.open(_G.port)
-  _G.max = g("getTotalInputCount")[8]
+  _G.max = (g("getTotalInputCount") or {})[8]
+  if not _G.max then
+    io.stderr:write("Failed to init.\n")
+    print("Are you sure you're near enough to a modem and you have nanomachines?")
+    return
+  end
   if fs.exists(CONF) then
     dofile(CONF)
   else
@@ -63,7 +68,7 @@ local function test(...)
       print("Effects found:")
       print(_G.effects[i])
     else
-      print("Run #" .. i .. " skipped on user's request")
+      print("Run #" .. i .. " skipped per user's request")
     end
   end
 end
@@ -142,13 +147,13 @@ local function combotest(...)
             print(_G.effectscomb[i][j])
             g("setInput", j, false)
           else
-            print("Run #" .. i .. "." .. j .. " skipped on user's request")
+            print("Run #" .. i .. "." .. j .. " skipped per user's request")
           end
         end
       end
       g("setInput", i, false)
     else
-      print("Run #" .. i .. " skipped on user's request")
+      print("Run #" .. i .. " skipped per user's request")
     end
   end
 end
