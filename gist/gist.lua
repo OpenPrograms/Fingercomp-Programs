@@ -59,8 +59,8 @@ local function format(args)
   return base
 end
 
-local function request(url, headers)
-  if gResponse[url] then
+local function requestUrl(url, data, headers, opts)
+  if opts.cache and gResponse[url] then
     return gResponse[url]
   end
   if headers == true and auth then
@@ -70,46 +70,11 @@ local function request(url, headers)
     }
   end
   local response = ""
-  local req, reason = inet.request(url, nil, headers)
-  if req == nil then
-    return {}
-  end
-  for atps = 1, 100, 1 do
-    local finish, reason = req.finishConnect()
-    if finish == false then
-      os.sleep(.1)
-    elseif not finish and reason then
-      return finish, reason
-    else
-      break
-    end
-  end
-  if not req.finishConnect() then
-    return {}
-  end
-  while true do
-    local chunk = req:read()
-    if chunk == nil then break end
-    response = response .. chunk
-  end
-  req:close()
-  gResponse[url] = json:decode(response)
-  return gResponse[url]
-end
-
-local function post(url, data, noDecode, checkGitio, headers)
-  if headers == true and auth then
-    headers = {
-      Authorization = "token " .. auth,
-      ["User-Agent"] = "Fingercomp's OpenComputers Gist Client https://github.com/OpenPrograms/Fingercomp-Programs/gist/" -- is that valid?
-    }
-  end
-  local response = ""
   local req, reason = inet.request(url, data, headers)
   if req == nil then
-    return not noDecode and {} or nil
+    return opts.default
   end
-  for atps = 1, 150, 1 do
+  for atps = 1, opts.timeout, 1 do
     local finish, reason = req.finishConnect()
     if finish == false then
       os.sleep(.1)
@@ -120,54 +85,64 @@ local function post(url, data, noDecode, checkGitio, headers)
     end
   end
   if not req.finishConnect() then
-    return not noDecode and {} or nil
+    return opts.default
   end
   while true do
     local chunk = req:read()
     if chunk == nil then break end
     response = response .. chunk
-    if checkGitio and ({req.response()})[3]["Content-Type"][1]:find("text/html") then
-      for i = 1, unicode.len(response), 256 do
-        local bit = unicode.sub(response, i, i + 255)
-        local match = bit:match("^.+https://gist.github.com/%w-/([0-9a-fA-F]+).+$")
-        if match then
-          return match
-        end
+    if opts.resp then
+      local res = opts.resp(req, response, chunk)
+      if res then
+        req:close()
+        return res
       end
     end
   end
   req:close()
-  if checkGitio then
-    return not noDecode and {} or nil
+  local result = opts.decode and json:decode(response) or response
+  if opts.cache then
+    gResponse[url] = result
   end
-  if not noDecode then
-    return json:decode(response)
+  return result
+end
+
+local function getGistID(req, response, chunk)
+  if ({req.response()})[3]["Content-Type"][1]:find("text/html") then
+    for i = 1, unicode.len(response), 256 do
+      local bit = unicode.sub(response, i, i + 255)
+      local match = bit:match("^.+https://gist.github.com/%w-/(%x+).+$")
+      if match then
+        return match
+      end
+      os.sleep(0)
+    end
   end
-  return response
 end
 
 local function isIDValid(id)
-  local gitio = false
+  local getLink = false
   local url = id
   if not url:match("https?://git.io/%w+") and not url:match("gist.github.com/%w*/?%x+") then
     url = format{base=URLS.basic, id=id}
   else
-    gitio = true
+    getLink = true
   end
-  local response = post(url, nil, gitio, gitio, true)
-  if not response or (not gitio and not response.url and (not response.message or response.message == "Not Found") or not response and gitio) then
-    return false
-  elseif gitio and not response then
+  local response = requestUrl(url, nil, true, {timeout=100, resp=(getLink and getGistID)})
+  if response and not getLink then
+    response = json:decode(response)
+  end
+  if not response or (not getLink and not response.url and (not response.message or response.message == "Not Found") or not response and getLink) then
     return false
   end
-  if gitio then
+  if getLink then
     id = response
   end
-  return id, gitio
+  return id, getLink
 end
 
 local function getFileList(id)
-  local response = request(format{base=URLS.basic, id=id}, true)
+  local response = requestUrl(format{base=URLS.basic, id=id}, nil, true, {cache=true, decode=true, timeout=100})
   local files = {}
   for k, v in pairs(response.files) do
     table.insert(files, k)
@@ -176,17 +151,17 @@ local function getFileList(id)
 end
 
 local function getFileInfo(id, filename)
-  local response = request(format{base=URLS.basic, id=id}, true)
+  local response = requestUrl(format{base=URLS.basic, id=id}, nil, true, {cache=true, decode=true, timeout=100})
   return response.files[filename]
 end
 
 local function getFullResponse(id)
-  return request(format{base=URLS.basic, id=id}, true)
+  return requestUrl(format{base=URLS.basic, id=id}, nil, true, {cache=true, decode=true, timeout=100})
 end
 
 local function shorten(url, code)
   local data = "url=" .. url .. (code and "&code=" .. code or "")
-  return post(URLS.gitio, data, true)
+  return requestUrl(URLS.gitio, data, false, {cache=true, decode=true, timeout=100})
 end
 
 local function help()
@@ -251,13 +226,13 @@ do
 end
 
 if options.p then
-  local public = true
+  local public = false
   if options.P then
-    if options.P == "s" or options.P == "secret" or options.P == "private" then
-      public = false
+    if options.P ~= "s" and options.P ~= "secret" and options.P ~= "private" then
+      public = true
     end
   end
-  local description = options.d or options.desc or ""
+  local description = options.d or options.desc
   local files = {}
   for _, f in pairs(args) do
     local path, filename = f:match("(.+)=(.+)")
@@ -304,7 +279,7 @@ if options.p then
     smout("Expected --u=GISTID and --token=OAUTHTOKEN", true)
     return
   end
-  local response = post(posturl, json:encode(post_tbl), nil, nil, true)
+  local response = requestUrl(posturl, json:encode(post_tbl), true, {decode=true, timeout=150, default={}})
   if response.html_url then
     if not options.s then
       print((public and "Public " or "Secret ") .. "gist " .. (posturl == URLS.post and "create" or "update") .. "d! " .. response.html_url)
@@ -406,7 +381,10 @@ if args[2] then
   f:close()
   smout("Successfully saved to file: \"" .. args[2] .. "\"!")
 else
-  print(file_info.content)
+  for i = 1, unicode.len(file_info.content), 512 do
+    io.write(unicode.sub(file_info.content, i, i + 512))
+    os.sleep(.05)
+  end
 end
 
 -- vim: autoindent expandtab tabstop=2 shiftwidth=2 :
