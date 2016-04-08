@@ -22,6 +22,14 @@ local cellHL = false
 local showPtrns = false
 local pattern = 0
 
+local paletteColors = {}
+if gpu.setPaletteColor then
+  for i = 0, 15, 1 do
+    paletteColors[i] = gpu.getPaletteColor(i)
+    gpu.setPaletteColor(i, (i + 1) * 0x0f0f0f)
+  end
+end
+
 local blocks = {
   dl = 0x2596,
   dr = 0x2597,
@@ -106,8 +114,8 @@ end
 
 local function getCell(x, y)
   y = y % 2 == 0 and y - 1 or y
-  local gridColorUpper = x % 2 == 0 and 0x000000 or 0x1e1e1e
-  local gridColorLower = x % 2 == 0 and 0x1e1e1e or 0x000000
+  local gridColorUpper = x % 2 == 0 and 0x000000 or 0x3c3c3c
+  local gridColorLower = x % 2 == 0 and 0x3c3c3c or 0x000000
   local sc = {}
   sc.u = {getPixel(x, y), getScsrPixel(x, y)}
   sc.d = {getPixel(x, y + 1), getScsrPixel(x, y + 1)}
@@ -116,9 +124,9 @@ local function getCell(x, y)
       if v[1] and v[2] then
         sc[k][3] = 0xffffff
       elseif v[1] and v[2] == false then
-        sc[k][3] = 0xff4040
+        sc[k][3] = 0xff2440
       elseif v[1] == false and v[2] then
-        sc[k][3] = 0x004000
+        sc[k][3] = 0x002400
       elseif v[1] == false and v[2] == false then
         sc[k][3] = false
       end
@@ -194,22 +202,29 @@ local function render()
     gpu.setBackground(0x008000)
     gpu.set(w - 13, 1, " " .. unicode.char(0x25ba) .. " Simulation ")
   end
-  for i = 1, bw, 1 do
-    for j = 1, bh, 2 do
-      local colorU, colorD = getCell(i, j)
-      local pixel = {gpu.get(i, (j + 1) / 2 + 1)}
-      if pixel[1] ~= blocks.ulur or pixel[2] ~= colorU or pixel[3] ~= colorD or firstUpd then
-        if gpu.getForeground() ~= colorU then
-          gpu.setForeground(colorU)
-        end if gpu.getBackground() ~= colorD then
-          gpu.setBackground(colorD)
-        end
-        gpu.set(i, (j + 1) / 2 + 1, blocks.ulur)
-        if firstUpd then
-          firstUpd = false
+  gpu.setBackground(0x000000)
+  local bg, fg = 0x0, 0xffffff
+  for run = 0, firstUpd and 1 or 0, 1 do
+    for i = 1, bw, 1 do
+      for j = 1, bh, 2 do
+        local colorU, colorD = getCell(i, j)
+        local pixel = {gpu.get(i, (j + 1) / 2 + 1)}
+        if pixel[1] ~= blocks.ulur or pixel[2] ~= colorU or pixel[3] ~= colorD or firstUpd and i % 2 == run then
+          if gpu.getForeground() ~= colorU then
+            gpu.setForeground(colorU)
+            fg = colorU
+          end if gpu.getBackground() ~= colorD then
+            gpu.setBackground(colorD)
+            bg = colorD
+          end
+          gpu.set(i, (j + 1) / 2 + 1, blocks.ulur)
+        --gpu.set(10, 1, tostring(pixel[1] ~= blocks.ulur) .. ", " .. tostring(pixel[2] ~= colorU) .. ", " .. tostring(pixel[3] ~= colorD) .. ", " .. i .. ", " .. j .. ", " .. colorU .. ", " .. pixel[2] .. ", " .. colorD .. ", " .. pixel[3])
         end
       end
     end
+  end
+  if firstUpd then
+    firstUpd = false
   end
 end
 
@@ -309,6 +324,12 @@ event.ignore("drag", onTouch)
 event.ignore("drop", onTouch)
 event.ignore("key_down", onKey)
 event.cancel(renderTimer)
+
+if gpu.setPaletteColor then
+  for i = 0, 15, 1 do
+    gpu.setPaletteColor(i, paletteColors[i])
+  end
+end
 
 gpu.setForeground(0xffffff)
 gpu.setBackground(0x000000)
