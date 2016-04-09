@@ -1,5 +1,5 @@
 # opg-chat
-*The powerful chat program*
+*A powerful chat program*
 
 ![Screenshot of the program](http://i.imgur.com/pskyEl9.png)
 
@@ -13,7 +13,7 @@
 * ...
 
 ### Requirements
-* Data card or OpenSecurity data block. If you will be missing all of them, the network interface will be disabled.
+* Data card or OpenSecurity data block. If you will be missing both of them, the network interface will be disabled.
 * OpenPeripheral terminal glasses bridge connected via adapter.
 * OpenPeripheral terminal glasses connected to a bridge.
 
@@ -21,7 +21,7 @@
 ## Installation
 The things you'll need are a terminal bridge, terminal glasses, an adapter and either a data card or a data block.
 Connect an adapter to a computer, place a bridge next to a adapter. Insert your data card into a computer if you've crafted it, or connect your data block to a computer.
-Now type `edit /etc/chat.json` and configure this program as you wish. You'll probably want to at least change a list of admins to be able to stop the chat.
+Now type `edit /etc/chat.json` and configure this program as you wish. You'll probably want to change a list of admins to be able to stop the chat.
 When you're finally done, simply run `opg-chat`.
 
 ## Basic usage
@@ -32,14 +32,14 @@ When you're finally done, simply run `opg-chat`.
 ### Some commands you should know:
 * `stop` - as you might guess, this command stops the program. Available for admins only.
 * `join <chan>` - join a channel.
-* `part [chan/tab]` - leave a channel. And yes, you can't leave a main channel. Sorry about that.
+* `part [chan/tab]` - leave a channel. And no, you can't leave a main channel. Sorry about that.
 * `help [command]` - request help. With no arguments given, list all the commands.
 * `page <lines>` - move in a channel history. Positive values move the chat up for the specific number of lines, negative values move the chat down.
   * You can also press PgUp/PgDn keys if you use a wireless keyboard.
 
 # Advanced tweaking
 ## Modules
-If you're not satisfied with the included modules, you can also write your own! Create a file with an extension `.module` in `/usr/lib/chat-modules/` and do magic.
+If you're not satisfied with the included modules, you can also write your own! Create a file with an extension `.module` in `/usr/lib/chat-modules/` and do magic things.
 Use the included modules as an example.
 
 ### Environment
@@ -47,15 +47,15 @@ Use the included modules as an example.
 * `apcall(func, args...)` - an advanced pcall, cuts off an unnecessary stuff, leaving only a reason. It used in modules to show an error reason to users.
 * `createChannel` - this function is actually for internal use only, don't use it.
 * `addUser(user)` - add a user with the specific name.
-* `join` - don't use this function either, but instead use...
-* `joinN(chan, user)` - ...this one instead. Makes a user join a channel, sends notifications and events. Creates a channel if it doesn't exist.
+* `join` - don't use this function either.
+* `joinN(chan, user)` - makes a user join a channel, sends notifications and events. Creates a channel if it doesn't exist.
 * `part` - an internal function too, use:
 * `partN(chan, user[, partMsg])` - makes a user leave a channel.
 * `quitN(user[, quitMsg])` - makes a user leave all channels.
 * `sendMsgChan(chan, user, msg[, recipients])` - makes a user send a message to a channel. You can also specify a table with recipients if you need so.
-* `sendMsgChanN(chan, user, msg)` - do some additional checks, for example, if a user has sufficient rights, and do the same as the previous function if all's OK.
-* `addObject(surface, objName, funcKey, ...)` - the preferred way to add new objects to the glasses. Stores an object under a specified name so it could be accessed later.
-  * **Note:** `funcKey` should have a `string` type.
+* `sendMsgChanN(chan, user, msg)` - do some additional checks, for example, if a user has sufficient rights, and then do the same as the previous function if all's OK.
+* `addObject(surface, objName, funcKey, ...)` - the preferred way to add new objects to the glasses. Stores an object under a specific name so it could be accessed later.
+  * **Note:** `funcKey` should be a `string`.
 * `getActiveChannel(user)` - get an "active" channel (user has a tab with that channel open).
 * `bridge` - a bridge proxy.
 * `surfaces` - a table which contains users' surfaces.
@@ -69,14 +69,14 @@ surfaces[user] = {
 * `channels` - a table containing channels.
 * `commands` - a table containing all registered commands.
 * `isin` - a simple but still very useful function. Iterates over a table and searches for a specific value. Returns `true, <key>` on success or `false` otherwise.
-* `cfg` - a configuration. It auto-saves every minute and also on exit.
+* `cfg` - a configuration. It auto-saves every minute and on exit.
 * `setMode(chan, user, mode[, arg])` - sets a mode. Errors on failtures. `mode` should be `±<modeLetter>`, ex.: `+o`, `-h`.
 * `modes` - a table containing modes.
 * `getLevel(chan, user)` - returns user access level mask.
-* `checkLevel(chan, user, levels, any)` - checks if a user has requested access. `levels` is a table containing access levels (`{OP, ADMIN, SERVER}`). If `any` is `true`, a user should have `any` of given access levels. Otherwise, a user should have *all* of them.
-* `reqcom(componentName, required[, msg])` - get a component proxy. If `required` is `false`, return a dummy component and `false`. Otherwise, error. Print a `msg` if component is not available.
+* `checkLevel(chan, user, levels, any)` - checks if a user has requested access. `levels` is a table containing access levels (`{OP, ADMIN, SERVER}`). If `any` is `true`, a user should have *any* of given access levels. Otherwise, a user should have *all* of them.
+* `reqcom(componentName, required[, msg])` - get a component proxy. If `required` is `false` and component is unavailable, return a dummy component and `false`. Otherwise, error. Print a `msg` if component is not available.
 * `copy(tbl)` - returns a copy of a table.
-* `_FILE` - a filename.
+* `_FILE` - a module filename.
 * `_MODULE` - a module name (a filename without extension).
 * `NORMAL`, `VOICE`, `HALFOP`, `OP`, `ADMIN`, `SERVER` - access levels.
 * `PREFIXES` - a table containing prefixes for levels.
@@ -85,7 +85,7 @@ surfaces[user] = {
 * `command {args}` - add a new command. Args is an table with the following keys:
 ```lua
 {
-  name = "command", -- a command, required
+  name = "command", -- a name of command, required
   level = NORMAL, -- who is allowed to use this command, required
   help = "A short description of this command",
   doc = [[A long documentation for this command]],
@@ -100,7 +100,7 @@ This module allows to create your own chat bots.
 It supports both types of modems. Be aware of a spoofing card from Computronics, as it allows to specify a custom address.
 
 ### Configuration
-There is a "net" section in a configuration file (`/etc/chat.json`). Here is an example:
+There is a "net" section in a configuration file (`/etc/chat.json`). Example configuration:
 ```json
 "net": {
   "enabled": true,
@@ -113,18 +113,18 @@ There is a "net" section in a configuration file (`/etc/chat.json`). Here is an 
 ```
 * `enabled` controls whether the network module should be enabled.
 * If a modem is wireless, its strength will be set to the value of `modemStrength` setting.
-* `ports` is a list with ports which the program will listen.
+* `ports` is a list containing ports which the program will listen on.
   * Left part (`"6667"`), obviously, is a port to listen on.
-  * Right part can be one of two values: `true`, which means a port is *not* filtered, or a list with white-listed addresses (or their parts). In this example, the program will accept connections on a port 6667 only from sender starting with `"519187"`.
+  * Right part can be one of two values: `true`, which means a port is *not* filtered, or a list with white-listed addresses (or their parts). In this example, the program will accept connections on a port 6667 only from senders with their address starting with `"519187"`.
 
 ### Commands
 * `"userName", "auth", <pass>` - authenticate to the server.
-* `"userName", "msg", <someMsg>` - send message or command to the server.
+* `"userName", "msg", <someMsg>` - send a message or command to the server.
 * `"userName", "quit"[, reason]` - close a connection.
 
 ### Passwords
 As you could see, you need a password to authenticate. Where should you take it?
-* If there is no password for a username (or that username hasn't ever been used), you should give an empty string (`""`) as a password.
-* But if there is, you should use it as a `<pass>` argument.
-* Use `/pass <pass>` to set a password for a username. If you omit the argument, a password will be unset.
+* If there is no password for a username (or that username hasn't ever been used), you should give an empty string (`""`) as the password.
+* But if there is, you should use it as the `<pass>` argument.
+* Use `/pass [pass]` to set the password for a username. If you omit the argument, the password will be unset.
   * Passwords are saved in a configuration file as their MD5 hashes.
