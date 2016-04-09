@@ -22,17 +22,29 @@ end
 local connections = {}
 storage.connections = {}
 
-local function hash(text)
-  local data = ""
-  if com.isAvailable("data") then
-    data = com.data.md5(text)
-  elseif com.isAvailable("os_datablock") then
-    data = com.os_datablock.md5(text)
-  end
-  return data:gsub(".", function(char) return ("%02X"):format(string.byte(char)) end)
+if com.isAvailable("data") then
+  data = com.data
+elseif com.isAvailable("os_datablock") then
+  data = com.os_datablock
 end
 
-addListener("modem_message", "network.modem", function(evt, addr, sender, port, distance, user, cmd, msg, ...)
+local function byte2hex(str)
+  return str:gsub(".", function(chat) return ("%02X"):format(string.byte(chat)) end)
+end
+
+local function hash(text)
+  return byte2hex(data.md5(text))
+end
+
+local function random(len)
+  local result = ""
+  for i = 1, len, 1 do
+    result = result .. string.char(math.random(0, 255))
+  end
+  return byte2hex(result)
+end
+
+addListener("modem_message", "network.modem", function(evt, addr, sender, port, distance, user, cmd, pass, msg, ...)
   port = math.tointeger(port)
   local args = {...}
   if cfg.net.ports[tostring(port)] == nil then
@@ -47,7 +59,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       end
     end
   end
-  if type(user) ~= "string" or type(cmd) ~= "string" then
+  if type(user) ~= "string" or type(cmd) ~= "string" or type(pass) ~= "string" then
     modem.send(sender, port, false, "close", "wrong message format")
     return -1
   end
@@ -60,13 +72,13 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       modem.send(sender, port, false, "close", "nickname is already in use")
       return -1
     end
-    if not msg then
+    if not pass then
       modem.send(sender, port, false, "close", "no password given")
       return -1
     end
     if not cfg.users[user] then
-    elseif cfg.users[user].pass == "" and msg == "" then
-    elseif cfg.users[user].pass ~= hash(msg) then
+    elseif cfg.users[user].pass == "" and pass == "" then
+    elseif cfg.users[user].pass ~= hash(pass) then
       modem.send(sender, port, false, "close", "wrong password")
       return -1
     end
@@ -75,15 +87,16 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       modem.send(sender, port, false, "close", "could not auth: " .. reason)
       return -1
     end
-    connections[sender] = {user = user, port = port}
+    local session = random(8)
+    connections[sender] = {user = user, port = port, pass = session}
     joinN(cfg.main_channel, user)
-    modem.send(sender, port, true, "keep", "ok")
+    modem.send(sender, port, true, "keep", "ok", session)
   else
     if not users[user] then
       modem.send(sender, port, false, "close", "not authenticated")
       return -1
     end
-    if not connections[sender] or connections[sender].user ~= user then
+    if not connections[sender] or connections[sender].user ~= user or connections[sender].pass ~= pass then
       modem.send(sender, port, false, "close", "wrong auth")
       return -1
     end

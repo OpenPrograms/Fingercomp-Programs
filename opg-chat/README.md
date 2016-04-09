@@ -97,7 +97,7 @@ surfaces[user] = {
 
 ## Network interface (network.module)
 This module allows to create your own chat bots.
-It supports both types of modems. Be aware of a spoofing card from Computronics, as it allows to specify a custom address.
+It supports both types of modems.
 
 ### Configuration
 There is a "net" section in a configuration file (`/etc/chat.json`). Example configuration:
