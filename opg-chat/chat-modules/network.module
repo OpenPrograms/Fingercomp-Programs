@@ -90,7 +90,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
     local session = random(8)
     connections[sender] = {user = user, port = port, pass = session}
     joinN(cfg.main_channel, user)
-    modem.send(sender, port, true, "keep", "ok", session)
+    modem.send(sender, port, true, "keep", "auth", session)
   else
     if not users[user] then
       modem.send(sender, port, false, "close", "not authenticated")
@@ -206,7 +206,7 @@ end)
 
 addListener("chat_stop", "network.stop", function(evt, time)
   for conn, value in pairs(connections) do
-    modem.send(conn, value.port, "close", "server is stopping")
+    modem.send(conn, value.port, false, "close", "server is stopping")
     connections[conn] = nil
   end
   for port in pairs(cfg.net.ports) do
