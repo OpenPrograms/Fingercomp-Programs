@@ -87,17 +87,52 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       modem.send(sender, port, false, "close", "wrong auth")
       return -1
     end
-    if cmd == "msg" then
-      if not msg then
-        modem.send(sender, port, false, "keep", "no message given")
-        return -1
-      end
-      event.push("chat_chat_message", addr, user, sender, msg)
-      modem.send(sender, port, true, "keep", "ok")
-    elseif cmd == "quit" then
+    if cmd == "quit" then
       msg = msg or ""
       quitN(connections[sender].user, msg)
       connections[sender] = nil
+      modem.send(sender, port, true, "close")
+    end
+    if not msg then
+      modem.send(sender, port, false, "keep", "no message given")
+      return -1
+    end
+    if cmd == "msg" then
+      event.push("chat_chat_message", addr, user, sender, tostring(msg))
+      modem.send(sender, port, true, "keep", "ok")
+    elseif cmd == "chaninfo" then
+      if not channels[tostring(msg)] or not channels[tostring(msg)].users[connections[sender].user] then
+        modem.send(sender, port, false, "keep", "you are not on channel")
+        return -1
+      end
+      local chan = tostring(msg)
+      local data = {
+        info =    channels[chan].info,
+        users =   channels[chan].users,
+        modes =   channels[chan].modes,
+        topic =   channels[chan].topic,
+        banned =  channels[chan].banned,
+        exempt =  channels[chan].exempt
+      }
+      modem.send(sender, port, true, "keep", srl.serialize(data))
+    elseif cmd == "userinfo" then
+      if not users[tostring(msg)] then
+        modem.send(sender, port, false, "keep", "no such user")
+        return -1
+      end
+      local user = tostring(msg)
+      local self = user == connections[sender].user
+      local data = {
+        channels =          self and  users[user].channels        or nil,
+        modes =             self and  users[user].modes           or nil,
+        prompt =            self and  users[user].prompt          or nil,
+        history =           self and  users[user].history         or nil,
+        tabStart =          self and  users[user].tabStart        or nil,
+        shown =             self and  users[user].shown           or nil,
+        channelOffsets =    self and  users[user].channelOffsets  or nil,
+        net =                         users[user].net
+      }
+      modem.send(sender, port, true, "keep", srl.serialize(data))
     end
   end
 end)
