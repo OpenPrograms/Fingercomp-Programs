@@ -570,7 +570,7 @@ function env.delListener(eventName, name)
 end
 
 local function cmdWrapper(cmdInfo)
-  return function(evt, chan, user, cmd, ...)
+  return function(evt, chan, user, raw, cmd, ...)
     if checkLevel(chan, user, cmdInfo.level, true) then
       cmdInfo.func(evt, chan, user, raw, cmd, ...)
     else

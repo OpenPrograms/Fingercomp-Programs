@@ -12,7 +12,7 @@ local function typeLine(evt, addr, user, uuid, msg)
       elseif msg:sub(1, 3):match("^//") then
         sendMsgChanN(chan, user, unicode.sub(msg, 2, -1))
       else
-        local raw = unicode.sub(msg, 2, 1)
+        local raw = unicode.sub(msg, 2, -1)
         local args = {}
         for arg in msg:gmatch("%S+") do
           table.insert(args, arg)
