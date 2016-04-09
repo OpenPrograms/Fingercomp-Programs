@@ -1,13 +1,14 @@
 mkdir /usr/lib
 mkdir /usr/lib/chat-modules
 mkdir /usr/bin
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/opg-chat.lua /usr/bin/opg-chat.lua
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/config.json /etc/config.json
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/admin.module /usr/lib/chat-modules/admin.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/channels.module /usr/lib/chat-modules/channels.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/chanserv.module /usr/lib/chat-modules/chanserv.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/help.module /usr/lib/chat-modules/help.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/hide.module /usr/lib/chat-modules/hide.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/input.module /usr/lib/chat-modules/input.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/network.module /usr/lib/chat-modules/network.module
-wget https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/user.module /usr/lib/user.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/opg-chat.lua /usr/bin/opg-chat.lua
+wget -Q https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/config.json /etc/chat.json
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/admin.module /usr/lib/chat-modules/admin.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/channels.module /usr/lib/chat-modules/channels.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/chanserv.module /usr/lib/chat-modules/chanserv.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/help.module /usr/lib/chat-modules/help.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/hide.module /usr/lib/chat-modules/hide.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/input.module /usr/lib/chat-modules/input.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/network.module /usr/lib/chat-modules/network.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/chat-modules/user.module /usr/lib/chat-modules/user.module
+wget -q -f https://raw.githubusercontent.com/OpenPrograms/Fingercomp-Programs/master/opg-chat/installer.openos /usr/misc/opg-chat-installer.openos
