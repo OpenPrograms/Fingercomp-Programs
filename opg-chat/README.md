@@ -118,9 +118,41 @@ There is a "net" section in a configuration file (`/etc/chat.json`). Example con
   * Right part can be one of two values: `true`, which means a port is *not* filtered, or a list with white-listed addresses (or their parts). In this example, the program will accept connections on a port 6667 only from senders with their address starting with `"519187"`.
 
 ### Commands
-* `"userName", "auth", <pass>` - authenticate to the server.
-* `"userName", "msg", <someMsg>` - send a message or command to the server.
-* `"userName", "quit"[, reason]` - close a connection.
+* `<username>, "auth", <pass>` - authenticate to the server.
+  * `true, "keep", "auth", <session>` - `<session>` is a password required for other commands.
+* `<username>, "msg", <session>, <someMsg>` - send a message or command to the server.
+  * `true, "keep", "ok"` - message sent successfully.
+* `<username>, "quit", <session>[, reason]` - close a connection.
+  * `true, "close"` - closed successfully.
+* `<username>, "chaninfo", <session>, <channel>` - get info about channel.
+  * `false, "keep", "you are not on channel"`
+  * `true, "keep", <data>` - `<data>` is a serialized table containing channel info.
+* `<username>, "userinfo", <session>, <user>` - get info about user.
+  * `false, "keep", "no such user"`
+  * `true, "keep", <data>` - `<data>` is a serialized table containing user info.
+
+### Errors
+Error | Comment
+----- | -------
+`false, "error", "there is already an open connection for this address"` | -
+`false, "error", "nickname is already in use"` | -
+`false, "error", "no password given"` | -
+`false, "error", "wrong password"` | -
+`false, "error", "could not auth: <reason>"` | An unknown reason
+`false, "error", "not authenticated"` | -
+`false, "error", "wrong auth"` | No connection, no such user or wrong pass
+`false, "error", "no message given"` | -
+
+### Events
+Event | Description
+----- | -----------
+`"event", "chat", <chan>, <nick>, <msg>, <all>, <recipients>` | This event gets fired on chat messages. Here and below, `<all>` is a boolean value which is `true` if the message is sent to all people on channel, or `false` if not. `<recipients>` is `"all"` if `<all>` is true, or serialized table containing recipients otherwise.
+`"event", "notice", <chan>, <noticeType>, <notice>, <recipients>` | This event gets fired on notices.
+`"event", "pm", <user>, <addressee>, <msg>` | This event gets fired on PMs.
+`"event", "join", <chan>, <user>` | This event is fired when someone joins the channel.
+`"event", "part", <chan>, <user>, <reason>` | This event is fired when someone leaves the channel.
+`"event", "quit", <user>, <reason>` | Someone quit the server.
+`false, "close", "server is stopping"` | Server is shutting down, connection is closed.
 
 ### Passwords
 As you could see, you need a password to authenticate. Where should you take it?
@@ -128,3 +160,6 @@ As you could see, you need a password to authenticate. Where should you take it?
 * But if there is, you should use it as the `<pass>` argument.
 * Use `/pass [pass]` to set the password for a username. If you omit the argument, the password will be unset.
   * Passwords are saved in a configuration file as their MD5 hashes.
+
+### Sessions
+After a bit of thinking I've got a solution to the Computronics spoofing card problem. So now you need a `<session>` for the most of network commands. This is a 16 char long password given to you on authentication.

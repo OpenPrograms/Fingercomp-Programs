@@ -54,37 +54,37 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
   if cfg.net.ports[tostring(port)] ~= true then
     for _, allowed in pairs(cfg.net.ports[tostring(port)]) do
       if not sender:sub(1, #allowed) == allowed then
-        modem.send(sender, port, false, "close", "address is not whitelisted")
+        modem.send(sender, port, false, "error", "address is not whitelisted")
         return -1
       end
     end
   end
   if type(user) ~= "string" or type(cmd) ~= "string" or type(pass) ~= "string" then
-    modem.send(sender, port, false, "close", "wrong message format")
+    modem.send(sender, port, false, "error", "wrong message format")
     return -1
   end
   if cmd == "auth" then
     if connections[sender] then
-      modem.send(sender, port, false, "close", "there is already an open connection for this address")
+      modem.send(sender, port, false, "error", "there is already an open connection for this address")
       return -1
     end
     if users[user] then
-      modem.send(sender, port, false, "close", "nickname is already in use")
+      modem.send(sender, port, false, "error", "nickname is already in use")
       return -1
     end
     if not pass then
-      modem.send(sender, port, false, "close", "no password given")
+      modem.send(sender, port, false, "error", "no password given")
       return -1
     end
     if not cfg.users[user] then
     elseif cfg.users[user].pass == "" and pass == "" then
     elseif cfg.users[user].pass ~= hash(pass) then
-      modem.send(sender, port, false, "close", "wrong password")
+      modem.send(sender, port, false, "error", "wrong password")
       return -1
     end
     local success, reason = apcall(addUser, user, true)
     if not success then
-      modem.send(sender, port, false, "close", "could not auth: " .. reason)
+      modem.send(sender, port, false, "error", "could not auth: " .. reason)
       return -1
     end
     local session = random(8)
@@ -93,11 +93,11 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
     modem.send(sender, port, true, "keep", "auth", session)
   else
     if not users[user] then
-      modem.send(sender, port, false, "close", "not authenticated")
+      modem.send(sender, port, false, "error", "not authenticated")
       return -1
     end
     if not connections[sender] or connections[sender].user ~= user or connections[sender].pass ~= pass then
-      modem.send(sender, port, false, "close", "wrong auth")
+      modem.send(sender, port, false, "error", "wrong auth")
       return -1
     end
     if cmd == "quit" then
@@ -154,7 +154,7 @@ addListener("chat_event_msg", "network.chat.msg", function(evt, time, chan, nick
   local rec = all and "all" or {...}
   for conn, value in pairs(connections) do
     if rec == "all" or isin(rec, value.user) then
-      modem.send(conn, value.port, "event", "chat", chan, nick, msg, all, srl.serialize(...))
+      modem.send(conn, value.port, "event", "chat", chan, nick, msg, all, srl.serialize(rec))
     end
   end
 end)
@@ -163,7 +163,7 @@ addListener("chat_event_notice", "network.chat.notice", function(evt, time, chan
   local rec = all and "all" or {...}
   for conn, value in pairs(connections) do
     if rec == "all" or isin(rec, value.user) then
-      modem.send(conn, value.port, "event", "notice", chan, noticeType, notice, srl.serialize(...))
+      modem.send(conn, value.port, "event", "notice", chan, noticeType, notice, srl.serialize(rec))
     end
   end
 end)
