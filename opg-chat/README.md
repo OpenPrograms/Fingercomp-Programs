@@ -1,5 +1,5 @@
 # opg-chat
-*A powerful chat program*
+*A powerful IRC-like chat program*
 
 ![Screenshot of the program](http://i.imgur.com/pskyEl9.png)
 
