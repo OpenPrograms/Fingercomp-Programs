@@ -10,6 +10,7 @@ _G.max = _G.max or 15
 _G.effects = _G.effects or {}
 _G.effectscomb = _G.effectscomb or {}
 _G.groups = _G.groups or {}
+_G.init = _G.init or false
 
 local function s(...)
   m.broadcast(_G.port, "nanomachines", ...)
@@ -31,6 +32,7 @@ local function init(rqpt, prpt)
   if not _G.max then
     io.stderr:write("Failed to init.\n")
     print("Are you sure you're near enough to a modem and you have nanomachines?")
+    _G.max = 15
     return
   end
   if fs.exists(CONF) then
@@ -39,6 +41,7 @@ local function init(rqpt, prpt)
     group = {}
   end
   _G.groups = group
+  _G.init = true
   print("Configured: PORT " .. _G.port .. ", MAX " .. _G.max)
 end
 
@@ -52,6 +55,10 @@ local function isIn(tbl, value)
 end
 
 local function test(...)
+  if not _G.init then
+    io.stderr:write("Run nn init first!\n")
+    return -1
+  end
   local exclude = {...}
   print("Starting basic testing")
   print("Total runs: " .. _G.max)
@@ -96,6 +103,10 @@ local function splitComma(str)
 end
 
 local function combotest(...)
+  if not _G.init then
+    io.stderr:write("Run nn init first!\n")
+    return -1
+  end
   print("Combinatoric test")
   print("Total runs: " .. recurSum(_G.max - 1))
   print("It may take very long time!")
@@ -166,6 +177,10 @@ local function clear()
 end
 
 local function ge()
+  if not _G.init then
+    io.stderr:write("Run nn init first!\n")
+    return -1
+  end
   for i = 1, _G.max, 1 do
     if _G.effects[i] then
       print("Input #" .. i .. ":\t" .. _G.effects[i])
@@ -174,6 +189,10 @@ local function ge()
 end
 
 local function getCombo()
+  if not _G.init then
+    io.stderr:write("Run nn init first!\n")
+    return -1
+  end
   for numi, i in pairs(_G.effectscomb) do
     for numj, j in pairs(_G.effectscomb[numi]) do
       if j ~= "{}" then
@@ -185,11 +204,12 @@ end
 
 local function reset()
   _G.max, _G.port, _G.effects = 15, 27091, {}
+  _G.init = false
 end
 
 local function info()
-  print("PORT: " .. _G.port)
-  print("MAX: " .. _G.max)
+  print("PORT: " .. (_G.port) or "none")
+  print("MAX: " .. (_G.max) or "none")
   print("EFFECTS: ")
   ge()
 end
@@ -262,6 +282,10 @@ local function getActiveEffects()
 end
 
 local function group(...)
+  if not _G.init then
+    io.stderr:write("Run nn init first!\n")
+    return -1
+  end
   local args = {...}
   local command = args[1]
   table.remove(args, 1)
