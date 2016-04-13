@@ -1,7 +1,7 @@
 # Conway's Game of Life implementation for OpenComputers
 ![Screenshot of the game.](http://i.imgur.com/J7enOnc.png)
 
-## What you should do in this game
+## What should you do in this game?
 * With the simulation paused, use the controls below to place or kill cells.
 * Press `[Space]` and observe the magic evolution of these cells.
 
@@ -20,7 +20,7 @@
 ### Highlighting
 * If cell will *die* on the next generation, it'll be red.
 * If cell will *be born* on the next generation, it'll be dark green.
-* If cell is *alive* in current and next generations, it will be white.
+* If cell is *alive* on current and next generations, it will be white.
 
 ## Controls
 * `[Space]` *Start* or *pause* simulation.
