@@ -25,7 +25,8 @@ end
 local json = loadfile("/usr/lib/json.lua")()
 
 -- Program Variables --
-local gResponse = {}
+_G.gist = _G.gist or {}
+_G.gist.gResponse = _G.gist.gResponse or {}
 local args, options = shell.parse(...)
 local auth = nil
 
@@ -60,8 +61,8 @@ local function format(args)
 end
 
 local function requestUrl(url, data, headers, opts)
-  if opts.cache and gResponse[url] then
-    return gResponse[url]
+  if opts.cache and _G.gist.gResponse[url] then
+    return opts.decode and json:decode(_G.gist.gResponse[url]) or _G.gist.gResponse[url]
   end
   if headers == true and auth then
     headers = {
@@ -100,10 +101,10 @@ local function requestUrl(url, data, headers, opts)
     end
   end
   req:close()
-  local result = opts.decode and json:decode(response) or response
   if opts.cache then
-    gResponse[url] = result
+    _G.gist.gResponse[url] = response
   end
+  local result = opts.decode and json:decode(response) or response
   return result
 end
 
@@ -128,7 +129,7 @@ local function isIDValid(id)
   else
     getLink = true
   end
-  local response = requestUrl(url, nil, true, {timeout=100, resp=(getLink and getGistID)})
+  local response = requestUrl(url, nil, true, {timeout=100, resp=(getLink and getGistID), cache=true})
   if response and not getLink then
     response = json:decode(response)
   end
@@ -161,7 +162,7 @@ end
 
 local function shorten(url, code)
   local data = "url=" .. url .. (code and "&code=" .. code or "")
-  return requestUrl(URLS.gitio, data, false, {cache=true, decode=true, timeout=100})
+  return requestUrl(URLS.gitio, data, false, {cache=true, timeout=100})
 end
 
 local function help()
@@ -325,7 +326,7 @@ if options.G then
   local fr = getFullResponse(ID)
   print((fr.public and "Public " or "Secret ") .. "gist " .. fr.id)
   print(" " .. fr.description)
-  print(" Owner: " .. fr.owner.login)
+  print(" Owner: " .. ((fr.owner or {}).login or "anonymous"))
   print(" Comments: " .. fr.comments)
   print(" Forks: " .. #fr.forks)
   print(" Revisions: " .. #fr.history)
@@ -336,7 +337,7 @@ local files = getFileList(ID)
 
 if options.l then
   print("Files:")
-  for _, f in pairs(file) do
+  for _, f in pairs(files) do
     print(" * " .. f)
   end
   return
