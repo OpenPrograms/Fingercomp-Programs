@@ -422,13 +422,13 @@ modes.v = function(chan, user, set, arg)
   end
 end
 
-local function togglableMode(mode, level, soft)
+local function togglableMode(mode, level, any)
   checkArg(1, mode, "string")
   checkArg(2, level, "table")
   checkArg(3, soft, "boolean", "nil")
-  soft = soft or true
+  any = any or true
   return function(chan, user, set, arg)
-    assert(checkLevel(chan, user, level, soft), "no permission")
+    assert(checkLevel(chan, user, level, any), "no permission")
     if set and not isin(channels[chan].modes, mode) then
       table.insert(channels[chan].modes, mode)
     else
@@ -536,6 +536,7 @@ env.setMode = setMode
 env.modes = modes
 env.getLevel = getLevel
 env.checkLevel = checkLevel
+env.togglableMode = togglableMode
 env.storage = storage
 env.reqcom = reqcom
 env.copy = copy

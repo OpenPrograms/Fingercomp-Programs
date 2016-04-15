@@ -74,6 +74,7 @@ surfaces[user] = {
 * `modes` - a table containing modes.
 * `getLevel(chan, user)` - returns user access level mask.
 * `checkLevel(chan, user, levels, any)` - checks if a user has requested access. `levels` is a table containing access levels (`{OP, ADMIN, SERVER}`). If `any` is `true`, a user should have *any* of given access levels. Otherwise, a user should have *all* of them.
+* `togglableMode(char, levels[, any])` - creates a simple channel togglable mode.
 * `reqcom(componentName, required[, msg])` - get a component proxy. If `required` is `false` and component is unavailable, return a dummy component and `false`. Otherwise, error. Print a `msg` if component is not available.
 * `copy(tbl)` - returns a copy of a table.
 * `_FILE` - a module filename.
