@@ -90,6 +90,8 @@ addListener("chat_event_createChannel", "chanserv.event.create", function(evt, t
     channels[chan].banned = copy(cfg.chanserv.channels[chan].ban)
     channels[chan].exempt = copy(cfg.chanserv.channels[chan].exempt)
     channels[chan].modes = copy(cfg.chanserv.channels[chan].modes)
+  else
+    apcall(setMode, chan, cfg.server, "+o", user)
   end
 end)
 

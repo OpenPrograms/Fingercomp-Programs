@@ -1,9 +1,5 @@
 local event = require("event")
 
-addListener("chat_event_createChannel", "admin.event.onChannelCreate", function(evt, time, chan, user)
-  setMode(chan, cfg.server, "+o", user)
-end)
-
 addListener("chat_event_part", "admin.event.onUserPart", function(evt, time, chan, user)
   local users = {}
   for k, _ in pairs(channels[chan].users) do
