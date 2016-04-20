@@ -1,7 +1,7 @@
 local smap = {}
 smap.__index = smap
 
-smap.audio = require("audio")
+smap.audio = require("smap.audio")
 local audio = smap.audio
 
 local fs = require("filesystem")
@@ -75,7 +75,7 @@ local function addEnv(e)
       end
     end,
     __newindex = globals
-  }, e)
+  }, e), globals
 end
 
 function env:setName(name)
@@ -86,7 +86,7 @@ for _, modtype in pairs({"input", "output"}) do
   for file in filesystem.list(path(modtype)) do
     if file:sub(-#("." .. modtype .. ".module")) == "." .. modtype .. ".module" then
       local p = path(modtype, file)
-      local mEnv = addEnv({
+      local mEnv, globals = addEnv({
         _MODULE = file:sub(1, -#a - 1),
         _FILE = file,
         _PATH = p,
@@ -94,11 +94,15 @@ for _, modtype in pairs({"input", "output"}) do
       })
       local success, chunk = pcall(loadfile, p, "t", mEnv)
       if not success then
-        io.stderr:write("Could not load an " .. modtype .. " module \"" .. p .. "\": " .. chunk .. "\n")
+        return false, "fatal", chunk, p
       else
         local success, module = xpcall(chunk, debug.traceback)
         if not success then
-          io.stderr:write("Could not run an " .. modtype .. " module \"" .. p .. "\": " .. module .. "\n")
+          return false, "fatal", module, p
+        else
+          if mEnv._name and not smap.module[modtype][mEnv._name] then
+            smap.modules[modtype][mEnv._name] = globals
+          end
         end
       end
     end
