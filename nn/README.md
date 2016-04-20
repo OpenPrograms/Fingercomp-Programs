@@ -45,6 +45,8 @@ This program allows the player to control their's nanomachines.
   * Get player's name.
 * `input`
   * Get max safe and hard max active inputs limits.
+* `copy`
+  * Save the nanomachines configration to other nanomachines in inventory.
 * `efon`
   * Get currently active effects.
 * `combo [exclude...]`

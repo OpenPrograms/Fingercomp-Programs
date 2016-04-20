@@ -233,17 +233,29 @@ end
 
 local function getHP()
   local data = g("getHealth")
-  io.write("HP: " .. string.rep("♥", data[8]) .. string.rep("♡", data[9] - data[8]) .. " (" .. data[8] .. "/" .. data[9] .. ")\n")
+  if data then
+    io.write("HP: " .. string.rep("♥", data[8]) .. string.rep("♡", data[9] - data[8]) .. " (" .. data[8] .. "/" .. data[9] .. ")\n")
+  else
+    print("Oops, no response")
+  end
 end
 
 local function getHung()
   local data = g("getHunger")
-  io.write("Hunger: " .. data[8] .. " | Saturation: " .. data[9])
+  if data then
+    io.write("Hunger: " .. data[8] .. " | Saturation: " .. data[9])
+  else
+    print("Oops, no response")
+  end
 end
 
 local function getEnergy()
   local data = g("getPowerState")
-  io.write("↯: " .. data[8] .. "/" .. data[9] .. " (" .. math.floor(data[8] / data[9] * 100) .. "%)")
+  if data then
+    io.write("↯: " .. data[8] .. "/" .. data[9] .. " (" .. math.floor(data[8] / data[9] * 100) .. "%)")
+  else
+    print("Opps, no response")
+  end
 end
 
 local function formatNum(num)
@@ -255,6 +267,10 @@ local function usage()
   local data = {}
   for run = 1, 2, 1 do
     data[run] = g("getPowerState")
+    if not data[run] then
+      print("Oops, no response")
+      return
+    end
     os.sleep(1)
   end
   print("Usage: " .. formatNum(data[2][8] - data[1][8]) .. " per second")
@@ -262,23 +278,49 @@ end
 
 local function getAge()
   local data = g("getAge")
-  io.write("Age: " .. data[8] .. "s")
+  if data then
+    io.write("Age: " .. data[8] .. "s")
+  else
+    print("Oops, no response")
+  end
 end
 
 local function getName()
   local data = g("getName")
-  io.write("Player's name is " .. data[8])
+  if data then
+    io.write("Player's name is " .. data[8])
+  else
+    print("Oops, no response")
+  end
 end
 
 local function getInputsInfo()
   local safe = g("getSafeActiveInputs")
   local max = g("getMaxActiveInputs")
-  print("Safe: " .. safe[8] .. ", max: " .. max[8])
+  print("Safe: " .. (safe[8] or "none") .. ", max: " .. (max[8] or "none"))
 end
 
 local function getActiveEffects()
   local data = g("getActiveEffects")
-  print(data[8])
+  if data then
+    print(data[8])
+  else
+    print("Oops, no response")
+  end
+end
+
+local function copy()
+  local data = g("saveConfiguration")
+  if data then
+    if data[8] == false then
+      io.stderr("There was a problem: " .. (data[9] or "unknown") .. " =\\")
+      return
+    else
+      print("Copied!")
+    end
+  else
+    print("Oops, no response")
+  end
 end
 
 local function group(...)
@@ -357,6 +399,7 @@ local actions = {
   age = getAge,
   name = getName,
   input = getInputsInfo,
+  copy = copy,
   efon = getActiveEffects,
   combo = combotest,
   getcombo = getCombo,

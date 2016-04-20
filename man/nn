@@ -61,6 +61,9 @@ ACTIONS
   input
     Get max safe and hard max active input limits.
   
+  copy
+    Save the nanomachines configuration to other nanomachines in inventory.
+  
   efon
     Get turned on effects.
   
