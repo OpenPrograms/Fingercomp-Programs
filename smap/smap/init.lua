@@ -51,18 +51,18 @@ end
 smap.modules = {}
 smap.modules.input = {}
 local input = smap.modules.input
-local inputNames = {}
 smap.modules.output = {}
 local output = smap.modules.output
-local outputNames
 
 local env = {}
+local ienv = {}
+local oenv = {}
 
 local function addEnv(e)
   local globals = {}
   return concat({
     __index = function(self, k)
-      for _, tbl in ipairs({e.TYPE == INPUT and ienv or oenv}) do
+      for _, tbl in ipairs({globals, e.TYPE == INPUT and ienv or oenv, env}) do
         if tbl[k] then
           if type(tbl[k]) == "function" then
             return function(...)
@@ -82,22 +82,24 @@ function env:setName(name)
   self._name = name
 end
 
-for file in filesystem.list(path("input")) do
-  if file:sub(-#(".input.module")) == ".input.module" then
-    local p = path("input", file)
-    local mEnv = addEnv({
-      _MODULE = file:sub(1, -#a - 1),
-      _FILE = file,
-      _PATH = p,
-      _TYPE = INPUT
-    })
-    local success, chunk = pcall(loadfile, p, "t", mEnv)
-    if not success then
-      io.stderr:write("Could not load an input module \"" .. p .. "\": " .. chunk .. "\n")
-    else
-      local success, module = xpcall(chunk, debug.traceback)
+for _, modtype in pairs({"input", "output"}) do
+  for file in filesystem.list(path(modtype)) do
+    if file:sub(-#("." .. modtype .. ".module")) == "." .. modtype .. ".module" then
+      local p = path(modtype, file)
+      local mEnv = addEnv({
+        _MODULE = file:sub(1, -#a - 1),
+        _FILE = file,
+        _PATH = p,
+        _TYPE = modtype == "input" and INPUT or OUTPUT
+      })
+      local success, chunk = pcall(loadfile, p, "t", mEnv)
       if not success then
-        io.stderr:write("Could not run an input module \"" .. p .. "\": " .. module .. "\n")
+        io.stderr:write("Could not load an " .. modtype .. " module \"" .. p .. "\": " .. chunk .. "\n")
+      else
+        local success, module = xpcall(chunk, debug.traceback)
+        if not success then
+          io.stderr:write("Could not run an " .. modtype .. " module \"" .. p .. "\": " .. module .. "\n")
+        end
       end
     end
   end
