@@ -23,7 +23,7 @@ local function checkType(name, value, ...)
   elseif #types > 2 then
     exp = table.concat(types, ", ", 1, #types - 1) .. ", or " .. types[#types]
   end
-  error(("bad argument %s (%s expected, got %s)"):format(tonumber(name) and ("#" .. name) or ('"' .. name .. '"'), getType(value)))
+  error(("bad argument %s (%s expected, got %s)"):format(tonumber(name) and ("#" .. name) or ('"' .. name .. '"'), exp, getType(value)))
 end
 
 
@@ -39,17 +39,20 @@ function Chord:new()
   return o
 end
 
-function Chord:add(flt, ...)
-  local tbl = {flt, ...}
+function Chord:add(...)
+  local tbl = {...}
   for num, item in ipairs(tbl) do
     item.freq = item.freq or item.f or item[1]
     item.length = item.length or item.l or item[2]
+    item.instr = item.instrument or item.instr or item[3]
     item.f = nil
     item[1] = nil
     item.l = nil
     item[2] = nil
+    item.instrument = nil
+    item[3] = nil
     if not tonumber(item.freq) or not tonumber(item.length) then
-      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number}, got {" .. type(item.freq) .. ", " .. type(item.length) .. "}")
+      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, string}, got {" .. type(item.freq) .. ", " .. type(item.length) .. ", " .. type(item.instr) .. "}")
     end
     table.insert(self.data, item)
   end
@@ -65,7 +68,7 @@ function Chord:__pairs()
   return function()
     pos = pos + 1
     if self.data[pos] then
-      return self.data[pos].freq, self.data[pos].length
+      return self.data[pos].freq, self.data[pos].length, self.data[pos].instr
     else
       return nil
     end
@@ -80,25 +83,23 @@ Chord.__ipairs = Chord.__pairs
 --    Stores an array of Chords, and its length.
 --    Calls a given function when reaches a specific time.
 
-local Buffer = {data={},length=math.huge,func=nil,to=math.huge,pos=1,called=false}
-local Buffer.__name = "Buffer"
+local Buffer = {data={},length=0,func=nil,to=math.huge,pos=1,called=false}
+Buffer.__name = "Buffer"
 
 function Buffer:new(args)
-  checkArg(1, args, "table")
-  local length = args.length or args.len or args.l
-  local func = args.function or args.func
+  checkType(1, args, "table")
+  local func = args.func
   local to = args.timeout or args.to
-  checkType("length", length, "number")
   checkType("func", func, "function")
   checkType("to", to, "number")
-  self.length, self.func, self.to = length, func, to
+  self.func, self.to = func, to
   local o = setmetatable({}, self)
   self.__index = self
   return o
 end
 
 function Buffer:seek(pos)
-  checkArg(1, pos, "number")
+  checkType(1, pos, "number")
   if pos > self.length then
     self.pos = self.length
   elseif pos < 1 then
@@ -119,6 +120,7 @@ function Buffer:add(...)
     checkType(num, tick, "number")
     checkType(num, chord, "Chord")
     table.insert(self.data, {tick = tick, chord = chord})
+    self.length = math.max(self.length, tick)
   end
   return true
 end
@@ -126,7 +128,7 @@ end
 function Buffer:play()
   local chords = {}
   for k, v in ipairs(self.data) do
-    if v[1].tick == self.pos then
+    if v.tick == self.pos then
       table.insert(chords, v.chord)
     end
   end
@@ -136,12 +138,94 @@ function Buffer:play()
     self.called = false
   end
   self.pos = self.pos + 1
-  return chords
+  if self.pos <= self.length then
+    return chords
+  else
+    return nil
+  end
+end
+
+function Buffer:__pairs()
+  local pos = 0
+  return function()
+    pos = pos + 1
+    if self.data[pos] then
+      return self.data[pos].tick, self.data[pos].chord
+    else
+      return nil
+    end
+  end
+end
+
+function Buffer:__ipairs()
+  local grouped = {}
+  for k, v in pairs(self.data) do
+    grouped[v.tick] = grouped[v.tick] or {}
+    table.insert(grouped[v.tick], v.chord)
+  end
+  local pos = -1
+  return function()
+    pos = pos + 1
+    return pairs(grouped)
+  end
 end
 
 
 
-local function call(class) -- Sugar! Makes a class callable.
+--  Track
+--    Stores buffers and audio info.
+
+local Track = {data={},tempo=0,length=math.huge,pos=1}
+Track.__name = "Track"
+
+function Track:new(args)
+  checkType(1, args, "table")
+  local tempo = args.tempo
+  local length = args.length or args.len or args.l
+  checkType("tempo", tempo, "number")
+  checkType("length", length, "number")
+  self.tempo, self.length = tempo, length
+  local o = setmetatable({}, self)
+  self.__index = self
+  return o
+end
+
+function Track:add(buffer)
+  checkType(1, buffer, "Buffer")
+  table.insert(self.data, buffer)
+  self.length = math.max(self.length, self.data[#self.data].length)
+  return #self.data
+end
+
+function Track:play()
+  if not self.data[self.pos] then
+    return false, "end"
+  end
+  self.length = math.max(self.length, self.data[#self.data].length)
+  local result = self.data[self.pos]:play()
+  if result == nil then
+    self.pos = self.pos + 1
+    if self.data[self.pos] then
+      self.data[self.pos]:seek(1)
+    end
+    return self:play()
+  end
+  return result
+end
+
+function Track:__pairs()
+  local pos = -1
+  return function()
+    pos = pos + 1
+    return self.data[pos]
+  end
+end
+
+Track.__ipairs = Track.__pairs
+
+
+
+local function callable(class) -- Sugar! Makes a class callable.
   class.__name = class.__name or "<?>"
   class.__tostring = function()
     return "An object \"" .. class.__name .. "\""
@@ -156,7 +240,9 @@ local function call(class) -- Sugar! Makes a class callable.
 end
 
 return {
-  Chord = call(Chord)
+  Chord = callable(Chord),
+  Buffer = callable(Buffer),
+  Track = callable(Track)
 }
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
