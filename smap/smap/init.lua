@@ -1,5 +1,4 @@
 local smap = {}
-smap.__index = smap
 
 smap.audio = require("smap.audio")
 local audio = smap.audio
@@ -79,8 +78,11 @@ local function addEnv(e)
 end
 
 function env:setName(name)
-  self._name = name
+  self.__name = name
 end
+
+env.audio = audio
+
 
 for _, modtype in pairs({"input", "output"}) do
   for file in fs.list(path(modtype)) do
@@ -100,13 +102,24 @@ for _, modtype in pairs({"input", "output"}) do
         if not success then
           return false, "fatal", module, p
         else
-          if mEnv._name and not smap.module[modtype][mEnv._name] then
-            smap.modules[modtype][mEnv._name] = globals
+          if mEnv.__name and not smap.module[modtype][mEnv.__name] then
+            smap.modules[modtype][mEnv.__name] = globals
           end
         end
       end
     end
   end
+end
+
+function smap.load(path, format)
+  format = format:lower(format)
+  if not smap.modules.input[format] then
+    return false, "uncompatible file format"
+  end
+  if not smap.modules.input[format].load then
+    return false, "load is not implemented in module"
+  end
+  return smap.modules.input[format].load(path)
 end
 
 return smap
