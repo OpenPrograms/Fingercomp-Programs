@@ -1,3 +1,5 @@
+local event = require("event")
+
 local function getType(v)
   local t = type(v)
   if t == "table" then
@@ -127,6 +129,13 @@ function Buffer:add(...)
   return true
 end
 
+function Buffer:getLength()
+  for _, item in pairs(self.data) do
+    self.length = math.max(self.length, item.tick)
+  end
+  return self.length
+end
+
 function Buffer:play()
   local chords = {}
   for k, v in ipairs(self.data) do
@@ -191,18 +200,40 @@ function Track:new(args)
   return o
 end
 
+function Track:getLength()
+  if #self.data > 0 then
+    self.length = self.data[#self.data]:getLength()
+  else
+    self.length = 0
+  end
+  return self.length
+end
+
 function Track:add(buffer)
   checkType(1, buffer, "Buffer")
   table.insert(self.data, buffer)
-  self.length = math.max(self.length, self.data[#self.data].length)
+  self:getLength()
   return #self.data
 end
 
+function Track:seek(pos)
+  if not self.data[pos] then
+    self.pos = self.length
+  elseif pos < 1 then
+    self.pos = 1
+  else
+    self.pos = pos
+  end
+  if self.data[pos] then
+    self.data[pos]:seek(1)
+  end
+end
+
 function Track:play()
+  self:getLength()
   if not self.data[self.pos] then
     return false, "end"
   end
-  self.length = math.max(self.length, self.data[#self.data].length)
   local result = self.data[self.pos]:play()
   if result == nil then
     self.pos = self.pos + 1
@@ -226,6 +257,98 @@ Track.__ipairs = Track.__pairs
 
 
 
+--  Music
+--    A handle, connects Track and devices.
+
+local Music = {}
+Music.__name = "Music"
+
+function Music:new(track)
+  checkType(1, track, "Track")
+  local o = {track = track, devices = {}, timer = nil, stopping = false}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function Music:connect(device)
+  checkType(1, device, "Device")
+  table.insert(self.devices, device)
+end
+
+function Music:disconnect(device)
+  checkType(1, device, "Device")
+  local _, pos = isin(self.devices, device)
+  if not pos then
+    error("no such device")
+  end
+  table.remove(self.devices, pos)
+end
+
+function Music:seek(pos)
+  self.track:seek(pos)
+end
+
+function Music:play(len)
+  checkType(1, len, "number")
+  if self.timer then
+    return false, "already playing in background"
+  end
+  for i = 1, len, 1 do
+    if self.stopping then
+      return false, "stopped"
+    end
+    local success, reason = self.track:play()
+    if not success then
+      return success, reason
+    end
+    for _, dev in pairs(self.devices) do
+      dev:play(success)
+    end
+    os.sleep(1 / self.track.tempo)
+  end
+  return true
+end
+
+function Music:getPos()
+  return self.track.pos
+end
+
+function Music:getLength()
+  return self.track:getLength()
+end
+
+function Music:bgPlayStart(len)
+  if self.timer then
+    return false, "already plaring in background"
+  end
+  self.timer = event.timer(1 / self.timer.tempo, function()
+    local success = self:play(1)
+    if not success then
+      self:bgPlayStop()
+    end
+  end, len)
+end
+
+function Music:bgPlayStop()
+  if not self.timer then
+    return
+  end
+  event.cancel(self.timer)
+  self.timer = nil
+end
+
+function Music:stop()
+  self:bgPlayStop()
+  self.stopping = true
+end
+
+function Music:resume()
+  self.stopping = false
+end
+
+
+
 local function callable(class) -- Sugar! Makes a class callable.
   class.__name = class.__name or "<?>"
   class.__tostring = function()
@@ -243,7 +366,8 @@ end
 return {
   Chord = callable(Chord),
   Buffer = callable(Buffer),
-  Track = callable(Track)
+  Track = callable(Track),
+  Music = callable(Music)
 }
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
