@@ -30,11 +30,12 @@ end
 --  Chord
 --    Stores an array of frequency-length tables.
 
-local Chord = {data={}}
+local Chord = {}
 Chord.__name = "Chord"
 
 function Chord:new()
-  local o = setmetatable({}, self)
+  local o = {data={}}
+  setmetatable(o, self)
   self.__index = self
   return o
 end
@@ -83,7 +84,7 @@ Chord.__ipairs = Chord.__pairs
 --    Stores an array of Chords, and its length.
 --    Calls a given function when reaches a specific time.
 
-local Buffer = {data={},length=0,func=nil,to=math.huge,pos=1,called=false}
+local Buffer = {}
 Buffer.__name = "Buffer"
 
 function Buffer:new(args)
@@ -93,7 +94,8 @@ function Buffer:new(args)
   checkType("func", func, "function")
   checkType("to", to, "number")
   self.func, self.to = func, to
-  local o = setmetatable({}, self)
+  local o = {data={},length=0,func=nil,to=math.huge,pos=1,called=false}
+  o = setmetatable(o, self)
   self.__index = self
   return o
 end
@@ -175,17 +177,16 @@ end
 --  Track
 --    Stores buffers and audio info.
 
-local Track = {data={},tempo=0,length=math.huge,pos=1}
+local Track = {}
 Track.__name = "Track"
 
 function Track:new(args)
   checkType(1, args, "table")
   local tempo = args.tempo
-  local length = args.length or args.len or args.l
   checkType("tempo", tempo, "number")
-  checkType("length", length, "number")
-  self.tempo, self.length = tempo, length
-  local o = setmetatable({}, self)
+  self.tempo = tempo
+  local o = {data={},tempo=0,length=0,pos=1}
+  setmetatable(o, self)
   self.__index = self
   return o
 end
@@ -228,12 +229,12 @@ Track.__ipairs = Track.__pairs
 local function callable(class) -- Sugar! Makes a class callable.
   class.__name = class.__name or "<?>"
   class.__tostring = function()
-    return "An object \"" .. class.__name .. "\""
+    return "Object \"" .. class.__name .. "\""
   end
   return setmetatable(class, {
     __call = class.new,
     __tostring = function()
-      return "A class \"" .. class.__name .. "\""
+      return "Class \"" .. class.__name .. "\""
     end,
     __name = class
   })

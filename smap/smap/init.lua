@@ -83,7 +83,7 @@ function env:setName(name)
 end
 
 for _, modtype in pairs({"input", "output"}) do
-  for file in filesystem.list(path(modtype)) do
+  for file in fs.list(path(modtype)) do
     if file:sub(-#("." .. modtype .. ".module")) == "." .. modtype .. ".module" then
       local p = path(modtype, file)
       local mEnv, globals = addEnv({
@@ -108,5 +108,7 @@ for _, modtype in pairs({"input", "output"}) do
     end
   end
 end
+
+return smap
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
