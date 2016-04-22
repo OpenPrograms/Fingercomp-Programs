@@ -154,7 +154,7 @@ function Buffer:play()
   if self.pos == self:getLength() - self.to + 1 and not self.called then
     -- Run a new buffer generator function
     self.func(self)
-    self.called = false
+    self.called = true
   end
   self.pos = self.pos + 1
   if self.pos <= self.length then
