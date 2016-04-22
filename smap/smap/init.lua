@@ -61,7 +61,7 @@ local function addEnv(e)
   local globals = {}
   return concat({
     __index = function(self, k)
-      for _, tbl in ipairs({globals, e.TYPE == INPUT and ienv or oenv, env}) do
+      for _, tbl in ipairs({globals, e.TYPE == INPUT and ienv or oenv, env, _G}) do
         if tbl[k] then
           if type(tbl[k]) == "function" then
             return function(...)
@@ -116,10 +116,13 @@ function smap.load(path, format)
   if not smap.modules.input[format] then
     return false, "uncompatible file format"
   end
-  if not smap.modules.input[format].load then
+  if not smap.modules.input[format].loadpath then
     return false, "load is not implemented in module"
   end
-  return smap.modules.input[format].load(path)
+  if not fs.exists(path) then
+    return false, "no such file"
+  end
+  return smap.modules.input[format].loadpath(path)
 end
 
 return smap
