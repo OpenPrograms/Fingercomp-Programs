@@ -349,6 +349,22 @@ end
 
 
 
+--  Device
+--    Class used by Music to play Chords
+
+local Device = {}
+Device.__name = "Device"
+
+function Device:new(playImpl)
+  checkType(1, playImpl, "function")
+  local o = {play = playImpl}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+
+
 local function callable(class) -- Sugar! Makes a class callable.
   class.__name = class.__name or "<?>"
   class.__tostring = function()
@@ -367,7 +383,8 @@ return {
   Chord = callable(Chord),
   Buffer = callable(Buffer),
   Track = callable(Track),
-  Music = callable(Music)
+  Music = callable(Music),
+  Device = callable(Device)
 }
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :

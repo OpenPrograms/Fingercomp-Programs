@@ -1,8 +1,12 @@
 -- Note Block Studio files reader
 -- Used: http://pastebin.com/yrtLYBhz
 
+local fs = require("filesystem")
+
+NAME = "nbs"
+
 local function note2freq(note)
-  return freq = 2 ^ ((note - 49) / 12) * 440
+  return 2 ^ ((note - 49) / 12) * 440
 end
 
 local function byte(file)
@@ -34,7 +38,7 @@ function loadpath(path)
   local track
 
   local function loadBuffer(file, curTick, tempo, size)
-    local buf = audio.Buffer{to=10, function(b)
+    local buf = audio.Buffer{to=10, func=function(b)
       local newBuf = loadBuffer(file, b.pos, track.tempo, size)
       if newBuf then
         track:add(newBuf)
@@ -62,7 +66,7 @@ function loadpath(path)
         local instr = byte(file)
         local note = byte(file)
         local freq = note2freq(note)
-        chord:add{freq=freq, length=(1 / tempo), instr}
+        chord:add{freq=freq, length=(1000 / tempo), instr}
       end
 
       buf:add({tick, chord})
@@ -71,6 +75,8 @@ function loadpath(path)
     if #buf.data > 0 then
       return buf
     end
+
+    file:close()
 
     return nil
   end
