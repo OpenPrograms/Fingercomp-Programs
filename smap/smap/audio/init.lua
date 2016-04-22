@@ -1,5 +1,14 @@
 local event = require("event")
 
+local function isin(tbl, value)
+  for k, v in pairs(tbl) do
+    if v == value then
+      return true, k
+    end
+  end
+  return false
+end
+
 local function getType(v)
   local t = type(v)
   if t == "table" then
@@ -45,17 +54,17 @@ end
 function Chord:add(...)
   local tbl = {...}
   for num, item in ipairs(tbl) do
-    item.freq = item.freq or item.f or item[1]
-    item.length = item.length or item.l or item[2]
-    item.instr = item.instrument or item.instr or item[3]
+    item.freq = tonumber(item.freq or item.f or item[1])
+    item.length = tonumber(item.length or item.l or item[2])
+    item.instr = tonumber(item.instrument or item.instr or item[3])
     item.f = nil
     item[1] = nil
     item.l = nil
     item[2] = nil
     item.instrument = nil
     item[3] = nil
-    if not tonumber(item.freq) or not tonumber(item.length) then
-      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, string}, got {" .. type(item.freq) .. ", " .. type(item.length) .. ", " .. type(item.instr) .. "}")
+    if not tonumber(item.freq) or not tonumber(item.length) or not tonumber(item.instr) then
+      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, number}, got {" .. type(item.freq) .. ", " .. type(item.length) .. ", " .. type(item.instr) .. "}")
     end
     table.insert(self.data, item)
   end
@@ -263,7 +272,7 @@ Music.__name = "Music"
 
 function Music:new(track)
   checkType(1, track, "Track")
-  local o = {track = track, devices = {}, timer = nil, stopping = false}
+  local o = {track = track, devices = {}, timer = false, stopping = false}
   setmetatable(o, self)
   self.__index = self
   return o
@@ -320,12 +329,13 @@ function Music:bgPlayStart(len)
   if self.timer then
     return false, "already playing in background"
   end
-  self.timer = event.timer(1 / self.timer.tempo, function()
+  self.timer, reason = event.timer(1 / self.track.tempo, function()
     local success = self:play(1)
     if not success then
       self:bgPlayStop()
     end
   end, len)
+  print(self.timer, reason, self)
 end
 
 function Music:bgPlayStop()
@@ -333,7 +343,7 @@ function Music:bgPlayStop()
     return
   end
   event.cancel(self.timer)
-  self.timer = nil
+  self.timer = false
 end
 
 function Music:stop()

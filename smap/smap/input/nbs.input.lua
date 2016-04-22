@@ -48,6 +48,10 @@ function loadpath(path)
     local tick = 0
 
     while true do
+      if #buf.data >= size then
+        break
+      end
+
       local jumps = nbsInt16(byte(file), byte(file))
 
       if jumps == 0 then
@@ -55,9 +59,6 @@ function loadpath(path)
       end
 
       tick = tick + jumps
-      if #buf.data > size then
-        break
-      end
       
       local chord = audio.Chord()
       while true do 
@@ -68,7 +69,7 @@ function loadpath(path)
         local instr = byte(file)
         local note = byte(file)
         local freq = note2freq(note)
-        chord:add{freq=freq, length=(1000 / tempo), instr}
+        chord:add{freq=freq, length=(1000 / tempo), instr=instr}
       end
 
       buf:add({tick, chord})
@@ -92,7 +93,7 @@ function loadpath(path)
   local originAuthor = nbsStr(file)
   local desc = nbsStr(file)
 
-  local tempo = nbsInt16(byte(file), byte(file)) / 1000
+  local tempo = nbsInt16(byte(file), byte(file)) / 100
 
   local trash = file:read(23)
   trash = nbsStr(file)

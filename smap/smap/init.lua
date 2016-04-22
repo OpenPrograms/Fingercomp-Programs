@@ -40,6 +40,34 @@ local function copy(tbl)
   return result
 end
 
+local function getType(v)
+  local t = type(v)
+  if t == "table" then
+    t = v.__name or (getmetatable(v) or {}).__name or t
+  end
+  return t
+end
+
+local function checkType(name, value, ...)
+  local types = {...}
+  for _, t in pairs(types) do
+    if getType(value) == t then
+      return true
+    end
+  end
+  local exp = ""
+  if #types == 0 then
+    return true
+  elseif #types == 1 then
+    exp = types[1]
+  elseif #types == 2 then
+    exp = table.concat(types, ", ")
+  elseif #types > 2 then
+    exp = table.concat(types, ", ", 1, #types - 1) .. ", or " .. types[#types]
+  end
+  error(("bad argument %s (%s expected, got %s)"):format(tonumber(name) and ("#" .. name) or ('"' .. name .. '"'), exp, getType(value)))
+end
+
 local function path(p, ...)
   if p:sub(1, 1) ~= "/" then
     p = fs.concat(pwd, p, ...)
@@ -82,6 +110,11 @@ local function addEnv(e)
 end
 
 env.audio = audio
+env.isin = isin
+env.getType = getType
+env.checkType = checkType
+env.copy = copy
+env.concat = concat
 
 
 for _, modtype in pairs({"input", "output"}) do
