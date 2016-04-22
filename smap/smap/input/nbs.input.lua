@@ -37,13 +37,15 @@ function loadpath(path)
 
   local track
 
-  local function loadBuffer(file, curTick, tempo, size)
+  local function loadBuffer(file, tempo, size)
     local buf = audio.Buffer{to=10, func=function(b)
-      local newBuf = loadBuffer(file, b.pos, track.tempo, size)
+      local newBuf = loadBuffer(file, track.tempo, size)
       if newBuf then
         track:add(newBuf)
       end
     end}
+
+    local tick = 0
 
     while true do
       local jumps = nbsInt16(byte(file), byte(file))
@@ -52,7 +54,7 @@ function loadpath(path)
         break
       end
 
-      local tick = curTick + jumps
+      tick = tick + jumps
       if #buf.data > size then
         break
       end
@@ -90,13 +92,13 @@ function loadpath(path)
   local originAuthor = nbsStr(file)
   local desc = nbsStr(file)
 
-  local tempo = nbsInt16(byte(file), byte(file))
+  local tempo = nbsInt16(byte(file), byte(file)) / 1000
 
   local trash = file:read(23)
   trash = nbsStr(file)
 
   track = audio.Track{tempo = tempo}
-  local firstBuffer = loadBuffer(file, 0, tempo, 60)
+  local firstBuffer = loadBuffer(file, tempo, 120)
 
   if firstBuffer then
     track:add(firstBuffer)
