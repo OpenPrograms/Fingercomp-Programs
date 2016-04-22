@@ -19,7 +19,7 @@ local function isin(tbl, value)
 end
 
 local function concat(t1, t2)
-  local result
+  local result = {}
   for k, v in pairs(t1) do
     result[k] = v
   end
@@ -43,6 +43,8 @@ end
 local function path(p, ...)
   if p:sub(1, 1) ~= "/" then
     p = fs.concat(pwd, p, ...)
+  else
+    p = fs.concat(p, ...)
   end
   return p
 end
@@ -59,13 +61,14 @@ local oenv = {}
 
 local function addEnv(e)
   local globals = {}
-  return concat({
+  local o = copy(e)
+  setmetatable(o, {
     __index = function(self, k)
       for _, tbl in ipairs({globals, e.TYPE == INPUT and ienv or oenv, env, _G}) do
         if tbl[k] then
           if type(tbl[k]) == "function" then
             return function(...)
-              return tbl[k](self, ...)
+              return tbl[k](...)
             end
           else
             return tbl[k]
@@ -74,27 +77,24 @@ local function addEnv(e)
       end
     end,
     __newindex = globals
-  }, e), globals
-end
-
-function env:setName(name)
-  self.__name = name
+  })
+  return o, globals
 end
 
 env.audio = audio
 
 
 for _, modtype in pairs({"input", "output"}) do
-  for file in fs.list(path(modtype)) do
-    if file:sub(-#("." .. modtype .. ".module")) == "." .. modtype .. ".module" then
-      local p = path(modtype, file)
+  for file in fs.list(path("/usr/lib/smap", modtype)) do
+    if file:sub(-#("." .. modtype .. ".lua")) == "." .. modtype .. ".lua" then
+      local p = path("/usr/lib/smap", modtype, file)
       local mEnv, globals = addEnv({
-        _MODULE = file:sub(1, -#a - 1),
+        _MODULE = file:sub(1, -#file - 1),
         _FILE = file,
         _PATH = p,
         _TYPE = modtype == "input" and INPUT or OUTPUT
       })
-      local success, chunk = pcall(loadfile, p, "t", mEnv)
+      local success, chunk, reason = pcall(loadfile, p, "t", mEnv)
       if not success then
         return false, "fatal", chunk, p
       else
@@ -102,8 +102,8 @@ for _, modtype in pairs({"input", "output"}) do
         if not success then
           return false, "fatal", module, p
         else
-          if mEnv.__name and not smap.module[modtype][mEnv.__name] then
-            smap.modules[modtype][mEnv.__name] = globals
+          if globals.NAME and not smap.modules[modtype][globals.NAME] then
+            smap.modules[modtype][globals.NAME] = globals
           end
         end
       end
@@ -112,9 +112,11 @@ for _, modtype in pairs({"input", "output"}) do
 end
 
 function smap.load(path, format)
+  checkArg(1, path, "string")
+  checkArg(2, format, "string")
   format = format:lower(format)
   if not smap.modules.input[format] then
-    return false, "uncompatible file format"
+    return false, "unknown file format"
   end
   if not smap.modules.input[format].loadpath then
     return false, "load is not implemented in module"
