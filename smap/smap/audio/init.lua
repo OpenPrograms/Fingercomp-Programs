@@ -143,7 +143,7 @@ function Buffer:play()
       table.insert(chords, v.chord)
     end
   end
-  if self.pos == self.to and not self.called then
+  if self.pos == self:getLength() - self.to + 1 and not self.called then
     -- Run a new buffer generator function
     self.func(self)
     self.called = false
@@ -320,7 +320,7 @@ end
 
 function Music:bgPlayStart(len)
   if self.timer then
-    return false, "already plaring in background"
+    return false, "already playing in background"
   end
   self.timer = event.timer(1 / self.timer.tempo, function()
     local success = self:play(1)
