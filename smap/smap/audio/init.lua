@@ -95,8 +95,7 @@ function Buffer:new(args)
   local to = args.timeout or args.to
   checkType("func", func, "function")
   checkType("to", to, "number")
-  self.func, self.to = func, to
-  local o = {data={},length=0,func=nil,to=math.huge,pos=1,called=false}
+  local o = {data={},length=0,func=func,to=to,pos=1,called=false}
   o = setmetatable(o, self)
   self.__index = self
   return o
@@ -193,8 +192,7 @@ function Track:new(args)
   checkType(1, args, "table")
   local tempo = args.tempo
   checkType("tempo", tempo, "number")
-  self.tempo = tempo
-  local o = {data={},tempo=0,length=0,pos=1}
+  local o = {data={},tempo=tempo,length=0,pos=1}
   setmetatable(o, self)
   self.__index = self
   return o
