@@ -11,7 +11,7 @@ function new()
   return audio.Device(function(buf, chords)
     for _, chord in pairs(chords) do
       for freq, len, instr in pairs(chord) do
-        noteblock.playNote(instr, freq2note(freq), 1)
+        noteblock.playNote(instr - 1, freq2note(freq), 1)
       end
     end
   end)

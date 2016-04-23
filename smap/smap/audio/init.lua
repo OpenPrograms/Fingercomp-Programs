@@ -157,7 +157,7 @@ function Buffer:play()
     self.called = true
   end
   self.pos = self.pos + 1
-  if self.pos <= self.length then
+  if self.pos - 1 <= self.length then
     return chords
   else
     return nil
@@ -312,7 +312,13 @@ function Music:play(len)
     for _, dev in pairs(self.devices) do
       dev:play(success)
     end
-    os.sleep(1 / self.track.tempo)
+    -- Found in Sangar's midi.lua code. Looks useful to me.
+    if math.floor(1 / self.track.tempo * 100 + 0.5) % 5 == 0 then
+      os.sleep(1 / self.track.tempo)
+    else
+      local begin = os.clock()
+      while os.clock() - begin < 1 / self.track.tempo do end
+    end
   end
   return true
 end
@@ -325,12 +331,12 @@ function Music:getLength()
   return self.track:getLength()
 end
 
-function Music:bgPlayStart(len)
+function Music:bgPlayStart(len, ticks)
   if self.timer then
     return false, "already playing in background"
   end
-  self.timer, reason = event.timer(1 / self.track.tempo, function()
-    local success = self:play(1)
+  self.timer, reason = event.timer(ticks / self.track.tempo, function()
+    local success = self:play(ticks)
     if not success then
       self:bgPlayStop()
     end
@@ -373,6 +379,18 @@ end
 
 
 
+--  Instruments
+
+local instr = {
+  piano = 1,
+  drum = 2,
+  snare = 3,
+  click = 4,
+  bass = 5
+}
+
+
+
 local function callable(class) -- Sugar! Makes a class callable.
   class.__name = class.__name or "<?>"
   class.__tostring = function()
@@ -392,7 +410,8 @@ return {
   Buffer = callable(Buffer),
   Track = callable(Track),
   Music = callable(Music),
-  Device = callable(Device)
+  Device = callable(Device),
+  instr = instr
 }
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
