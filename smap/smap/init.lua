@@ -1,3 +1,8 @@
+-- Big thanks to:
+--  * Sangar for his program, midi.lua, a huge part of it was borrowed for midi module,
+--  * FluttyProger for helping me to fight against these damn bugs,
+--  * TxN for his NBS player code.
+
 local smap = {}
 
 smap.audio = require("smap.audio")

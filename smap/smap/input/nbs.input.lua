@@ -30,6 +30,14 @@ local function nbsStr(file)
   return file:read(strlen)
 end
 
+local instr = {
+  [0] = audio.instr.piano,
+  [1] = audio.instr.bass,
+  [2] = audio.instr.drum,
+  [3] = audio.instr.snare,
+  [4] = audio.instr.click
+}
+
 function loadpath(path)
   if fs.isDirectory(path) then
     return false, "directories are not supported"
@@ -66,10 +74,10 @@ function loadpath(path)
         if curLayer == 0 then
           break
         end
-        local instr = byte(file)
+        local instrument = byte(file)
         local note = byte(file)
         local freq = note2freq(note)
-        chord:add{freq=freq, length=(1000 / tempo), instr=instr}
+        chord:add{freq=freq, length=(1000 / tempo), instr=instr[instrument]}
       end
 
       buf:add({tick, chord})
