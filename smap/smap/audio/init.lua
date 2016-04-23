@@ -208,10 +208,9 @@ function Track:new(args)
 end
 
 function Track:getLength()
-  if #self.data > 0 then
-    self.length = self.data[#self.data]:getLength()
-  else
-    self.length = 0
+  self.length = 0
+  for _, b in pairs(self.data) do
+    self.length = b:getLength()
   end
   return self.length
 end
@@ -301,6 +300,7 @@ function Music:play(len)
   if self.timer then
     return false, "already playing in background"
   end
+  local lastSleep = os.clock()
   for i = 1, len, 1 do
     if self.stopping then
       return false, "stopped"
@@ -315,9 +315,15 @@ function Music:play(len)
     -- Found in Sangar's midi.lua code. Looks useful to me.
     if math.floor(1 / self.track.tempo * 100 + 0.5) % 5 == 0 then
       os.sleep(1 / self.track.tempo)
+      lastSleep = os.clock()
     else
       local begin = os.clock()
-      while os.clock() - begin < 1 / self.track.tempo do end
+      while os.clock() - begin < 1 / self.track.tempo do
+        if os.clock() - lastSleep > 2.5 then
+          os.sleep(.05)
+          lastSleep = os.clock()
+        end
+      end
     end
   end
   return true
