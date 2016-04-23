@@ -31,7 +31,7 @@ local function init(rqpt, prpt)
   _G.max = (g("getTotalInputCount") or {})[8]
   if not _G.max then
     io.stderr:write("Failed to init.\n")
-    print("Are you sure you're near enough to a modem and you have nanomachines?")
+    print("Are you sure you're near enough to modem and you have nanomachines?")
     _G.max = 15
     return
   end
