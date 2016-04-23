@@ -11,3 +11,5 @@ This is a place where brilliant ideas become the programs.
   * My implementation of Life.
 * `opg-chat`
   * IRC-like OpenPeripheral glasses chat.
+* `smap`
+  * A *s*imple *M*inecraft *a*udio *p*layer.
