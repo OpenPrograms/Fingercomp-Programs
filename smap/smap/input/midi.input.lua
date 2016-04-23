@@ -4,7 +4,6 @@ local DEBUG = true
 NAME = "midi"
 
 local fs = require("filesystem")
-local note = require("note")
 local bit32 = bit32 or require("bit32")
 
 local function instr(i, ch)
@@ -19,12 +18,27 @@ local function instr(i, ch)
   end
 end
 
+function freq(n)
+  if type(n) == "string" then
+    n = string.lower(n)
+    if tonumber(notes[n])~=nil then
+      return 2 ^ ((tonumber(notes[n])-69)/12*440)
+    else
+      error("Wrong input "..tostring(n).." given to note.freq, needs to be <note>[semitone sign]<octave>, e.g. A#0 or Gb4",2)
+    end
+  elseif type(n) == "number" then
+    return 2 ^ (n-69)/12*440
+  else
+    error("Wrong input "..tostring(n).." given to note.freq, needs to be a number or a string",2)
+  end
+end
+
 function loadpath(path)
   if fs.isDirectory(path) then
     return false, "directories are not supported"
   end
 
-  local f, rsn = io.open(path)
+  local f, rsn = io.open(path, "rb")
   if not f then
     return false, rsn
   end
@@ -32,7 +46,6 @@ function loadpath(path)
   -- This code is borrowed from Sangar's awesome program, midi.lua
   -- Check it out here: https://github.com/OpenPrograms/Sangar-Programs/blob/master/midi.lua
   local function parseVarInt(s, bits) -- parses multiple bytes as an integer
-    print(s, bits)
     if not s then
       f:close()
       error("error parsing file")
@@ -65,7 +78,9 @@ function loadpath(path)
   local tracks = parseVarInt(f:read(2))
   local delta = parseVarInt(f:read(2))
 
-  print(format, tracks, delta)
+  if DEBUG then
+    print(format, tracks, delta)
+  end
 
   if format < 0 or format > 2 then
     f:close()
@@ -289,9 +304,10 @@ function loadpath(path)
 
   f:close()
 
-  local t = audio.Track{tempo = time.tick()}
+  local t = audio.Track{tempo = 1 / time.calcDelay(1, 0)}
+  local buf = audio.Buffer{func=function() end, to=0} -- All tracks are already loaded
 
-  local lastTick, lastTime = 0, computer.uptime()
+  local lastTick = 0
   for tick = 1, totalLength do
     local hasEvent = false
     for _, track in ipairs(tracks) do
@@ -301,9 +317,7 @@ function loadpath(path)
       end
     end
     if hasEvent then
-      local buf = audio.Buffer{func=function() end, to=0} -- All tracks are already loaded
       lastTick = tick
-      lastTime = computer.uptime()
       for _, track in ipairs(tracks) do
         local chord = audio.Chord()
         local event = track[tick]
@@ -311,17 +325,17 @@ function loadpath(path)
           if type(event) == "number" then
             time.mspb = event
           elseif type(event) == "table" then
-            local channel, note, velocity, duration = table.unpack(event)
-            chord:add({freq=note.freq(note), length=duration, instr=instr(track.instrument, channel)})
+            local channel, noteNum, velocity, duration = table.unpack(event)
+            chord:add({freq=freq(noteNum), length=duration, instr=instr(track.instrument or 1, channel)})
+            buf:add({tick, chord})
           end
         end
-        buffer:add({tick, chord})
       end
-      track:add(buf)
     end
   end
+  t:add(buf)
 
-  return audio.Music(track)
+  return audio.Music(t)
 end
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
