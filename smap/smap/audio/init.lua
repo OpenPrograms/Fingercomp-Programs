@@ -312,17 +312,11 @@ function Music:play(len)
     for _, dev in pairs(self.devices) do
       dev:play(success)
     end
-    -- Found in Sangar's midi.lua code. Looks useful to me.
-    if math.floor(1 / self.track.tempo * 100 + 0.5) % 5 == 0 then
-      os.sleep(1 / self.track.tempo)
-      lastSleep = os.clock()
-    else
-      local begin = os.clock()
-      while os.clock() - begin < 1 / self.track.tempo do
-        if os.clock() - lastSleep > 2.5 then
-          os.sleep(.05)
-          lastSleep = os.clock()
-        end
+    local begin = os.clock()
+    while os.clock() - begin < 1 / self.track.tempo do
+      if os.clock() - lastSleep > 2.5 then
+        os.sleep(.05)
+        lastSleep = os.clock()
       end
     end
   end
