@@ -14,11 +14,11 @@ local min, max = note2freq(0), note2freq(24)
 
 function new()
   local noteblock = require("component").iron_noteblock
-  return audio.Device(function(buf, chords)
+  return audio.Device(function(dev, chords)
     for _, chord in pairs(chords) do
       for freq, len, instr in pairs(chord) do
         while freq <= min do freq = freq * 2 end
-        while freq >= max do freq = freq / 2 end
+        while freq > max do freq = freq / 2 end
         noteblock.playNote(instr - 1, freq2note(freq), 1)
       end
     end
