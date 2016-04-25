@@ -57,12 +57,16 @@ function Chord:add(...)
     item.freq = tonumber(item.freq or item.f or item[1])
     item.length = tonumber(item.length or item.l or item[2])
     item.instr = tonumber(item.instrument or item.instr or item[3])
+    item.volume = tonumber(item.volume or item.vol or item.v or item[4]) or 1
     item.f = nil
     item[1] = nil
     item.l = nil
     item[2] = nil
     item.instrument = nil
     item[3] = nil
+    item.vol = nil
+    item.v = nil
+    item[4] = nil
     if not tonumber(item.freq) or not tonumber(item.length) or not tonumber(item.instr) then
       error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, number}, got {" .. type(item.freq) .. ", " .. type(item.length) .. ", " .. type(item.instr) .. "}")
     end
@@ -80,7 +84,7 @@ function Chord:__pairs()
   return function()
     pos = pos + 1
     if self.data[pos] then
-      return self.data[pos].freq, self.data[pos].length, self.data[pos].instr
+      return self.data[pos].freq, self.data[pos].length, self.data[pos].instr, self.data[pos].volume
     else
       return nil
     end
