@@ -1,3 +1,4 @@
+local comp = require("computer")
 local event = require("event")
 
 local function isin(tbl, value)
@@ -299,12 +300,9 @@ function Music:seek(pos)
   self.track:seek(pos)
 end
 
-function Music:play(len)
+function Music:play(len, allowSleeping)
   checkType(1, len, "number")
-  if self.timer then
-    return false, "already playing in background"
-  end
-  local lastSleep = os.clock()
+  local lastSleep = comp.uptime()
   for i = 1, len, 1 do
     if self.stopping then
       return false, "stopped"
@@ -316,11 +314,16 @@ function Music:play(len)
     for _, dev in pairs(self.devices) do
       dev:play(success)
     end
-    local begin = os.clock()
-    while os.clock() - begin < 1 / self.track.tempo do
-      if os.clock() - lastSleep > 2.5 then
-        os.sleep(.05)
-        lastSleep = os.clock()
+    if allowSleeping and 1 / self.track.tempo * 100 % 5 == 0 then
+      os.sleep(1 / self.track.tempo)
+      lastSleep = comp.uptime()
+    else
+      local begin = comp.uptime()
+      while comp.uptime() - begin < 1 / self.track.tempo do
+        if comp.uptime() - lastSleep > 2.5 then
+          os.sleep(.05)
+          lastSleep = comp.uptime()
+        end
       end
     end
   end
@@ -335,17 +338,25 @@ function Music:getLength()
   return self.track:getLength()
 end
 
-function Music:bgPlayStart(len, ticks)
+
+-- After a bit of thinking, I decided to remove these two methods completely
+-- and make programs to handle all of the BG-playing stuff by themselves.
+-- Because I don't want neither to copy-paste the code just to change a delay handling,
+-- nor to create some additional params for the :play() method.
+-- So, rest in peace.
+--[[
+function Music:bgPlayStart(len)
+  checkType(1, len, "number")
   if self.timer then
     return false, "already playing in background"
   end
-  self.timer, reason = event.timer(ticks / self.track.tempo, function()
-    local success = self:play(ticks)
+  local timer, reason = event.timer(0, function()
+    local success, reason = self:play(len, true)
     if not success then
       self:bgPlayStop()
     end
-  end, len)
-  print(self.timer, reason, self)
+  end, 1)
+  self.timer = timer
 end
 
 function Music:bgPlayStop()
@@ -355,6 +366,7 @@ function Music:bgPlayStop()
   event.cancel(self.timer)
   self.timer = false
 end
+]]--
 
 function Music:stop()
   self:bgPlayStop()
