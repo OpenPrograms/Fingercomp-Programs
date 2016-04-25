@@ -27,7 +27,7 @@ function freq(n)
       error("Wrong input "..tostring(n).." given to note.freq, needs to be <note>[semitone sign]<octave>, e.g. A#0 or Gb4",2)
     end
   elseif type(n) == "number" then
-    return 2 ^ (n-69)/12*440
+    return 2 ^ ((n-69)/12)*440
   else
     error("Wrong input "..tostring(n).." given to note.freq, needs to be a number or a string",2)
   end
@@ -326,7 +326,7 @@ function loadpath(path)
             time.mspb = event
           elseif type(event) == "table" then
             local channel, noteNum, velocity, duration = table.unpack(event)
-            chord:add({freq=freq(noteNum), length=duration, instr=instr(track.instrument or 1, channel)})
+            chord:add({freq=freq(noteNum), length=duration, instr=instr(track.instrument or 1, channel) or 1, volume=velocity / 0x80})
             buf:add({tick, chord})
           end
         end
