@@ -31,6 +31,9 @@ function new(addr)
       for freq, len, instr, volume in pairs(chord) do
         while freq <= min do freq = freq * 2 end
         while freq > max do freq = freq / 2 end
+        if not com.proxy(addr) then
+          return false, "device is unavailable"
+        end
         noteblock.playNote(instr - 1, freq2note(freq), volume)
       end
     end
