@@ -1,4 +1,3 @@
-local comp = require("computer")
 local event = require("event")
 
 local function isin(tbl, value)
@@ -304,7 +303,7 @@ end
 
 function Music:play(len, allowSleeping)
   checkType(1, len, "number")
-  local lastSleep = comp.uptime()
+  local lastSleep = os.clock()
   for i = 1, len, 1 do
     if self.stopped then
       return false, "stopped"
@@ -318,13 +317,13 @@ function Music:play(len, allowSleeping)
     end
     if allowSleeping and 1 / self.track.tempo * 100 % 5 == 0 then
       os.sleep(1 / self.track.tempo)
-      lastSleep = comp.uptime()
+      lastSleep = os.clock()
     else
-      local begin = comp.uptime()
-      while comp.uptime() - begin < 1 / self.track.tempo do
-        if comp.uptime() - lastSleep > 2.5 then
+      local begin = os.clock()
+      while os.clock() - begin < 1 / self.track.tempo do
+        if os.clock() - lastSleep > 2.5 then
           os.sleep(.05)
-          lastSleep = comp.uptime()
+          lastSleep = os.clock()
         end
       end
     end

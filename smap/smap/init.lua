@@ -165,6 +165,15 @@ function smap.load(path, format)
   return smap.modules.input[format].loadpath(path)
 end
 
+
+function smap.device(dev)
+  checkArg(1, dev, "string")
+  if not smap.modules.output[dev] then
+    return false, "no such device"
+  end
+  return smap.modules.output[dev].new()
+end
+
 return smap
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
