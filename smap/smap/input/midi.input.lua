@@ -1,6 +1,6 @@
 -- MIDI input module.
 
-local DEBUG = true
+local DEBUG = false
 NAME = "midi"
 
 local fs = require("filesystem")
