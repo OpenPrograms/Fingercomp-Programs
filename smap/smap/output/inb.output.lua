@@ -1,5 +1,7 @@
 -- Computronics Iron Note Blocks output module
 
+local com = require("component")
+
 NAME = "inoteblock"
 
 local function freq2note(freq)
@@ -12,8 +14,18 @@ end
 
 local min, max = note2freq(0), note2freq(24)
 
-function new()
-  local noteblock = require("component").iron_noteblock
+function new(addr)
+  if not com.isAvailable("iron_noteblock") then
+    return false, "no device connected"
+  end
+  addr = addr or com.getPrimary("iron_noteblock").address
+  if not com.proxy(addr) then
+    return false, "no device with such address"
+  end
+  local noteblock = com.proxy(addr)
+  if not noteblock.type == "iron_noteblock" then
+    return false, "wrong device"
+  end
   return audio.Device(function(dev, chords)
     for _, chord in pairs(chords) do
       for freq, len, instr, volume in pairs(chord) do
