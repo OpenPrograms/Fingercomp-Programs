@@ -324,6 +324,7 @@ function Music:play(len, allowSleeping)
         if os.clock() - lastSleep > 2.5 then
           os.sleep(.05)
           lastSleep = os.clock()
+          begin = begin + 0.05
         end
       end
     end
