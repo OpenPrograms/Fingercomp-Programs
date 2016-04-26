@@ -1,6 +1,7 @@
 --  computer.beep()
 
 NAME = "pcspkr"
+DEVICE = "computer"
 
 local comp = require("computer")
 

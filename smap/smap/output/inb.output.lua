@@ -3,6 +3,7 @@
 local com = require("component")
 
 NAME = "inoteblock"
+DEVICE = "iron_noteblock"
 
 local function freq2note(freq)
   return 12 * math.log(freq / 440, 2) + 49 - 34
