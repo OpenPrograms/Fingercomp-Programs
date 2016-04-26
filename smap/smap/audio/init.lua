@@ -214,7 +214,7 @@ end
 function Track:getLength()
   self.length = 0
   for _, b in pairs(self.data) do
-    self.length = b:getLength()
+    self.length = self.length + b:getLength()
   end
   return self.length
 end

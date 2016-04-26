@@ -3,6 +3,7 @@
 local com = require("component")
 
 NAME = "beep"
+DEVICE = "beep"
 
 function new(addr)
   if not com.isAvailable("beep") then
