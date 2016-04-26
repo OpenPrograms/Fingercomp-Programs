@@ -113,7 +113,9 @@ function loadpath(path)
     track:add(firstBuffer)
   end
 
-  return audio.Music(track)
+  return audio.Music(track, function()
+    file:close()
+  end)
 end
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
