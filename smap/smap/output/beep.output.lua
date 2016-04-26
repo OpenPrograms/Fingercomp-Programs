@@ -30,6 +30,9 @@ function new(addr)
       end
     end
     ::outer::
+    if not com.proxy(addr) then
+      return false, "device is unavailable"
+    end
     beep.beep(freqPairs)
   end)
 end
