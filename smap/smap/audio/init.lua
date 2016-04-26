@@ -55,21 +55,21 @@ end
 function Chord:add(...)
   local tbl = {...}
   for num, item in ipairs(tbl) do
-    item.freq = tonumber(item.freq or item.f or item[1])
-    item.length = tonumber(item.length or item.l or item[2])
-    item.instr = tonumber(item.instrument or item.instr or item[3])
-    item.volume = tonumber(item.volume or item.vol or item.v or item[4]) or 1
+    item[1] = tonumber(item.freq or item.f or item[1])
+    item[2] = tonumber(item.length or item.l or item[2])
+    item[3] = tonumber(item.instrument or item.instr or item[3])
+    item[4] = tonumber(item.volume or item.vol or item.v or item[4]) or 1
     item.f = nil
-    item[1] = nil
+    item.freq = nil
     item.l = nil
-    item[2] = nil
+    item.length = nil
     item.instrument = nil
-    item[3] = nil
+    item.instr = nil
     item.vol = nil
     item.v = nil
-    item[4] = nil
-    if not tonumber(item.freq) or not tonumber(item.length) or not tonumber(item.instr) then
-      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, number}, got {" .. type(item.freq) .. ", " .. type(item.length) .. ", " .. type(item.instr) .. "}")
+    item.volume = nil
+    if not tonumber(item[1]) or not tonumber(item[2]) or not tonumber(item[3]) then
+      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, number}, got {" .. type(item[1]) .. ", " .. type(item[2]) .. ", " .. type(item[3]) .. "}")
     end
     table.insert(self.data, item)
   end
@@ -85,7 +85,7 @@ function Chord:__pairs()
   return function()
     pos = pos + 1
     if self.data[pos] then
-      return self.data[pos].freq, self.data[pos].length, self.data[pos].instr, self.data[pos].volume
+      return table.unpack(self.data[pos])
     else
       return nil
     end
@@ -136,7 +136,7 @@ function Buffer:add(...)
     local chord = item.chord or item.c or item[2]
     checkType(num, tick, "number")
     checkType(num, chord, "Chord")
-    table.insert(self.data, {tick = tick, chord = chord})
+    table.insert(self.data, {tick, chord})
     self.length = math.max(self.length, tick)
   end
   return true
@@ -144,7 +144,7 @@ end
 
 function Buffer:getLength()
   for _, item in pairs(self.data) do
-    self.length = math.max(self.length, item.tick)
+    self.length = math.max(self.length, item[1])
   end
   return self.length
 end
@@ -152,13 +152,13 @@ end
 function Buffer:play()
   local chords = {}
   for k, v in ipairs(self.data) do
-    if v.tick == self.pos then
-      table.insert(chords, v.chord)
+    if v[1] == self.pos then
+      table.insert(chords, v[2])
     end
   end
   if self.pos == self:getLength() - self.to + 1 and not self.called then
     -- Run a new buffer generator function
-    self.func(self)
+    self:func()
     self.called = true
   end
   self.pos = self.pos + 1
@@ -174,7 +174,7 @@ function Buffer:__pairs()
   return function()
     pos = pos + 1
     if self.data[pos] then
-      return self.data[pos].tick, self.data[pos].chord
+      return table.unpack(self.data[pos])
     else
       return nil
     end
@@ -184,8 +184,8 @@ end
 function Buffer:__ipairs()
   local grouped = {}
   for k, v in pairs(self.data) do
-    grouped[v.tick] = grouped[v.tick] or {}
-    table.insert(grouped[v.tick], v.chord)
+    grouped[v[1]] = grouped[v[1]] or {}
+    table.insert(grouped[v[1]], v[2])
   end
   local pos = -1
   return function()
@@ -274,9 +274,11 @@ Track.__ipairs = Track.__pairs
 local Music = {}
 Music.__name = "Music"
 
-function Music:new(track)
+function Music:new(track, onCloseImpl)
   checkType(1, track, "Track")
-  local o = {track = track, devices = {}, timer = false, stopping = false}
+  onCloseImpl = onCloseImpl or function() end
+  checkType(2, onCloseImpl, "function")
+  local o = {track = track, devices = {}, timer = false, stopped = false, onClose = onCloseImpl}
   setmetatable(o, self)
   self.__index = self
   return o
@@ -304,7 +306,7 @@ function Music:play(len, allowSleeping)
   checkType(1, len, "number")
   local lastSleep = comp.uptime()
   for i = 1, len, 1 do
-    if self.stopping then
+    if self.stopped then
       return false, "stopped"
     end
     local success, reason = self.track:play()
@@ -368,13 +370,10 @@ function Music:bgPlayStop()
 end
 ]]--
 
-function Music:stop()
-  self:bgPlayStop()
-  self.stopping = true
-end
-
-function Music:resume()
-  self.stopping = false
+function Music:close()
+  self:onClose()
+  self.stopped = true
+  self.track = nil
 end
 
 
