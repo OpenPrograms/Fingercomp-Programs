@@ -1,9 +1,21 @@
 -- Beep card module
 
+local com = require("component")
+
 NAME = "beep"
 
-function new()
-  local beep = require("component").beep
+function new(addr)
+  if not com.isAvailable("beep") then
+    return false, "no device connected"
+  end
+  addr = addr or com.getPrimary("beep").address
+  if not com.proxy(addr) then
+    return false, "no device with such address"
+  end
+  local beep = com.proxy(addr)
+  if not beep.type == "beep" then
+    return false, "wrong device"
+  end
   return audio.Device(function(dev, chords)
     local freqPairs = {}
     local l = 1
