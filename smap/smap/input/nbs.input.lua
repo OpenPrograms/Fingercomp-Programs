@@ -60,8 +60,15 @@ function loadpath(path)
         break
       end
 
-      local jumps = nbsInt16(byte(file), byte(file))
+      local jumps = 0
 
+      if pcall(function()
+        jumps = nbsInt16(byte(file), byte(file))
+      end) ~= true then
+        file:close()
+        return false, "not a NBS file"
+      end
+  
       if jumps == 0 then
         break
       end
@@ -69,15 +76,20 @@ function loadpath(path)
       tick = tick + jumps
       
       local chord = audio.Chord()
-      while true do 
-        local curLayer = nbsInt16(byte(file), byte(file))
-        if curLayer == 0 then
-          break
+      if pcall(function()
+        while true do 
+          local curLayer = nbsInt16(byte(file), byte(file))
+          if curLayer == 0 then
+            break
+          end
+          local instrument = byte(file)
+          local note = byte(file)
+          local freq = note2freq(note)
+          chord:add{freq=freq, length=(1000 / tempo), instr=instr[instrument]}
         end
-        local instrument = byte(file)
-        local note = byte(file)
-        local freq = note2freq(note)
-        chord:add{freq=freq, length=(1000 / tempo), instr=instr[instrument]}
+      end) ~= true then
+        file:close()
+        return false, "not a NBS file"
       end
 
       buf:add({tick, chord})
@@ -93,15 +105,21 @@ function loadpath(path)
   end
 
   local file = io.open(path, "rb")
-  local length = nbsInt16(byte(file), byte(file))
+  local length, height, name, author, originAuthor, desc, tempo
+  if pcall(function()
+    length = nbsInt16(byte(file), byte(file))
 
-  local height = nbsInt16(byte(file), byte(file))
-  local name = nbsStr(file)
-  local author = nbsStr(file)
-  local originAuthor = nbsStr(file)
-  local desc = nbsStr(file)
+    height = nbsInt16(byte(file), byte(file))
+    name = nbsStr(file)
+    author = nbsStr(file)
+    originAuthor = nbsStr(file)
+    desc = nbsStr(file)
 
-  local tempo = nbsInt16(byte(file), byte(file)) / 100
+    tempo = nbsInt16(byte(file), byte(file)) / 100
+  end) ~= true then
+    file:close()
+    return false, "not a NBS file"
+  end
 
   local trash = file:read(23)
   trash = nbsStr(file)

@@ -1,6 +1,6 @@
 -- Big thanks to:
 --  * Sangar for his program, midi.lua, a huge part of it was borrowed for midi module,
---  * FluttyProger for helping me to fight against these damn bugs,
+--  * FluttyProger for helping me to fight against those damn bugs,
 --  * TxN for his NBS player code.
 
 local smap = {}
@@ -166,12 +166,13 @@ function smap.load(path, format)
 end
 
 
-function smap.device(dev)
+function smap.device(dev, addr)
   checkArg(1, dev, "string")
+  checkArg(2, addr, "string", "nil")
   if not smap.modules.output[dev] then
     return false, "no such device"
   end
-  return smap.modules.output[dev].new()
+  return smap.modules.output[dev].new(addr)
 end
 
 return smap
