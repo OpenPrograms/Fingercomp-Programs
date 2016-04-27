@@ -13,9 +13,16 @@ local function help()
   print([[USAGE: smap --d=<device> <input-file> <format>]])
 end
 
-if #args ~= 2 or type(opts.d) ~= "string" then
+if #args ~= 2 then
   help()
   return 1
+end
+
+if type(opts.d) ~= "string" then
+  for name, module in pairs(smap.modules.output) do
+    print(" * Module \"" .. name .. "\": " .. (module.DEVICE or "unknown device"))
+  end
+  return 0
 end
 
 local path, format = table.unpack(args)
@@ -49,10 +56,9 @@ print("Playing: " .. path)
 local status = 0
 local exit = false
 local len = math.huge
-local x, y = term.getCursor()
-local w, h = com.gpu.getResolution()
 
 local function formatTime(t)
+  t = math.floor(t)
   local h = math.floor(t / 3600)
   t = t % 3600
   local m = math.floor(t / 60)
@@ -60,7 +66,18 @@ local function formatTime(t)
   return ("%02d"):format(h) .. ":" .. ("%02d"):format(m) .. ":" .. ("%02d"):format(t)
 end
 
-print("Tempo: " .. ("%d"):format(music.track.tempo) .. " ticks per second")
+print("Tempo: " .. music.track.tempo .. " ticks per second.")
+
+local function onKeyDown()
+  if kbd.isKeyDown(kbd.keys.c) and kbd.isControlDown() then
+    exit = true
+  end
+end
+
+local x, y = term.getCursor()
+local w, h = com.gpu.getResolution()
+
+event.listen("key_down", onKeyDown)
 
 local success, reason = pcall(function()
   local lastSleep = os.clock()
@@ -80,20 +97,19 @@ local success, reason = pcall(function()
     local begin = os.clock()
     while os.clock() - begin < 1 / music.track.tempo do
       --if math.floor(comp.uptime() - beginUptime) > lastTime then
-      if math.floor(1 / music.track.tempo * i) > lastTime then
+      if 1 / music.track.tempo * i - lastTime >= 0.25 then
         --lastTime = math.floor(comp.uptime() - beginUptime)
-        lastTime = math.floor(1 / music.track.tempo * i)
-        local length = math.floor(music:getLength() / music.track.tempo)
+        lastTime = 1 / music.track.tempo * i
+        local length = music:getLength() / music.track.tempo
         com.gpu.fill(1, y, w, 1, " ")
         term.setCursor(1, y)
         io.write("A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) [#" .. i .. "]")
       end
-      if kbd.isKeyDown(kbd.keys.c) and kbd.isControlDown() then
+      if exit then
         os.sleep(.05)
-        exit = true
         break
       end
-      if os.clock() - lastSleep > 2.5 then
+      if os.clock() - lastSleep > 1 then
         os.sleep(.05)
         lastSleep = os.clock()
         begin = begin + 0.05
@@ -102,6 +118,8 @@ local success, reason = pcall(function()
   end
   return true
 end)
+
+event.ignore("key_down", onKeyDown)
 
 print("\n")
 
