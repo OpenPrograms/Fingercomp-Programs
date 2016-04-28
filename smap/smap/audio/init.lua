@@ -301,16 +301,16 @@ function Music:seek(pos)
   self.track:seek(pos)
 end
 
-function Music:play(len, sleepingMode)
+function Music:play(len, sleepMode)
   checkType(1, len, "number")
-  if sleepingMode == 1 or sleepingMode == "allow" or sleepingMode == true then
-    sleepingMode = "allow"
-  elseif sleepingMode == 2 or sleepingMode == "force" then
-    sleepingMode = "force"
-  elseif sleepingMode == -1 or sleepingMode == "forbid" then
-    sleepingMode = "forbid"
+  if sleepMode == 1 or sleepMode == "allow" or sleepMode == true then
+    sleepMode = "allow"
+  elseif sleepMode == 2 or sleepMode == "force" then
+    sleepMode = "force"
+  elseif sleepMode == -1 or sleepMode == "forbid" then
+    sleepMode = "deny"
   else
-    sleepingMode = "none"
+    sleepMode = "none"
   end
   local lastSleep = os.clock()
   for i = 1, len, 1 do
@@ -324,15 +324,15 @@ function Music:play(len, sleepingMode)
     for _, dev in pairs(self.devices) do
       dev:play(success)
     end
-    if sleepingMode == "force" and self.track.tempo > 20 then
+    if sleepMode == "force" and self.track.tempo > 20 then
       return false, "too fast"
     end
-    if sleepingMode == "allow" and 1 / self.track.tempo * 100 % 5 == 0 or sleepingMode == "force" then
+    if sleepMode == "allow" and 1 / self.track.tempo * 100 % 5 == 0 or sleepMode == "force" then
       os.sleep(1 / self.track.tempo)
       lastSleep = os.clock()
     else
       local idle = 1 / self.track.tempo
-      if self.track.tempo <= 10 and sleepingMode ~= "forbid" then
+      if self.track.tempo <= 10 and sleepMode ~= "deny" then
         local sleep = math.floor(idle * 100) == idle * 100 and idle - 0.05 or math.floor(idle * 100) / 100
         os.sleep(sleep)
         idle = idle - sleep
