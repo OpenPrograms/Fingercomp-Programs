@@ -35,7 +35,7 @@ function new(addr)
         if not com.proxy(addr) then
           return false, "device is unavailable"
         end
-        noteblock.playNote(instr - 1, freq2note(freq), volume)
+        noteblock.playNote(instr - 1, freq2note(freq), volume * self.volume)
       end
     end
   end)

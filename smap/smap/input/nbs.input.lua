@@ -125,6 +125,11 @@ function loadpath(path)
   trash = nbsStr(file)
 
   track = audio.Track{tempo = tempo}
+  track:setInfo({
+    name = name,
+    author = author,
+    comment = (originAuthor ~= "" and "Originaly created by: " .. originAuthor .. ".\n") .. desc
+  })
   local firstBuffer = loadBuffer(file, tempo, 120)
 
   if firstBuffer then
