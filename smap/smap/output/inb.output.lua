@@ -27,7 +27,7 @@ function new(addr)
   if not noteblock.type == "iron_noteblock" then
     return false, "wrong device"
   end
-  return audio.Device(function(dev, chords)
+  return audio.Device(function(self, chords)
     for _, chord in pairs(chords) do
       for freq, len, instr, volume in pairs(chord) do
         while freq <= min do freq = freq * 2 end
