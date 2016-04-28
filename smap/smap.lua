@@ -94,16 +94,17 @@ local success, reason = pcall(function()
     for _, dev in pairs(music.devices) do
       dev:play(success)
     end
+    local pos = music:getPos()
     local begin = os.clock()
     while os.clock() - begin < 1 / music.track.tempo do
       --if math.floor(comp.uptime() - beginUptime) > lastTime then
-      if 1 / music.track.tempo * i - lastTime >= 0.25 then
+      if 1 / music.track.tempo * pos - lastTime >= 0.25 then
         --lastTime = math.floor(comp.uptime() - beginUptime)
-        lastTime = 1 / music.track.tempo * i
+        lastTime = 1 / music.track.tempo * pos
         local length = music:getLength() / music.track.tempo
         com.gpu.fill(1, y, w, 1, " ")
         term.setCursor(1, y)
-        io.write("A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) [#" .. i .. "]")
+        io.write("A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) - #" .. pos)
       end
       if exit then
         os.sleep(.05)
