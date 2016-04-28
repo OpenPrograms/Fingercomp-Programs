@@ -219,6 +219,19 @@ function Track:getLength()
   return self.length
 end
 
+function Track:getPos()
+  local result = 0
+  for i = 1, self.pos - 1, 1 do
+    if self.data[i] then
+      result = result + self.data[i]:getLength()
+    end
+  end
+  if self.data[self.pos] then
+    result = result + self.data[self.pos].pos
+  end
+  return result
+end
+
 function Track:add(buffer)
   checkType(1, buffer, "Buffer")
   table.insert(self.data, buffer)
@@ -352,7 +365,7 @@ function Music:play(len, sleepMode)
 end
 
 function Music:getPos()
-  return self.track.pos
+  return self.track:getPos()
 end
 
 function Music:getLength()
