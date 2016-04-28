@@ -149,6 +149,7 @@ for _, modtype in pairs({"input", "output"}) do
   end
 end
 
+-- TODO: make `format` arg optional
 function smap.load(path, format)
   checkArg(1, path, "string")
   checkArg(2, format, "string")

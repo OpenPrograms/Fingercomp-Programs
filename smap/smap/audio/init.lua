@@ -205,7 +205,7 @@ function Track:new(args)
   checkType(1, args, "table")
   local tempo = args.tempo
   checkType("tempo", tempo, "number")
-  local o = {data={},tempo=tempo,length=0,pos=1}
+  local o = {data={},tempo=tempo,length=0,pos=1,info={}}
   setmetatable(o, self)
   self.__index = self
   return o
@@ -237,6 +237,11 @@ function Track:add(buffer)
   table.insert(self.data, buffer)
   self:getLength()
   return #self.data
+end
+
+function Track:setInfo(info)
+  checkType(1, info, "table")
+  self.info = info
 end
 
 function Track:seek(pos)
@@ -418,10 +423,18 @@ Device.__name = "Device"
 
 function Device:new(playImpl)
   checkType(1, playImpl, "function")
-  local o = {play = playImpl}
+  local o = {play = playImpl,volume=1}
   setmetatable(o, self)
   self.__index = self
   return o
+end
+
+function Device:setVolume(vol)
+  checkType(1, vol, "number")
+  if vol < 0 or vol > 1 then
+    error("Wrong volume: a vaule [0, 1] expected")
+  end
+  self.volume = vol
 end
 
 

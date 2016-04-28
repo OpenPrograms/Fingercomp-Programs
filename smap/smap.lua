@@ -53,6 +53,20 @@ music:connect(device)
 
 print("Playing: " .. path)
 
+if music.track.info then
+  local info = music.track.info
+  if type(info.name) == "string" and info.name ~= "" then
+    print("Track name: " .. info.name)
+  end
+  if type(info.author) == "string" and info.author ~= "" then
+    print("Created by: " .. info.author)
+  end
+  if type(info.comment) == "string" and info.comment ~= "" then
+    print(info.comment)
+  end
+end
+print()
+
 local status = 0
 local exit = false
 local len = math.huge
