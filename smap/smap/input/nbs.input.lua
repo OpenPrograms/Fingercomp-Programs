@@ -128,7 +128,7 @@ function loadpath(path)
   track:setInfo({
     name = name,
     author = author,
-    comment = (originAuthor ~= "" and "Originaly created by: " .. originAuthor .. ".\n") .. desc
+    comment = (originAuthor ~= "" and "Originally created by: " .. originAuthor .. ".\n") .. desc
   })
   local firstBuffer = loadBuffer(file, tempo, 120)
 

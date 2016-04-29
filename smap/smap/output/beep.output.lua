@@ -17,7 +17,7 @@ function new(addr)
   if not beep.type == "beep" then
     return false, "wrong device"
   end
-  return audio.Device(function(dev, chords)
+  return audio.Device(function(self, chords)
     local freqPairs = {}
     local l = 1
     for _, chord in pairs(chords) do

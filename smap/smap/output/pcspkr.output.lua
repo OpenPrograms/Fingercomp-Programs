@@ -6,7 +6,7 @@ DEVICE = "computer"
 local comp = require("computer")
 
 function new()
-  return audio.Device(function(dev, chords)
+  return audio.Device(function(self, chords)
     for _, chord in pairs(chords) do
       for freq, len, instr in pairs(chord) do
         while freq < 20 do freq = freq * 2 end
