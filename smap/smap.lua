@@ -10,7 +10,12 @@ local term = require("term")
 local args, opts = shell.parse(...)
 
 local function help()
-  print("USAGE: smap --d=<device> <input-file> [format]")
+  print([[USAGE: smap [--sleep=<mode>] --d=<device> <input-file> [format]
+--sleep=<mode>: <mode> may be one of these values:
+ * `force` or `f`: force os.sleep()'ing, will not play tracks with the tempo more than 20 tps.
+ * `allow` or `a`: allow to use os.sleep() to make a delay between ticks
+ * `none` or `n`: use os.sleep() only to make partial delays. Default.
+ * `deny` or `d`: don't use os.sleep(), busy-idle instead. High CPU usage.]])
 end
 
 if #args ~= 1 then
