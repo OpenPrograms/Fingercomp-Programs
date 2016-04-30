@@ -117,7 +117,9 @@ local success, reason = pcall(function()
     end
     local pos = music:getPos()
     local begin = os.clock()
-    while os.clock() - begin < 1 / music.track.tempo do
+    local slept = false
+    local sleepTime = 1 / music.track.tempo
+    while os.clock() - begin < sleepTime do
       --if math.floor(comp.uptime() - beginUptime) > lastTime then
       if 1 / music.track.tempo * pos - lastTime >= 0.25 then
         --lastTime = math.floor(comp.uptime() - beginUptime)
@@ -131,10 +133,28 @@ local success, reason = pcall(function()
         os.sleep(.05)
         break
       end
+      if (opts.sleep == "force" or opts.sleep == "f") and music.track.tempo > 20 then
+        io.write("\nThe track is played too fast")
+        exit = true
+        break
+      elseif opts.sleep == "force" or opts.sleep == "f" then
+        os.sleep(1 / music.track.tempo)
+        break
+      end
+      if (opts.sleep == "allow" or opts.sleep == "a") and 1 / music.track.tempo * 100 % 5 == 0 then
+        os.sleep(1 / music.track.tempo)
+        break
+      end
+      if not slept and (opts.sleep == "allow" or opts.sleep == "none" or opts.sleep == "a" or opts.sleep == "n" or not opts.sleep) and music.track.tempo <= 10 then
+        local toSleep = math.floor(1 / music.track.tempo * 100) == 1 / music.track.tempo * 100 and 1 / music.track.tempo - 0.05 or math.floor(1 / music.track.tempo * 100) / 100
+        os.sleep(toSleep)
+        sleepTime = sleepTime - toSleep
+        slept = true
+      end
       if os.clock() - lastSleep > 1 then
         os.sleep(.05)
         lastSleep = os.clock()
-        begin = begin + 0.05
+        sleepTime = sleepTime - 0.05
       end
     end
   end
