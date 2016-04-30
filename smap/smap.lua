@@ -82,6 +82,8 @@ print()
 local status = 0
 local exit = false
 local len = math.huge
+local paused = false
+local forceUpdate = false
 
 local function formatTime(t)
   t = math.floor(t)
@@ -97,6 +99,9 @@ print("Tempo: " .. music.track.tempo .. " ticks per second.")
 local function onKeyDown()
   if kbd.isKeyDown(kbd.keys.c) and kbd.isControlDown() then
     exit = true
+  elseif kbd.isKeyDown(kbd.keys.space) then
+    paused = not paused
+    forceUpdate = true
   end
 end
 
@@ -126,40 +131,51 @@ local success, reason = pcall(function()
     local sleepTime = 1 / music.track.tempo
     while os.clock() - begin < sleepTime do
       --if math.floor(comp.uptime() - beginUptime) > lastTime then
-      if 1 / music.track.tempo * pos - lastTime >= 0.25 then
+      if 1 / music.track.tempo * pos - lastTime >= 0.25 or forceUpdate then
         --lastTime = math.floor(comp.uptime() - beginUptime)
         lastTime = 1 / music.track.tempo * pos
         local length = music:getLength() / music.track.tempo
         com.gpu.fill(1, y, w, 1, " ")
         term.setCursor(1, y)
-        io.write("A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) - #" .. pos)
+        io.write((paused and "(Paused) " or "") .. "A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) - #" .. pos)
+        forceUpdate = false
       end
       if exit then
         os.sleep(.05)
         break
       end
-      if (opts.sleep == "force" or opts.sleep == "f") and music.track.tempo > 20 then
-        io.write("\nThe track is played too fast")
-        exit = true
-        break
-      elseif opts.sleep == "force" or opts.sleep == "f" then
-        os.sleep(1 / music.track.tempo)
-        break
-      end
-      if (opts.sleep == "allow" or opts.sleep == "a") and 1 / music.track.tempo * 100 % 5 == 0 then
-        os.sleep(1 / music.track.tempo)
-        break
-      end
-      if not slept and (opts.sleep == "allow" or opts.sleep == "none" or opts.sleep == "a" or opts.sleep == "n" or not opts.sleep) and music.track.tempo <= 10 then
-        local toSleep = math.floor(1 / music.track.tempo * 100) == 1 / music.track.tempo * 100 and 1 / music.track.tempo - 0.05 or math.floor(1 / music.track.tempo * 100) / 100
-        os.sleep(toSleep)
-        sleepTime = sleepTime - toSleep
-        slept = true
-      end
-      if os.clock() - lastSleep > 1 then
-        os.sleep(.05)
+      if paused then
+        local c1 = os.clock()
+        os.sleep(.1)
         lastSleep = os.clock()
-        sleepTime = sleepTime - 0.05
+        sleepTime = sleepTime + lastSleep - c1
+      else
+        if (opts.sleep == "force" or opts.sleep == "f") and music.track.tempo > 20 then
+          io.write("\nThe track is played too fast")
+          exit = true
+          break
+        elseif opts.sleep == "force" or opts.sleep == "f" then
+          os.sleep(1 / music.track.tempo)
+          lastSleep = os.clock()
+          break
+        end
+        if (opts.sleep == "allow" or opts.sleep == "a") and 1 / music.track.tempo * 100 % 5 == 0 then
+          os.sleep(1 / music.track.tempo)
+          lastSleep = os.clock()
+          break
+        end
+        if not slept and (opts.sleep == "allow" or opts.sleep == "none" or opts.sleep == "a" or opts.sleep == "n" or not opts.sleep) and music.track.tempo <= 10 then
+          local toSleep = math.floor(1 / music.track.tempo * 100) == 1 / music.track.tempo * 100 and 1 / music.track.tempo - 0.05 or math.floor(1 / music.track.tempo * 100) / 100
+          os.sleep(toSleep)
+          lastSleep = os.clock()
+          sleepTime = sleepTime - toSleep
+          slept = true
+        end
+        if os.clock() - lastSleep > 1 then
+          os.sleep(.05)
+          lastSleep = os.clock()
+          sleepTime = sleepTime - 0.05
+        end
       end
     end
   end
