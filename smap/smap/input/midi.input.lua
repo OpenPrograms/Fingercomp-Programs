@@ -18,7 +18,7 @@ local function instr(i, ch)
   end
 end
 
-function freq(n)
+local function freq(n)
   if type(n) == "string" then
     n = string.lower(n)
     if tonumber(notes[n])~=nil then
@@ -30,6 +30,32 @@ function freq(n)
     return 2 ^ ((n-69)/12)*440
   else
     error("Wrong input "..tostring(n).." given to note.freq, needs to be a number or a string",2)
+  end
+end
+
+local function parseVarInt(s, bits) -- parses multiple bytes as an integer
+  if not s then
+    f:close()
+    error("error parsing file")
+  end
+  bits = bits or 8
+  local mask = bit32.rshift(0xFF, 8 - bits)
+  local num = 0
+  for i = 1, s:len() do
+    num = num + bit32.lshift(bit32.band(s:byte(i), mask), (s:len() - i) * bits)
+  end
+  return num
+end
+
+function guess(path)
+  local f, rsn = io.open(path, "rb")
+  if not f then
+    return false, rsn
+  end
+  local id = f:read(4)
+  local len = parseVarInt(f:read(4))
+  if id == "MThd" and len == 6 then
+    return true
   end
 end
 
@@ -45,19 +71,6 @@ function loadpath(path)
 
   -- This code is borrowed from Sangar's awesome program, midi.lua
   -- Check it out here: https://github.com/OpenPrograms/Sangar-Programs/blob/master/midi.lua
-  local function parseVarInt(s, bits) -- parses multiple bytes as an integer
-    if not s then
-      f:close()
-      error("error parsing file")
-    end
-    bits = bits or 8
-    local mask = bit32.rshift(0xFF, 8 - bits)
-    local num = 0
-    for i = 1, s:len() do
-      num = num + bit32.lshift(bit32.band(s:byte(i), mask), (s:len() - i) * bits)
-    end
-    return num
-  end
 
   local function readChunkInfo() -- reads chunk header info
     local id = f:read(4)
@@ -67,6 +80,7 @@ function loadpath(path)
     return id, parseVarInt(f:read(4))
   end
 
+  
   -- Read the file header and with if file information.
   local id, size = readChunkInfo()
   if id ~= "MThd" or size ~= 6 then
