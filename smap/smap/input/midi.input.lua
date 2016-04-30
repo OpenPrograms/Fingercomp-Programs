@@ -340,8 +340,10 @@ function loadpath(path)
             time.mspb = event
           elseif type(event) == "table" then
             local channel, noteNum, velocity, duration = table.unpack(event)
-            chord:add({freq=freq(noteNum), length=duration, instr=instr(track.instrument or 1, channel) or 1, volume=velocity / 0x80})
-            buf:add({tick, chord})
+            if duration then -- Semi-broken MIDI files fix
+              chord:add({freq=freq(noteNum), length=duration, instr=instr(track.instrument or 1, channel) or 1, volume=velocity / 0x80})
+              buf:add({tick, chord})
+            end
           end
         end
       end
