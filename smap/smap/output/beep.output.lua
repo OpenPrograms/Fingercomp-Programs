@@ -19,15 +19,19 @@ function new(addr)
   end
   return audio.Device(function(self, chords)
     local freqPairs = {}
+    if not com.proxy(addr) then
+      return false, "device is unavailable"
+    end
     local l = 1
     for _, chord in pairs(chords) do
       for freq, len, instr in pairs(chord) do
-        if l > 8 then
+        if beep.getBeepCount() + l > 8 then
           goto outer
         end
         while freq < 20 do freq = freq * 2 end
         while freq > 2000 do freq = freq / 2 end
-        freqPairs[freq] = len
+        freqPairs[freq] = len / 1000
+        l = l + 1
       end
     end
     ::outer::
