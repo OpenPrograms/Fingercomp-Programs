@@ -10,10 +10,10 @@ local term = require("term")
 local args, opts = shell.parse(...)
 
 local function help()
-  print([[USAGE: smap --d=<device> <input-file> <format>]])
+  print("USAGE: smap --d=<device> <input-file> [format]")
 end
 
-if #args ~= 2 then
+if #args ~= 1 then
   help()
   return 1
 end
@@ -31,6 +31,13 @@ path = shell.resolve(path)
 if not fs.exists(path) then
   print("No such file.")
   return 2
+end
+
+local reason
+format, reason = format or smap.guessFormat(path)
+if not format then
+  print("Could not detect file format: " .. reason)
+  return 42
 end
 
 local success, reason = smap.load(path, format)

@@ -149,7 +149,6 @@ for _, modtype in pairs({"input", "output"}) do
   end
 end
 
--- TODO: make `format` arg optional
 function smap.load(path, format)
   checkArg(1, path, "string")
   checkArg(2, format, "string")
@@ -174,6 +173,25 @@ function smap.device(dev, addr)
     return false, "no such device"
   end
   return smap.modules.output[dev].new(addr)
+end
+
+function smap.guessFormat(path)
+  checkArg(1, path, "string")
+  if not fs.exists(path) then
+    return false, "no such file"
+  end
+  if fs.isDirectory(path) then
+    return false, "not a file"
+  end
+  for module, value in pairs(smap.modules.input) do
+    if type(value.guess) == "function" then
+      local result = value.guess(path)
+      if result then
+        return module
+      end
+    end
+  end
+  return false, "unknown"
 end
 
 return smap

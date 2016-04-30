@@ -38,6 +38,27 @@ local instr = {
   [4] = audio.instr.click
 }
 
+function guess(path)
+  local file, rsn = io.open(path, "rb")
+  if not file then
+    return false, rsn
+  end
+  local result, rsn = pcall(function()
+    local length = nbsInt16(byte(file), byte(file))
+
+    local height = nbsInt16(byte(file), byte(file))
+    local name = nbsStr(file)
+    local author = nbsStr(file)
+    local originAuthor = nbsStr(file)
+    local desc = nbsStr(file)
+
+    local tempo = nbsInt16(byte(file), byte(file)) / 100
+  end)
+  if result then
+    return true
+  end
+end
+
 function loadpath(path)
   if fs.isDirectory(path) then
     return false, "directories are not supported"
@@ -46,7 +67,7 @@ function loadpath(path)
   local track
 
   local function loadBuffer(file, tempo, size)
-    local buf = audio.Buffer{to=10, func=function(b)
+    local buf = audio.Buffer{to=-1, func=function(b)
       local newBuf = loadBuffer(file, track.tempo, size)
       if newBuf then
         track:add(newBuf)
@@ -89,7 +110,7 @@ function loadpath(path)
         end
       end) ~= true then
         file:close()
-        return false, "not a NBS file"
+        return false, "corrupted file"
       end
 
       buf:add({tick, chord})
@@ -130,7 +151,7 @@ function loadpath(path)
     author = author,
     comment = (originAuthor ~= "" and "Originally created by: " .. originAuthor .. ".\n") .. desc
   })
-  local firstBuffer = loadBuffer(file, tempo, 120)
+  local firstBuffer = loadBuffer(file, tempo, math.huge)
 
   if firstBuffer then
     track:add(firstBuffer)
