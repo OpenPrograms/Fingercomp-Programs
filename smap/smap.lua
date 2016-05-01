@@ -125,14 +125,14 @@ local success, reason = pcall(function()
       return success, reason
     end
     if not (#success == 0 and (i - lastTick) / music.track.tempo < .25) then
-      lastTick = i
       for _, dev in pairs(music.devices) do
         dev:play(success)
       end
       local pos = music:getPos()
       local begin = os.clock()
       local slept = false
-      local sleepTime = (lastTick - i + 1) / music.track.tempo
+      local sleepTime = (i - lastTick) / music.track.tempo
+      lastTick = i
       while os.clock() - begin < sleepTime do
         --if math.floor(comp.uptime() - beginUptime) > lastTime then
         if 1 / music.track.tempo * pos - lastTime >= 0.25 or forceUpdate then
