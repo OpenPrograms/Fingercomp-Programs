@@ -316,6 +316,7 @@ function Music:play(len, sleepMode)
     sleepMode = "none"
   end
   local lastSleep = os.clock()
+  local lastTick = 0
   for i = 1, len, 1 do
     if self.stopped then
       return false, "stopped"
@@ -324,29 +325,32 @@ function Music:play(len, sleepMode)
     if not success then
       return success, reason
     end
-    for _, dev in pairs(self.devices) do
-      dev:play(success)
-    end
-    if sleepMode == "force" and self.track.tempo > 20 then
-      return false, "too fast"
-    end
-    if sleepMode == "allow" and 1 / self.track.tempo * 100 % 5 == 0 or sleepMode == "force" then
-      os.sleep(1 / self.track.tempo)
-      lastSleep = os.clock()
-    else
-      local idle = 1 / self.track.tempo
-      if self.track.tempo <= 10 and sleepMode ~= "deny" then
-        local sleep = math.floor(idle * 100) == idle * 100 and idle - 0.05 or math.floor(idle * 100) / 100
-        os.sleep(sleep)
-        idle = idle - sleep
-        lastSleep = os.clock()
+    if not (#success == 0 and (i - lastTick) / self.track.tempo > .1) then
+      for _, dev in pairs(self.devices) do
+        dev:play(success)
       end
-      local begin = os.clock()
-      while os.clock() - begin < idle do
-        if os.clock() - lastSleep > 2.5 then
-          os.sleep(.05)
+      local sleepTime = (i - lastTick) / self.track.tempo
+      lastTick = i
+      if sleepMode == "force" and sleepTime < .05 then
+        return false, "too fast"
+      end
+      if sleepMode == "allow" and sleepTime * 100 % 5 == 0 or sleepMode == "force" then
+        os.sleep(sleepTime)
+        lastSleep = os.clock()
+      else
+        if sleepTime >= .1 and sleepMode ~= "deny" then
+          local sleep = math.floor(sleepTime * 100) == sleepTime * 100 and sleepTime - 0.05 or math.floor(sleepTime * 100) / 100
+          os.sleep(sleep)
+          sleepTime = sleepTime - sleep
           lastSleep = os.clock()
-          begin = begin + 0.05
+        end
+        local begin = os.clock()
+        while os.clock() - begin < sleepTime do
+          if os.clock() - lastSleep > 2.5 then
+            os.sleep(.05)
+            lastSleep = os.clock()
+            begin = begin + 0.05
+          end
         end
       end
     end
