@@ -54,6 +54,7 @@ function guess(path)
   end
   local id = f:read(4)
   local len = parseVarInt(f:read(4))
+  f:close()
   if id == "MThd" and len == 6 then
     return true
   end
@@ -183,7 +184,7 @@ function loadpath(path)
         currentNoteEvents[channel][note] = {event=track[cursor], tick=cursor}
       end
       local function noteOff(cursor, channel, note, velocity)
-        if not (currentNoteEvents[channel] and currentNoteEvents[channel][note]) then return end
+        if not (currentNoteEvents[channel] and currentNoteEvents[channel][note] and currentNoteEvents[channel][note].event) then return end
         table.insert(currentNoteEvents[channel][note].event
             , time.calcDelay(cursor, currentNoteEvents[channel][note].tick))
         currentNoteEvents[channel][note] = nil
@@ -321,34 +322,29 @@ function loadpath(path)
   local t = audio.Track{tempo = 1 / time.calcDelay(1, 0)}
   local buf = audio.Buffer{func=function() end, to=0} -- All tracks are already loaded
 
-  local lastTick = 0
+  local trs = #tracks
   for tick = 1, totalLength do
-    local hasEvent = false
-    for _, track in ipairs(tracks) do
-      if track[tick] then
-        hasEvent = true
-        break
-      end
-    end
-    if hasEvent then
-      lastTick = tick
-      for _, track in ipairs(tracks) do
-        local chord = audio.Chord()
-        local event = track[tick]
-        if event then
-          if type(event) == "number" then
-            time.mspb = event
-          elseif type(event) == "table" then
-            local channel, noteNum, velocity, duration = table.unpack(event)
-            if duration then -- Semi-broken MIDI files fix
-              chord:add({freq=freq(noteNum), length=duration, instr=instr(track.instrument or 1, channel) or 1, volume=velocity / 0x80})
-              buf:add({tick, chord})
-            end
+    local chord
+    for trnum = 1, trs, 1 do
+      if tracks[trnum][tick] then
+        if type(tracks[trnum][tick]) == "number" then
+          time.mspb = tracks[trnum][tick]
+        elseif type(tracks[trnum][tick]) == "table" then
+          chord = chord or audio.Chord()
+          local channel, noteNum, velocity, duration = table.unpack(tracks[trnum][tick])
+          if duration then -- Semi-broken MIDI files fix
+            chord:add(freq(noteNum), duration * 1000, instr(tracks[trnum].instrument or 1, channel) or 1, velocity / 0x80)
           end
         end
       end
+      event = nil
+      tracks[trnum][tick] = nil
+    end
+    if chord then
+      buf:add({tick, chord})
     end
   end
+  tracks = nil
   t:add(buf)
 
   return audio.Music(t)

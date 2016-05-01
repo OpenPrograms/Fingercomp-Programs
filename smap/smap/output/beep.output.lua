@@ -38,7 +38,9 @@ function new(addr)
     if not com.proxy(addr) then
       return false, "device is unavailable"
     end
-    beep.beep(freqPairs)
+    if l > 1 then
+      beep.beep(freqPairs)
+    end
   end)
 end
 

@@ -106,7 +106,7 @@ function loadpath(path)
           local instrument = byte(file)
           local note = byte(file)
           local freq = note2freq(note)
-          chord:add{freq=freq, length=(1000 / tempo), instr=instr[instrument]}
+          chord:add(freq, 1000 / tempo, instr[instrument], 1)
         end
       end) ~= true then
         file:close()
