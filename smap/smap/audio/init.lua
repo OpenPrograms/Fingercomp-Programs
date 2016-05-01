@@ -51,27 +51,12 @@ function Chord:new()
   return o
 end
 
-function Chord:add(...)
-  local tbl = {...}
-  for num, item in ipairs(tbl) do
-    item[1] = tonumber(item.freq or item.f or item[1])
-    item[2] = tonumber(item.length or item.l or item[2])
-    item[3] = tonumber(item.instrument or item.instr or item[3])
-    item[4] = tonumber(item.volume or item.vol or item.v or item[4]) or 1
-    item.f = nil
-    item.freq = nil
-    item.l = nil
-    item.length = nil
-    item.instrument = nil
-    item.instr = nil
-    item.vol = nil
-    item.v = nil
-    item.volume = nil
-    if not tonumber(item[1]) or not tonumber(item[2]) or not tonumber(item[3]) then
-      error("bad table " .. (item.__name or "#" .. num) .. ": expected {number, number, number}, got {" .. type(item[1]) .. ", " .. type(item[2]) .. ", " .. type(item[3]) .. "}")
-    end
-    table.insert(self.data, item)
-  end
+function Chord:add(freq, length, instr, volume)
+  checkType(1, freq, "number")
+  checkType(2, length, "number")
+  checkType(3, instr, "number")
+  checkType(4, volume, "number")
+  self.data[#self.data+1] = {freq, length, instr, volume}
   return true
 end
 

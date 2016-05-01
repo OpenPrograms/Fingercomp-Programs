@@ -45,21 +45,22 @@ if not format then
   return 42
 end
 
-local success, reason = smap.load(path, format)
-if not success then
-  print("Could not load the file: " .. reason .. (reason:sub(-1) ~= "." and "." or ""))
-  return 3
-end
-
-local music = success
-
 local success, reason = smap.device(opts.d)
 if not success then
   print("Could not connect the device: " .. reason .. (reason:sub(-1) ~= "." and "." or ""))
-  return 4
+  return 3
 end
 
 local device = success
+
+local success, reason = smap.load(path, format)
+if not success then
+  reason = reason or "unknown reason"
+  print("Could not load the file: " .. reason .. (reason:sub(-1) ~= "." and "." or ""))
+  return 4
+end
+
+local music = success
 
 music:connect(device)
 
@@ -114,6 +115,7 @@ local success, reason = pcall(function()
   local lastSleep = os.clock()
   --local beginUptime = math.floor(comp.uptime())
   local lastTime = -1
+  local lastTick = 0
   for i = 1, len, 1 do
     if exit then
       break
@@ -122,59 +124,62 @@ local success, reason = pcall(function()
     if not success then
       return success, reason
     end
-    for _, dev in pairs(music.devices) do
-      dev:play(success)
-    end
-    local pos = music:getPos()
-    local begin = os.clock()
-    local slept = false
-    local sleepTime = 1 / music.track.tempo
-    while os.clock() - begin < sleepTime do
-      --if math.floor(comp.uptime() - beginUptime) > lastTime then
-      if 1 / music.track.tempo * pos - lastTime >= 0.25 or forceUpdate then
-        --lastTime = math.floor(comp.uptime() - beginUptime)
-        lastTime = 1 / music.track.tempo * pos
-        local length = music:getLength() / music.track.tempo
-        com.gpu.fill(1, y, w, 1, " ")
-        term.setCursor(1, y)
-        io.write((paused and "(Paused) " or "") .. "A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) - #" .. pos)
-        forceUpdate = false
+    if not (#success == 0 and (i - lastTick) / music.track.tempo < .25) then
+      lastTick = i
+      for _, dev in pairs(music.devices) do
+        dev:play(success)
       end
-      if exit then
-        os.sleep(.05)
-        break
-      end
-      if paused then
-        local c1 = os.clock()
-        os.sleep(.1)
-        lastSleep = os.clock()
-        sleepTime = sleepTime + lastSleep - c1
-      else
-        if (opts.sleep == "force" or opts.sleep == "f") and music.track.tempo > 20 then
-          io.write("\nThe track is played too fast")
-          exit = true
-          break
-        elseif opts.sleep == "force" or opts.sleep == "f" then
-          os.sleep(1 / music.track.tempo)
-          lastSleep = os.clock()
-          break
+      local pos = music:getPos()
+      local begin = os.clock()
+      local slept = false
+      local sleepTime = (lastTick - i + 1) / music.track.tempo
+      while os.clock() - begin < sleepTime do
+        --if math.floor(comp.uptime() - beginUptime) > lastTime then
+        if 1 / music.track.tempo * pos - lastTime >= 0.25 or forceUpdate then
+          --lastTime = math.floor(comp.uptime() - beginUptime)
+          lastTime = 1 / music.track.tempo * pos
+          local length = music:getLength() / music.track.tempo
+          com.gpu.fill(1, y, w, 1, " ")
+          term.setCursor(1, y)
+          io.write((paused and "(Paused) " or "") .. "A: " .. formatTime(lastTime) .. " / " .. formatTime(length) .. " (" .. math.floor(lastTime / length * 100) .. "%) - #" .. pos)
+          forceUpdate = false
         end
-        if (opts.sleep == "allow" or opts.sleep == "a") and 1 / music.track.tempo * 100 % 5 == 0 then
-          os.sleep(1 / music.track.tempo)
-          lastSleep = os.clock()
-          break
-        end
-        if not slept and (opts.sleep == "allow" or opts.sleep == "none" or opts.sleep == "a" or opts.sleep == "n" or not opts.sleep) and music.track.tempo <= 10 then
-          local toSleep = math.floor(1 / music.track.tempo * 100) == 1 / music.track.tempo * 100 and 1 / music.track.tempo - 0.05 or math.floor(1 / music.track.tempo * 100) / 100
-          os.sleep(toSleep)
-          lastSleep = os.clock()
-          sleepTime = sleepTime - toSleep
-          slept = true
-        end
-        if os.clock() - lastSleep > 1 then
+        if exit then
           os.sleep(.05)
+          break
+        end
+        if paused then
+          local c1 = os.clock()
+          os.sleep(.1)
           lastSleep = os.clock()
-          sleepTime = sleepTime - 0.05
+          sleepTime = sleepTime + lastSleep - c1
+        else
+          if (opts.sleep == "force" or opts.sleep == "f") and sleepTime < .05 then
+            io.write("\nThe track is played too fast")
+            exit = true
+            break
+          elseif opts.sleep == "force" or opts.sleep == "f" then
+            os.sleep(sleepTime)
+            lastSleep = os.clock()
+            break
+          end
+          if (opts.sleep == "allow" or opts.sleep == "a") and sleepTime * 100 % 5 == 0 then
+            os.sleep(sleepTime)
+            lastSleep = os.clock()
+            break
+          end
+          if not slept and (opts.sleep == "allow" or opts.sleep == "none" or opts.sleep == "a" or opts.sleep == "n" or not opts.sleep) and sleepTime >= .1 then
+            local toSleep = math.floor(sleepTime * 100) == sleepTime * 100 and sleepTime - .05 or math.floor(sleepTime * 100) / 100
+            os.sleep(toSleep)
+            lastSleep = os.clock()
+            sleepTime = sleepTime - toSleep
+            slept = true
+          end
+          if os.clock() - lastSleep > 1 then
+            os.sleep(.05)
+            lastSleep = os.clock()
+            sleepTime = sleepTime - 0.05
+          end
         end
       end
     end
