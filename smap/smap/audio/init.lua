@@ -366,6 +366,14 @@ function Music:getLength()
   return self.track:getLength()
 end
 
+function Music:stop()
+  self.stopped = true
+end
+
+function Music:resume()
+  self.stopped = false
+end
+
 
 -- After a bit of thinking, I decided to remove these two methods completely
 -- and make programs to handle all of the BG-playing stuff by themselves.
