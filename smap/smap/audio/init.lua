@@ -318,6 +318,9 @@ function Music:play(len, sleepMode)
   local lastSleep = os.clock()
   local lastTick = 0
   for i = 1, len, 1 do
+    if self.closed then
+      return false, "close"
+    end
     if self.stopped then
       return false, "stopped"
     end
@@ -370,43 +373,9 @@ function Music:stop()
   self.stopped = true
 end
 
-function Music:resume()
-  self.stopped = false
-end
-
-
--- After a bit of thinking, I decided to remove these two methods completely
--- and make programs to handle all of the BG-playing stuff by themselves.
--- Because I don't want neither to copy-paste the code just to change a delay handling,
--- nor to create some additional params for the :play() method.
--- So, rest in peace.
---[[
-function Music:bgPlayStart(len)
-  checkType(1, len, "number")
-  if self.timer then
-    return false, "already playing in background"
-  end
-  local timer, reason = event.timer(0, function()
-    local success, reason = self:play(len, true)
-    if not success then
-      self:bgPlayStop()
-    end
-  end, 1)
-  self.timer = timer
-end
-
-function Music:bgPlayStop()
-  if not self.timer then
-    return
-  end
-  event.cancel(self.timer)
-  self.timer = false
-end
-]]--
-
 function Music:close()
   self:onClose()
-  self.stopped = true
+  self.closed = true
   self.track = nil
 end
 

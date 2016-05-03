@@ -7,7 +7,13 @@ local smap = require("smap")
 local shell = require("shell")
 local term = require("term")
 
+local DEBUG = false
 local args, opts = shell.parse(...)
+
+local function dbg(...)
+  if not DEBUG then return end
+  print(table.concat({...}, "\t"))
+end
 
 local function help()
   print([[USAGE: smap [--sleep=<mode>] --d=<device> <input-file> [format]
@@ -113,9 +119,9 @@ event.listen("key_down", onKeyDown)
 
 local success, reason = pcall(function()
   local lastSleep = os.clock()
-  --local beginUptime = math.floor(comp.uptime())
   local lastTime = -1
   local lastTick = 0
+  -- FIXME: delays
   for i = 1, len, 1 do
     if exit then
       break
@@ -133,10 +139,9 @@ local success, reason = pcall(function()
       local slept = false
       local sleepTime = (i - lastTick) / music.track.tempo
       lastTick = i
+      local u1 = comp.uptime()
       while os.clock() - begin < sleepTime do
-        --if math.floor(comp.uptime() - beginUptime) > lastTime then
-        if 1 / music.track.tempo * pos - lastTime >= 0.25 or forceUpdate then
-          --lastTime = math.floor(comp.uptime() - beginUptime)
+        if 1 / music.track.tempo * pos - lastTime >= .25 or forceUpdate then
           lastTime = 1 / music.track.tempo * pos
           local length = music:getLength() / music.track.tempo
           com.gpu.fill(1, y, w, 1, " ")
@@ -169,19 +174,25 @@ local success, reason = pcall(function()
             break
           end
           if not slept and (opts.sleep == "allow" or opts.sleep == "none" or opts.sleep == "a" or opts.sleep == "n" or not opts.sleep) and sleepTime >= .1 then
-            local toSleep = math.floor(sleepTime * 100) == sleepTime * 100 and sleepTime - .05 or math.floor(sleepTime * 100) / 100
+            local toSleep = math.floor((sleepTime - .05) * 20) / 20
+            local c1 = os.clock()
+            dbg("\n\t" .. toSleep, sleepTime)
             os.sleep(toSleep)
             lastSleep = os.clock()
             sleepTime = sleepTime - toSleep
+            begin = begin + os.clock() - c1
             slept = true
           end
           if os.clock() - lastSleep > 1 then
+            local c1 = os.clock()
             os.sleep(.05)
             lastSleep = os.clock()
             sleepTime = sleepTime - 0.05
+            begin = begin + os.clock() - c1
           end
         end
       end
+      dbg("\n" .. sleepTime, comp.uptime() - u1)
     end
   end
   return true
