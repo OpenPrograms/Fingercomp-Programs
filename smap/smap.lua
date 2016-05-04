@@ -7,7 +7,7 @@ local smap = require("smap")
 local shell = require("shell")
 local term = require("term")
 
-local DEBUG = false
+local DEBUG = true
 local args, opts = shell.parse(...)
 
 local function dbg(...)
