@@ -123,8 +123,11 @@ There is a "net" section in a configuration file (`/etc/chat.json`). Example con
   * `true, "keep", "auth", <session>` - `<session>` is a password required for other commands.
 * `<username>, "msg", <session>, <someMsg>` - send a message or command to the server.
   * `true, "keep", "ok"` - message sent successfully.
-* `<username>, "quit", <session>[, reason]` - close a connection.
+* `<username>, "quit", <session>[, <reason>]` - close a connection.
   * `true, "close"` - closed successfully.
+* `<username>, "pong", <session>, <ping message>` - tell the server that your bot is alive.
+  * `false, "keep", "unexpected pong"`
+  * `false, "keep", "wrong ping message"`
 * `<username>, "chaninfo", <session>, <channel>` - get info about channel.
   * `false, "keep", "you are not on channel"`
   * `true, "keep", <data>` - `<data>` is a serialized table containing channel info.
@@ -147,6 +150,7 @@ Error | Comment
 ### Events
 Event | Description
 ----- | -----------
+`"ping", <ping message>, <time>` | This event is for making sure network connections are alive. `<ping message>` is a random string your network bot should send back with the "pong" command, or the connection will be closed.
 `"event", "chat", <chan>, <nick>, <msg>, <all>, <recipients>` | This event gets fired on chat messages. Here and below, `<all>` is a boolean value which is `true` if the message is sent to all people on channel, or `false` if not. `<recipients>` is `"all"` if `<all>` is true, or serialized table containing recipients otherwise.
 `"event", "notice", <chan>, <noticeType>, <notice>, <recipients>` | This event gets fired on notices.
 `"event", "pm", <user>, <addressee>, <msg>` | This event gets fired on PMs.
