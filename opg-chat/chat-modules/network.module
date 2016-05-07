@@ -29,7 +29,9 @@ elseif com.isAvailable("os_datablock") then
 end
 
 local function byte2hex(str)
-  return str:gsub(".", function(chat) return ("%02X"):format(string.byte(chat)) end)
+  return str:gsub(".", function(chat)
+    return ("%02X"):format(string.byte(chat))
+  end)
 end
 
 local function hash(text)
@@ -88,7 +90,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       return -1
     end
     local session = random(8)
-    connections[sender] = {user = user, port = port, pass = session}
+    connections[sender] = {user = user, port = port, pass = session, ping = os.time(), sentPing = false, pingMsg = ""}
     joinN(cfg.main_channel, user)
     modem.send(sender, port, true, "keep", "auth", session)
   else
@@ -113,6 +115,18 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
     if cmd == "msg" then
       event.push("chat_chat_message", addr, user, sender, tostring(msg))
       modem.send(sender, port, true, "keep", "ok")
+    elseif cmd == "pong" then
+      if not connections[sender].sentPing then
+        modem.send(sender, port, false, "keep", "unexpected pong")
+        return -1
+      end
+      if connections[sender].pingMsg ~= msg then
+        modem.send(sender, port, false, "keep", "wrong ping message")
+        return -1
+      end
+      connections[sender].pingMsg = ""
+      connections[sender].sentPing = false
+      connections[sender].ping = os.time()
     elseif cmd == "chaninfo" then
       if not channels[tostring(msg)] or not channels[tostring(msg)].users[connections[sender].user] then
         modem.send(sender, port, false, "keep", "you are not on channel")
@@ -149,6 +163,20 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
     end
   end
 end)
+
+local timer = event.timer(1, function()
+    for conn, value in pairs(connections) do
+      if value.ping > os.time() + cfg.net.ping.interval and not value.sentPing then
+        value.sentPing = true
+        value.pingMsg = random(16)
+        modem.send(conn, value.port, "ping", value.pingMsg, os.time())
+      elseif value.sentPing and value.ping > os.time() + cfg.net.ping.interval + cfg.net.ping.timeout then
+        modem.send(conn, value.port, false, "close", "ping timeout")
+        quitN(value.user, "Ping timeout (" .. tostring(math.tointeger(cfg.net.ping.timeout)) .. " seconds)")
+        connections[conn] = nil
+      end
+    end
+  end, math.huge)
 
 addListener("chat_event_msg", "network.chat.msg", function(evt, time, chan, nick, msg, all, ...)
   local rec = all and "all" or {...}
@@ -212,6 +240,7 @@ addListener("chat_stop", "network.stop", function(evt, time)
   for port in pairs(cfg.net.ports) do
     modem.close(tonumber(port))
   end
+  event.cancel(timer)
 end)
 
 -- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :
