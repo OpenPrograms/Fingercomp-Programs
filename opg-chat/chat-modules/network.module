@@ -7,6 +7,7 @@ local event = require("event")
 local srl = require("serialization")
 
 assert(com.isAvailable("os_datablock") or com.isAvailable("data"), "data card/block required")
+assert(com.isAvailable("modem"), "modem card required")
 
 local modem = com.modem
 
