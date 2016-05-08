@@ -914,7 +914,7 @@ local coreHandlers = {
 
 for eventName, hdlrs in pairs(coreHandlers) do
   for id, hdlr in pairs(hdlrs) do
-    print("Starting \"" .. eventName .. "\" listener [" .. id .. "]")
+    --print("Starting \"" .. eventName .. "\" listener [" .. id .. "]")
     event.listen(eventName, hdlr)
   end
 end
@@ -929,7 +929,7 @@ os.sleep(.5)
 
 for eventName, hdlrs in pairs(moduleHandlers) do
   for name, hdlr in pairs(hdlrs) do
-    print("Starting module \"" .. eventName .. "\" listener [" .. name .. "]")
+    --print("Starting module \"" .. eventName .. "\" listener [" .. name .. "]")
     event.listen(eventName, hdlr)
   end
 end
@@ -952,14 +952,14 @@ os.sleep(.5)
 
 for eventName, hdlrs in pairs(moduleHandlers) do
   for name, hdlr in pairs(hdlrs) do
-    print("Stopping module \"" .. eventName .. "\" listener [" .. name .. "]")
+    --print("Stopping module \"" .. eventName .. "\" listener [" .. name .. "]")
     event.ignore(eventName, hdlr)
   end
 end
 
 for eventName, hdlrs in pairs(coreHandlers) do
   for id, hdlr in pairs(hdlrs) do
-    print("Stopping \"" .. eventName .. "\" listener [" .. id .. "]")
+    --print("Stopping \"" .. eventName .. "\" listener [" .. id .. "]")
     event.ignore(eventName, hdlr)
   end
 end
