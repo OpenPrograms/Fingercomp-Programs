@@ -7,7 +7,7 @@ command {
     if type(channel) == "string" then
       local success, reason = apcall(joinN, channel, user)
       if not success then
-        sendPM(cfg.server, user, "Could not join the channel: " .. reason)
+        sendPM(cfg.server, user, "Could not join the channel: " .. (reason or "unknown reason"))
       else
         local _, pos = isin(users[user].channels, channel)
         users[user].currentTab = pos
@@ -44,7 +44,7 @@ command {
       local _, was = isin(users[user].channels, channel)
       local success, reason = apcall(partN, channel, user, msg)
       if not success then
-        sendPM(cfg.server, user, "Could not leave the channel: " .. reason)
+        sendPM(cfg.server, user, "Could not leave the channel: " .. (reason or "unknown reason"))
       else
         if users[user].currentTab == was then
           users[user].currentTab = users[user].currentTab - 1
@@ -104,7 +104,7 @@ command {
       channel = chan
     end
     if not channels[channel] or not channels[channel].users[user] then
-      sendPM(cfg.server, user, "You are not in channel")
+      sendPM(cfg.server, user, "You are not in the channel")
       return -1
     end
     if not isin(channels[channel].modes, "t") or checkLevel(chan, user, {HALFOP, OP}, true) then
@@ -119,7 +119,7 @@ command {
 command {
   name = "kick",
   level = HALFOP,
-  help = "Kick a user from channel",
+  help = "Kick a user from a channel",
   func = function(evt, chan, user, raw, cmd, channel, arg, msg)
     if not channel then
       help(user, "kick")
@@ -152,7 +152,7 @@ command {
     end
     local success, reason = apcall(partN, channel, arg, "Kicked by " .. user .. ": " .. msg)
     if not success then
-      sendPM(cfg.server, user, "Could not kick a user: " .. reason)
+      sendPM(cfg.server, user, "Could not kick a user: " .. (reason or "unknown reason"))
     end
   end
 }

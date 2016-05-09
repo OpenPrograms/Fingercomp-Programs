@@ -38,7 +38,7 @@ local function register(chan, user, channel)
     end
     sendPM(user, cfg.server, "The channel " .. channel .. " is now registered!")
   else
-    sendPM(user, cfg.server, "Could not register the channel: " .. reason)
+    sendPM(user, cfg.server, "Could not register the channel: " .. (reason or "unknown reason"))
   end
 end
 
@@ -128,7 +128,7 @@ addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, ch
     if notice == "mode" then
       cfg.chanserv.channels[chan].modes = copy(channels[chan].modes)
       for user, level in pairs(channels[chan].users) do
-        if channels[chan].users[cfg.chanserv.nick] < OP then -- :P
+        if channels[chan].users[cfg.chanserv.nick] < OP then
           setMode(chan, cfg.server, "+o", cfg.chanserv.nick)
         end
         local tbl = false

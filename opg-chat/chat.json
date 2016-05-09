@@ -8,6 +8,11 @@
     "ports": {
       "6667": true,
       "6666": ["244d"]
+    },
+    "ping": {
+      "enabled": true,
+      "interval": 180,
+      "timeout": 180
     }
   },
   "users": {},
