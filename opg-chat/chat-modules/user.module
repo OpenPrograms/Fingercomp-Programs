@@ -16,7 +16,7 @@ command {
     end
     local success, reason = apcall(sendPM, addressee, user, msg)
     if not success then
-      sendPM(user, cfg.server, "Could not send a PM: " .. reason)
+      sendPM(user, cfg.server, "Could not send a PM: " .. (reason or "unknown reason"))
     end
   end
 }

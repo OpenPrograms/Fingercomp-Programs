@@ -109,6 +109,11 @@ There is a "net" section in a configuration file (`/etc/chat.json`). Example con
   "ports": {
     "6667": true,
     "6666": ["519187"]
+  },
+  "ping": {
+    "enabled": true,
+    "interval": 180,
+    "timeout": 180
   }
 }
 ```
@@ -117,6 +122,10 @@ There is a "net" section in a configuration file (`/etc/chat.json`). Example con
 * `ports` is a list containing ports which the program will listen on.
   * Left part (`"6667"`), obviously, is a port to listen on.
   * Right part can be one of two values: `true`, which means a port is *not* filtered, or a list with white-listed addresses (or their parts). In this example, the program will accept connections on a port 6667 only from senders with their address starting with `"519187"`.
+* `ping` object controls pinging.
+  * If `enabled` is `false`, the server will not ping net users.
+  * `interval` specifies how often the server will ping net users. 180 s by default.
+  * `timeout` specifies how long the server will want for the "pong" message from net users.
 
 ### Commands
 * `<username>, "auth", <pass>` - authenticate to the server.

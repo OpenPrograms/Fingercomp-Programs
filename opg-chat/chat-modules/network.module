@@ -10,6 +10,7 @@ assert(com.isAvailable("os_datablock") or com.isAvailable("data"), "data card/bl
 assert(com.isAvailable("modem"), "modem card required")
 
 local modem = com.modem
+local data
 
 if modem.isWireless() then
   modem.setStrength(cfg.net.modemStrength)
@@ -87,7 +88,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
     end
     local success, reason = apcall(addUser, user, true)
     if not success then
-      modem.send(sender, port, false, "error", "could not auth: " .. reason)
+      modem.send(sender, port, false, "error", "could not auth: " .. (reason or "unknown reason"))
       return -1
     end
     local session = random(8)
@@ -165,7 +166,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
   end
 end)
 
-local timer = event.timer(1, function()
+local timer = cfg.ping.enabled and event.timer(1, function()
     for conn, value in pairs(connections) do
       if value.ping > os.time() + cfg.net.ping.interval and not value.sentPing then
         value.sentPing = true
@@ -177,7 +178,7 @@ local timer = event.timer(1, function()
         connections[conn] = nil
       end
     end
-  end, math.huge)
+  end, math.huge) or false
 
 addListener("chat_event_msg", "network.chat.msg", function(evt, time, chan, nick, msg, all, ...)
   local rec = all and "all" or {...}
@@ -241,7 +242,9 @@ addListener("chat_stop", "network.stop", function(evt, time)
   for port in pairs(cfg.net.ports) do
     modem.close(tonumber(port))
   end
-  event.cancel(timer)
+  if timer then
+    event.cancel(timer)
+  end
 end)
 
 -- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :

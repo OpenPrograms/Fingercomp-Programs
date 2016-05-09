@@ -14,7 +14,7 @@ Otherwise, show help for the specific command.]],
     else
       local success, reason = apcall(help, user, cmd)
       if not success then
-        sendPM(user, cfg.server, ("Could not display help for command %s: %s"):format(command, reason))
+        sendPM(user, cfg.server, ("Could not display help for command %s: %s"):format(command, (reason or "unknown reason")))
       end
     end
   end

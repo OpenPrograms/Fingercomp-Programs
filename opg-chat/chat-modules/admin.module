@@ -27,7 +27,7 @@ command {
     end
     local success, reason = apcall(setMode, channel, user, mode, arg)
     if not success then
-      sendPM(cfg.server, user, "Could not set mode: " .. reason)
+      sendPM(cfg.server, user, "Could not set mode: " .. (reason or "unknown reason"))
     end
   end
 }
