@@ -131,7 +131,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       connections[sender].ping = os.time()
     elseif cmd == "chaninfo" then
       if not channels[tostring(msg)] or not channels[tostring(msg)].users[connections[sender].user] then
-        modem.send(sender, port, false, "keep", "you are not on channel")
+        modem.send(sender, port, false, "keep", "you are not in the channel")
         return -1
       end
       local chan = tostring(msg)

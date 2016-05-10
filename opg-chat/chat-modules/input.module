@@ -129,7 +129,7 @@ end)
 command {
   name = "page",
   level = NORMAL,
-  help = "Go up or down by specified amount of lines",
+  help = "Go up or down by a specific amount of lines",
   aliases = {"pg"},
   func = function(evt, chan, user, raw, cmd, pages)
     if tonumber(pages) then
