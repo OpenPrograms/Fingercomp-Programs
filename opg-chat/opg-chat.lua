@@ -343,7 +343,7 @@ local function part(chan, user)
   checkArg(2, user, "string")
   assert(channels[chan], "no such channel")
   assert(users[user], "no such nickname")
-  assert(channels[chan].users[user], "user is not in channel")
+  assert(channels[chan].users[user], "user is not in the channel")
   channels[chan].users[user] = nil
   local _, pos = isin(users[user].channels, chan)
   table.remove(users[user].channels, pos)
@@ -694,7 +694,7 @@ local coreHandlers = {
           local userinfo = users[user]
           if not userinfo then goto nextUser end
           if not userinfo.shown then goto nextUser end
-          
+
           -- 1. TABS
           -- 1.1. Set tabs
           local chans = userinfo.channels
@@ -783,7 +783,7 @@ local coreHandlers = {
           for i = #lines - offset + 2, #lines, 1 do
             table.remove(toShow, #toShow)
           end
-          
+
           -- 2.2. Show 'em all
           for i = 12, 1, -1 do
             local line = toShow[#toShow + i - 12]
