@@ -70,6 +70,9 @@ do
   local all = f:read("*a")
   f:close()
   cfg = json:decode(all)
+  if not cfg.main_channel:match("^#%w[%w%._]*$") then
+    io.stderr:write("invalid main channel name, expected \"^#%w[%w%._]*$\". Fix your configuration file.")
+  end
 end
 
 local surfaces = {}
@@ -102,6 +105,11 @@ local users = {}
 local channels = {}
 
 local codePtn = "§[%xoklmn]"
+
+local function band(...)
+  local bit32 = bit32 or require("bit32")
+  return bit32.band(...)
+end
 
 local function isin(tbl, value)
   for k, v in pairs(tbl) do
@@ -182,7 +190,7 @@ local function checkLevel(chan, user, levels, any)
   local proceed = true
   local userLevel = getLevel(chan, user)
   for _, level in pairs(levels) do
-    if userLevel & level == level then
+    if band(userLevel, level) == level then
       if any then
         return true
       end
