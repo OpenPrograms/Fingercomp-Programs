@@ -5,9 +5,6 @@
 
 local smap = {}
 
-smap.audio = require("smap.audio")
-local audio = smap.audio
-
 local fs = require("filesystem")
 local pwd = os.getenv("PWD") or "/"
 
@@ -82,6 +79,8 @@ local function path(p, ...)
   return p
 end
 
+local audio
+
 smap.modules = {}
 smap.modules.input = {}
 local input = smap.modules.input
@@ -97,7 +96,7 @@ local function addEnv(e)
   local o = copy(e)
   setmetatable(o, {
     __index = function(self, k)
-      for _, tbl in ipairs({globals, e.TYPE == INPUT and ienv or oenv, env, _G}) do
+      for _, tbl in ipairs({globals, e._TYPE == INPUT and ienv or (e._TYPE == OUTPUT and oenv) or {}, env, _G}) do
         if tbl[k] then
           if type(tbl[k]) == "function" then
             return function(...)
@@ -114,12 +113,21 @@ local function addEnv(e)
   return o, globals
 end
 
+local audio = loadfile("/usr/lib/smap/audio/init.lua", "audio library", "t", addEnv({_TYPE = 0}))
+smap.audio = audio
+
 env.audio = audio
 env.isin = isin
 env.getType = getType
 env.checkType = checkType
 env.copy = copy
 env.concat = concat
+env.formatTypes = {
+  NOTE = 0,
+  WAVE = 1,
+  BOTH = 2
+}
+
 
 
 for _, modtype in pairs({"input", "output"}) do
@@ -148,6 +156,8 @@ for _, modtype in pairs({"input", "output"}) do
     end
   end
 end
+
+
 
 function smap.load(path, format)
   checkArg(1, path, "string")

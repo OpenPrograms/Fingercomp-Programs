@@ -4,6 +4,7 @@ local com = require("component")
 
 NAME = "inoteblock"
 DEVICE = "iron_noteblock"
+FORMATTYPE = formatType.NOTE
 
 local function freq2note(freq)
   return 12 * math.log(freq / 440, 2) + 49 - 34
@@ -38,7 +39,7 @@ function new(addr)
         noteblock.playNote(instr - 1, freq2note(freq), volume * self.volume)
       end
     end
-  end)
+  end, FORMATTYPE)
 end
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :

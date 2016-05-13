@@ -387,9 +387,10 @@ end
 local Device = {}
 Device.__name = "Device"
 
-function Device:new(playImpl)
+function Device:new(playImpl, format)
   checkType(1, playImpl, "function")
-  local o = {play = playImpl,volume=1}
+  assert(formatTypes[format], "wrong format type!")
+  local o = {play = playImpl,volume=1,format=format}
   setmetatable(o, self)
   self.__index = self
   return o
@@ -398,7 +399,7 @@ end
 function Device:setVolume(vol)
   checkType(1, vol, "number")
   if vol < 0 or vol > 1 then
-    error("Wrong volume: a vaule [0, 1] expected")
+    error("Wrong volume: a value [0, 1] expected")
   end
   self.volume = vol
 end
@@ -432,12 +433,15 @@ local function callable(class) -- Sugar! Makes a class callable.
 end
 
 return {
-  Chord = callable(Chord),
-  Buffer = callable(Buffer),
-  Track = callable(Track),
-  Music = callable(Music),
-  Device = callable(Device),
-  instr = instr
+  [formatTypes.NOTE] = {
+    Chord = callable(Chord),
+    Buffer = callable(Buffer),
+    Track = callable(Track),
+    Music = callable(Music),
+    instr = instr
+  },
+  [formatTypes.WAVE] = {},
+  Device = callable(Device)
 }
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :

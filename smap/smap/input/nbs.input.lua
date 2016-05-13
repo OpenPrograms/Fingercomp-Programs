@@ -4,6 +4,9 @@
 local fs = require("filesystem")
 
 NAME = "nbs"
+FORMATTYPE = audio.formatTypes.NOTE
+
+local noteAudio = audio[FORMATTYPE]
 
 local function note2freq(note)
   return 2 ^ ((note - 49) / 12) * 440
@@ -31,11 +34,11 @@ local function nbsStr(file)
 end
 
 local instr = {
-  [0] = audio.instr.piano,
-  [1] = audio.instr.bass,
-  [2] = audio.instr.drum,
-  [3] = audio.instr.snare,
-  [4] = audio.instr.click
+  [0] = noteAudio.instr.piano,
+  [1] = noteAudio.instr.bass,
+  [2] = noteAudio.instr.drum,
+  [3] = noteAudio.instr.snare,
+  [4] = noteAudio.instr.click
 }
 
 function guess(path)
@@ -67,7 +70,7 @@ function loadpath(path)
   local track
 
   local function loadBuffer(file, tempo, size)
-    local buf = audio.Buffer{to=-1, func=function(b)
+    local buf = noteAudio.Buffer{to=-1, func=function(b)
       local newBuf = loadBuffer(file, track.tempo, size)
       if newBuf then
         track:add(newBuf)
@@ -89,16 +92,16 @@ function loadpath(path)
         file:close()
         return false, "not a NBS file"
       end
-  
+
       if jumps == 0 then
         break
       end
 
       tick = tick + jumps
-      
-      local chord = audio.Chord()
+
+      local chord = noteAudio.Chord()
       if pcall(function()
-        while true do 
+        while true do
           local curLayer = nbsInt16(byte(file), byte(file))
           if curLayer == 0 then
             break
@@ -145,7 +148,7 @@ function loadpath(path)
   local trash = file:read(23)
   trash = nbsStr(file)
 
-  track = audio.Track{tempo = tempo}
+  track = noteAudio.Track{tempo = tempo}
   track:setInfo({
     name = name,
     author = author,
@@ -157,7 +160,7 @@ function loadpath(path)
     track:add(firstBuffer)
   end
 
-  return audio.Music(track, function()
+  return noteAudio.Music(track, function()
     file:close()
   end)
 end
