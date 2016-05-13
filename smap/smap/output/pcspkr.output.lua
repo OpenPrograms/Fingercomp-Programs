@@ -2,6 +2,7 @@
 
 NAME = "pcspkr"
 DEVICE = "computer"
+FORMATTYPE = formatTypes.NOTE
 
 local comp = require("computer")
 
@@ -14,7 +15,7 @@ function new()
         comp.beep(freq, len / 1000)
       end
     end
-  end)
+  end, FORMATTYPE)
 end
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :

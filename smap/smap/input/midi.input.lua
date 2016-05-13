@@ -2,19 +2,22 @@
 
 local DEBUG = false
 NAME = "midi"
+FORMATTYPE = audio.formatTypes.NOTE
 
 local fs = require("filesystem")
 local bit32 = bit32 or require("bit32")
 
+local noteAudio = audio[FORMATTYPE]
+
 local function instr(i, ch)
   if ch ~= 10 then
     if i >= 1 and i <= 32 or i >= 41 and i <= 112 then
-      return audio.instr.piano
+      return noteAudio.instr.piano
     elseif i >= 33 and i <= 40 or i >= 113 and i <= 120 then
-      return audio.instr.bass
+      return noteAudio.instr.bass
     end
   else
-    return audio.instr.bass
+    return noteAudio.instr.bass
   end
 end
 
@@ -81,7 +84,7 @@ function loadpath(path)
     return id, parseVarInt(f:read(4))
   end
 
-  
+
   -- Read the file header and with if file information.
   local id, size = readChunkInfo()
   if id ~= "MThd" or size ~= 6 then
@@ -242,7 +245,7 @@ function loadpath(path)
           end
         elseif event == 0xF1 then -- MIDI time code quarter frame
           parseVarInt(read()) -- not handled
-        elseif event == 0xF2 then -- Song position pointer 
+        elseif event == 0xF2 then -- Song position pointer
           parseVarInt(read(2), 7) -- not handled
         elseif event == 0xF3 then -- Song select
           parseVarInt(read(2), 7) -- not handled
@@ -319,8 +322,8 @@ function loadpath(path)
 
   f:close()
 
-  local t = audio.Track{tempo = 1 / time.calcDelay(1, 0)}
-  local buf = audio.Buffer{func=function() end, to=0} -- All tracks are already loaded
+  local t = noteAudio.Track{tempo = 1 / time.calcDelay(1, 0)}
+  local buf = noteAudio.Buffer{func=function() end, to=0} -- All tracks are already loaded
 
   local trs = #tracks
   for tick = 1, totalLength do
@@ -330,7 +333,7 @@ function loadpath(path)
         if type(tracks[trnum][tick]) == "number" then
           time.mspb = tracks[trnum][tick]
         elseif type(tracks[trnum][tick]) == "table" then
-          chord = chord or audio.Chord()
+          chord = chord or noteAudio.Chord()
           local channel, noteNum, velocity, duration = table.unpack(tracks[trnum][tick])
           if duration then -- Semi-broken MIDI files fix
             chord:add(freq(noteNum), duration * 1000, instr(tracks[trnum].instrument or 1, channel) or 1, velocity / 0x80)
@@ -347,7 +350,7 @@ function loadpath(path)
   tracks = nil
   t:add(buf)
 
-  return audio.Music(t)
+  return noteAudio.Music(t)
 end
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
