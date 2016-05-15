@@ -381,6 +381,10 @@ local function group(...)
   end
 end
 
+local function help()
+  print("Run man nn for help!")
+end
+
 local actions = {
   get = ge,
   clear = clear,
@@ -403,7 +407,8 @@ local actions = {
   efon = getActiveEffects,
   combo = combotest,
   getcombo = getCombo,
-  group = group
+  group = group,
+  help = help
 }
 
 local args = {...}
