@@ -73,7 +73,6 @@ local function row()
     if robot.compare() then
       robot.select(INV)
       r.swing()
-      r.suck()
     end
     if not robot.detect() and robot.count(INV) > 1 then
       robot.select(INV)
@@ -84,8 +83,8 @@ local function row()
     if robot.compare() then
       robot.select(INV)
       r.swing()
-      r.suck()
     end
+    r.suck()
     if not robot.detect() and robot.count(INV) > 1 then
       robot.select(INV)
       r.place()
