@@ -31,8 +31,8 @@ elseif com.isAvailable("os_datablock") then
 end
 
 local function byte2hex(str)
-  return str:gsub(".", function(chat)
-    return ("%02X"):format(string.byte(chat))
+  return str:gsub(".", function(char)
+    return ("%02X"):format(string.byte(char))
   end)
 end
 
@@ -41,11 +41,7 @@ local function hash(text)
 end
 
 local function random(len)
-  local result = ""
-  for i = 1, len, 1 do
-    result = result .. string.char(math.random(0, 255))
-  end
-  return byte2hex(result)
+  return byte2hex(data.random(len))
 end
 
 addListener("modem_message", "network.modem", function(evt, addr, sender, port, distance, user, cmd, pass, msg, ...)
@@ -166,13 +162,13 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
   end
 end)
 
-local timer = cfg.ping.enabled and event.timer(1, function()
+local timer = cfg.net.ping.enabled and event.timer(1, function()
     for conn, value in pairs(connections) do
-      if value.ping > os.time() + cfg.net.ping.interval and not value.sentPing then
+      if value.ping + cfg.net.ping.interval * 100 < os.time() and not value.sentPing then
         value.sentPing = true
         value.pingMsg = random(16)
         modem.send(conn, value.port, "ping", value.pingMsg, os.time())
-      elseif value.sentPing and value.ping > os.time() + cfg.net.ping.interval + cfg.net.ping.timeout then
+      elseif value.sentPing and value.ping + cfg.net.ping.interval * 100 + cfg.net.ping.timeout * 100 < os.time() then
         modem.send(conn, value.port, false, "close", "ping timeout")
         quitN(value.user, "Ping timeout (" .. tostring(math.tointeger(cfg.net.ping.timeout)) .. " seconds)")
         connections[conn] = nil

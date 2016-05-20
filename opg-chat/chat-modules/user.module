@@ -22,7 +22,7 @@ command {
 }
 
 if not data and not datablock then
-  io.stderr:write("Neither data card nor OpenSecutiry data block are available, /register will not be available\n")
+  io.stderr:write("Neither data card nor OpenSecurity data block are available, /register will not be available\n")
 else
   local function hash(text)
     checkArg(1, text, "string")
