@@ -1,7 +1,5 @@
-assert(_OSVERSION == "OpenOS 1.6", "This program requires OpenOS 1.6!")
 local com = require("component")
 local event = require("event")
-local guid = require("guid")
 local unicode = require("unicode")
 local fs = require("filesystem")
 local text = require("text")
@@ -11,6 +9,53 @@ local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
 local config = "/etc/chat.json"
 local exit = false
+local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.5" and "1.5" or (io.stderr:write("Warning: unknown OS! The program may eventually crash or work incorrectly.") and "1.5" or "1.5"))
+local guid = openos == "1.6" and require("guid") or {
+  toHex = function(n)
+    if type(n) ~= 'number' then
+      return nil, string.format("toHex only converts numbers to strings, %s is not a string, but a %s", tostring(n), type(n))
+    end
+    if n == 0 then
+      return '0'
+    end
+
+    local hexchars = "0123456789abcdef"
+    local result = ""
+    local prefix = "" -- maybe later allow for arg to request 0x prefix
+    if n < 0 then
+      prefix = "-"
+      n = -n
+    end
+
+    while n > 0 do
+      local next = math.floor(n % 16) + 1 -- lua has 1 based array indices
+      n = math.floor(n / 16)
+      result = hexchars:sub(next, next) .. result
+    end
+
+    return prefix .. result
+  end,
+  next = function()
+    -- e.g. 3c44c8a9-0613-46a2-ad33-97b6ba2e9d9a
+    -- 8-4-4-4-12
+    local sets = {8, 4, 4, 12}
+    local result = ""
+
+    local i
+    for _,set in ipairs(sets) do
+      if result:len() > 0 then
+        result = result .. "-"
+      end
+      for i = 1,set do
+        result = result .. guid.toHex(math.random(0, 15))
+      end
+    end
+
+    return result
+  end
+}
+
+event.push = event.push or require("computer").pushSignal
 
 local function reqcom(componentName, req, msg)
   if not com.isAvailable(componentName) then
@@ -44,7 +89,7 @@ local function reqcom(componentName, req, msg)
 end
 
 if not fs.exists("/usr/lib/json.lua") then
-  local inet = reqcom("internet", true, "This program need an internet card to install json lib!")
+  local inet = reqcom("internet", true, "This program needs an internet card to install json lib!")
   if not fs.exists("/usr/lib") then
     fs.makeDirectory("/usr/lib")
   end
@@ -58,12 +103,12 @@ if not fs.exists("/usr/lib/json.lua") then
   file:close()
 end
 
-local bridge = reqcom("openperipheral_bridge", true, "This program needs Openperipheral bridge to work!")
+local bridge = reqcom("openperipheral_bridge", true, "This program needs an Openperipheral bridge to work!")
 
 local json = require("json")
 
--- Let's load the config right here to be sure
--- program can access it if I'd need it somewhere in program init
+-- Let's load the config here to be sure the program
+-- can access it if I'd need it somewhere in program init
 local cfg = {}
 do
   local f = io.open(config, "r")

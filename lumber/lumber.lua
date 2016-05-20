@@ -4,8 +4,8 @@
 --    2       1<>
 --      Width
 
-local W, H = 6, 4
-local INTERVAL = 60
+local W, H = 7, 6
+local INTERVAL = 30
 
 local com = require("component")
 local robot = require("robot")
