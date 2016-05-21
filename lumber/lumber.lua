@@ -4,7 +4,7 @@
 --    2       1<>
 --      Width
 
-local W, H = 7, 6
+local W, H = 7, 11
 local INTERVAL = 30
 
 local com = require("component")
@@ -20,14 +20,6 @@ local wrappers = {
     to = to or 1
     return function(...)
       while not f(...) == true do
-        os.sleep(to)
-      end
-    end
-  end,
-  invrpt = function(f, to)
-    to = to or 1
-    return function(...)
-      while f(...) == true do
         os.sleep(to)
       end
     end
@@ -60,7 +52,11 @@ local r = {
   around = wrappers.rpt(robot.turnAround),
   up = wrappers.rpt(robot.up),
   down = wrappers.rpt(robot.down),
-  suck = wrappers.invrpt(magnet.suck, 0),
+  suck = function()
+    while magnet.suck() do
+      os.sleep(.05)
+    end
+  end,
   swing = wrappers.detect(robot.swing),
   place = wrappers.detect(robot.place)
 }
@@ -70,7 +66,7 @@ local function row()
   for i = 1, H, 1 do
     r.fwd()
     r.left()
-    if robot.compare() then
+    if robot.compare() and robot.durability() and robot.durability() > .1 then
       robot.select(INV)
       r.swing()
     end
@@ -80,7 +76,7 @@ local function row()
     end
     robot.select(INV - 1)
     r.around()
-    if robot.compare() then
+    if robot.compare() and robot.durability() and robot.durability() > .1 then
       robot.select(INV)
       r.swing()
     end
