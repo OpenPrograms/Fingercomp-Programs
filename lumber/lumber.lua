@@ -22,6 +22,7 @@ local wrappers = {
       while not f(...) == true do
         os.sleep(to)
       end
+      os.sleep(0)
     end
   end,
   detect = function(f, to)
