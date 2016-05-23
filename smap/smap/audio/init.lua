@@ -381,16 +381,59 @@ end
 
 
 
+--  WaveBuffer
+--    An instructions container
+
+local WaveBuffer = {}
+WaveBuffer.__name = "WaveBuffer"
+
+function WaveBuffer:new()
+  local o = {}
+  setmetatable(o, self)
+  return o
+end
+
+function WaveBuffer:add(instruction)
+  checkType(1, instruction, "Instruction")
+  self[#self + 1] = instruction
+end
+
+function WaveBuffer:__pairs()
+  local pos = 0
+  return function()
+    pos = pos + 1
+    return self[pos]
+  end
+end
+
+
+
+--  Instruction
+--    Stores an instruction
+
+local Instruction = {}
+Instruction.__name = "Instruction"
+
+function Instruction:new(name, ...)
+  checkType(1, name, "string")
+  local o = {name=name, ...}
+  setmetatable(o, self)
+  return o
+end
+
+
+
 --  Device
---    Class used by Music to play Chords
+--    A class used to generate sounds
 
 local Device = {}
 Device.__name = "Device"
 
-function Device:new(playImpl, format)
+function Device:new(playImpl, format, onVolumeChange)
   checkType(1, playImpl, "function")
   assert(formatTypes[format], "wrong format type!")
-  local o = {play = playImpl,volume=1,format=format}
+  checkType(3, onVolumeChange, "function", "nil")
+  local o = {play = playImpl,volume=1,format=format,onVolumeChange=onVolumeChange}
   setmetatable(o, self)
   self.__index = self
   return o
@@ -402,6 +445,9 @@ function Device:setVolume(vol)
     error("Wrong volume: a value [0, 1] expected")
   end
   self.volume = vol
+  if self.onVolumeChange then
+    self.onVolumeChange()
+  end
 end
 
 
