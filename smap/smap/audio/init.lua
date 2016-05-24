@@ -486,7 +486,10 @@ return {
     Music = callable(Music),
     instr = instr
   },
-  [formatTypes.WAVE] = {},
+  [formatTypes.WAVE] = {
+    WaveBuffer = callable(WaveBuffer),
+    Instruction = callable(Instruction)
+  },
   Device = callable(Device)
 }
 

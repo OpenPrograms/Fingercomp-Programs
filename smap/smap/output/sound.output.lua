@@ -35,10 +35,7 @@ local instrActions = {
     return validChannel, reason
   end,
   delay = function(dev, duration)
-    if duration > 0 and duration < 250 then
-      return dev.delay(duration)
-    end
-    return false, "invalid duration"
+    return dev.delay(duration)
   end,
   process = function(dev)
     return dev.process()
@@ -142,7 +139,7 @@ function new(addr)
     for instruction in pairs(instrs) do
       local name = instruction.name
       if instrActions[name] then
-        instrActions[name](table.unpack(instruction))
+        instrActions[name](sound, table.unpack(instruction))
       end
     end
   end,
