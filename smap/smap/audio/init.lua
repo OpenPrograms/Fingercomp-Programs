@@ -242,7 +242,7 @@ function Track:seek(pos)
   end
 end
 
-function Track:play()
+function Track:get()
   self:getLength()
   if not self.data[self.pos] then
     return false, "end"
@@ -253,9 +253,64 @@ function Track:play()
     if self.data[self.pos] then
       self.data[self.pos]:seek(1)
     end
-    return self:play()
+    return self:get()
   end
   return result
+end
+
+function Track:play(len, sleepMode)
+  checkType(1, len, "number")
+  if sleepMode == 1 or sleepMode == "allow" or sleepMode == true then
+    sleepMode = "allow"
+  elseif sleepMode == 2 or sleepMode == "force" then
+    sleepMode = "force"
+  elseif sleepMode == -1 or sleepMode == "forbid" then
+    sleepMode = "deny"
+  else
+    sleepMode = "none"
+  end
+  local lastSleep = os.clock()
+  local lastTick = 0
+  for i = 1, len, 1 do
+    if self.closed then
+      return false, "close"
+    end
+    if self.stopped then
+      return false, "stopped"
+    end
+    local success, reason = self:get()
+    if not success then
+      return success, reason
+    end
+    if not (#success == 0 and (i - lastTick) / self.tempo > .1) then
+      coroutine.yield(success)
+      local sleepTime = (i - lastTick) / self.tempo
+      lastTick = i
+      if sleepMode == "force" and sleepTime < .05 then
+        return false, "too fast"
+      end
+      if sleepMode == "allow" and sleepTime * 100 % 5 == 0 or sleepMode == "force" then
+        os.sleep(sleepTime)
+        lastSleep = os.clock()
+      else
+        if sleepTime >= .1 and sleepMode ~= "deny" then
+          local sleep = math.floor(sleepTime * 100) == sleepTime * 100 and sleepTime - 0.05 or math.floor(sleepTime * 100) / 100
+          os.sleep(sleep)
+          sleepTime = sleepTime - sleep
+          lastSleep = os.clock()
+        end
+        local begin = os.clock()
+        while os.clock() - begin < sleepTime do
+          if os.clock() - lastSleep > 2.5 then
+            os.sleep(.05)
+            lastSleep = os.clock()
+            begin = begin + 0.05
+          end
+        end
+      end
+    end
+  end
+  return true
 end
 
 function Track:__pairs()
@@ -304,61 +359,24 @@ function Music:seek(pos)
   self.track:seek(pos)
 end
 
-function Music:play(len, sleepMode)
-  checkType(1, len, "number")
-  if sleepMode == 1 or sleepMode == "allow" or sleepMode == true then
-    sleepMode = "allow"
-  elseif sleepMode == 2 or sleepMode == "force" then
-    sleepMode = "force"
-  elseif sleepMode == -1 or sleepMode == "forbid" then
-    sleepMode = "deny"
-  else
-    sleepMode = "none"
-  end
-  local lastSleep = os.clock()
-  local lastTick = 0
-  for i = 1, len, 1 do
-    if self.closed then
-      return false, "close"
+function Music:play(...)
+  local c = coroutine.create(self.track.play)
+  local args = {c, ...}
+  while true do
+    local data = {coroutine.resume(c, table.unpack(args))}
+    args = {}
+    if data[1] == false then
+      -- Something wrong happened, panic
+      error(data[2], 2)
     end
-    if self.stopped then
-      return false, "stopped"
+    if coroutine.status(c) == "dead" then
+      -- Return, the coroutine is now dead
+      return table.unpack(data, 2)
     end
-    local success, reason = self.track:play()
-    if not success then
-      return success, reason
-    end
-    if not (#success == 0 and (i - lastTick) / self.track.tempo > .1) then
-      for _, dev in pairs(self.devices) do
-        dev:play(success)
-      end
-      local sleepTime = (i - lastTick) / self.track.tempo
-      lastTick = i
-      if sleepMode == "force" and sleepTime < .05 then
-        return false, "too fast"
-      end
-      if sleepMode == "allow" and sleepTime * 100 % 5 == 0 or sleepMode == "force" then
-        os.sleep(sleepTime)
-        lastSleep = os.clock()
-      else
-        if sleepTime >= .1 and sleepMode ~= "deny" then
-          local sleep = math.floor(sleepTime * 100) == sleepTime * 100 and sleepTime - 0.05 or math.floor(sleepTime * 100) / 100
-          os.sleep(sleep)
-          sleepTime = sleepTime - sleep
-          lastSleep = os.clock()
-        end
-        local begin = os.clock()
-        while os.clock() - begin < sleepTime do
-          if os.clock() - lastSleep > 2.5 then
-            os.sleep(.05)
-            lastSleep = os.clock()
-            begin = begin + 0.05
-          end
-        end
-      end
+    for _, dev in pairs(self.devices) do
+      dev:play(table.unpack(data, 2))
     end
   end
-  return true
 end
 
 function Music:getPos()
@@ -391,6 +409,7 @@ function Instruction:new(name, ...)
   checkType(1, name, "string")
   local o = {name=name, ...}
   setmetatable(o, self)
+  self.__index = self
   return o
 end
 
@@ -410,6 +429,7 @@ function WaveBuffer:new(length, func, to)
   to = to or 0
   local o = {length=length,pos=0,func=func,called=called,to=to}
   setmetatable(o, self)
+  self.__index = self
   return o
 end
 
@@ -469,6 +489,10 @@ local WaveTrack = {}
 WaveTrack.__name = "WaveTrack"
 
 function WaveTrack:new()
+  local o = {}
+  setmetatable(o, self)
+  self.__index = self
+  return self
 end
 
 
