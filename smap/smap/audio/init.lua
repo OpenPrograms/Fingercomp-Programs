@@ -381,14 +381,34 @@ end
 
 
 
+--  Instruction
+--    Stores an instruction
+
+local Instruction = {}
+Instruction.__name = "Instruction"
+
+function Instruction:new(name, ...)
+  checkType(1, name, "string")
+  local o = {name=name, ...}
+  setmetatable(o, self)
+  return o
+end
+
+
+
 --  WaveBuffer
 --    An instructions container
 
 local WaveBuffer = {}
 WaveBuffer.__name = "WaveBuffer"
 
-function WaveBuffer:new()
-  local o = {}
+function WaveBuffer:new(length, func, to)
+  checkType(1, length, "number", "nil")
+  checkType(2, func, "function", "nil")
+  checkType(3, to, "number", "nil")
+  length = length or math.huge
+  to = to or 0
+  local o = {length=length,pos=0,func=func,called=called,to=to}
   setmetatable(o, self)
   return o
 end
@@ -406,19 +426,49 @@ function WaveBuffer:__pairs()
   end
 end
 
+function WaveBuffer:getLength()
+  return self.length
+end
+
+function WaveBuffer:play()
+  if self.func and self.pos == self:getLength() - self.to + 1 and not self.called then
+    self:func()
+    self.called = true
+  end
+  self.pos = self.pos + 1
+  return self[self.pos]
+end
+
+-- TODO: newPos should be some time moment, not instruction pos
+function WaveBuffer:seek(newPos)
+  if newPos > self:getLength() then
+    self.pos = self.length
+  elseif newPos < 1 then
+    self.pos = 1
+  else
+    self.pos = newPos
+  end
+end
+
+function WaveBuffer:__pairs()
+  local pos = 0
+  return function()
+    pos = pos + 1
+    return self[pos]
+  end
+end
+
+WaveBuffer.__ipairs = WaveBuffer.__pairs
 
 
---  Instruction
---    Stores an instruction
 
-local Instruction = {}
-Instruction.__name = "Instruction"
+--  WaveTrack
+--    Provides functions for the Music class
 
-function Instruction:new(name, ...)
-  checkType(1, name, "string")
-  local o = {name=name, ...}
-  setmetatable(o, self)
-  return o
+local WaveTrack = {}
+WaveTrack.__name = "WaveTrack"
+
+function WaveTrack:new()
 end
 
 
