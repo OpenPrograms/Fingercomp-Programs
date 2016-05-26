@@ -4,7 +4,7 @@ local com = require("component")
 
 NAME = "inoteblock"
 DEVICE = "iron_noteblock"
-FORMATTYPE = formatType.NOTE
+FORMATTYPE = audio.formatTypes.NOTE
 
 local function freq2note(freq)
   return 12 * math.log(freq / 440, 2) + 49 - 34

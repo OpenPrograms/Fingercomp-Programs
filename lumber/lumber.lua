@@ -12,6 +12,7 @@ local robot = require("robot")
 local term = require("term")
 
 local magnet = com.tractor_beam
+local inv = com.inventory_controller
 
 local INV = robot.inventorySize()
 
@@ -58,7 +59,12 @@ local r = {
       os.sleep(.05)
     end
   end,
-  swing = wrappers.detect(robot.swing),
+  swing = wrappers.detect(function()
+    if robot.durability() > .1 then
+      return robot.swing()
+    end
+    return true
+  end),
   place = wrappers.detect(robot.place)
 }
 
@@ -110,6 +116,9 @@ local function dropAll()
 end
 
 local function field()
+  robot.select(1)
+  robot.useDown()
+  inv.equip()
   robot.select(INV - 1)
   for i = 1, W, 1 do
     r.fwd()
@@ -130,6 +139,8 @@ local function field()
   r.fwd()
   dropAll()
   r.around()
+  robot.select(1)
+  r.useDown()
 end
 
 while true do

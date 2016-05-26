@@ -314,7 +314,7 @@ function Track:play(len, sleepMode)
 end
 
 function Track:__pairs()
-  local pos = -1
+  local pos = 0
   return function()
     pos = pos + 1
     return self.data[pos]
@@ -322,80 +322,6 @@ function Track:__pairs()
 end
 
 Track.__ipairs = Track.__pairs
-
-
-
---  Music
---    A handle, connects Track and devices.
-
-local Music = {}
-Music.__name = "Music"
-
-function Music:new(track, onCloseImpl)
-  checkType(1, track, "Track")
-  onCloseImpl = onCloseImpl or function() end
-  checkType(2, onCloseImpl, "function")
-  local o = {track = track, devices = {}, timer = false, stopped = false, onClose = onCloseImpl}
-  setmetatable(o, self)
-  self.__index = self
-  return o
-end
-
-function Music:connect(device)
-  checkType(1, device, "Device")
-  table.insert(self.devices, device)
-end
-
-function Music:disconnect(device)
-  checkType(1, device, "Device")
-  local _, pos = isin(self.devices, device)
-  if not pos then
-    error("no such device")
-  end
-  table.remove(self.devices, pos)
-end
-
-function Music:seek(pos)
-  self.track:seek(pos)
-end
-
-function Music:play(...)
-  local c = coroutine.create(self.track.play)
-  local args = {c, ...}
-  while true do
-    local data = {coroutine.resume(c, table.unpack(args))}
-    args = {}
-    if data[1] == false then
-      -- Something wrong happened, panic
-      error(data[2], 2)
-    end
-    if coroutine.status(c) == "dead" then
-      -- Return, the coroutine is now dead
-      return table.unpack(data, 2)
-    end
-    for _, dev in pairs(self.devices) do
-      dev:play(table.unpack(data, 2))
-    end
-  end
-end
-
-function Music:getPos()
-  return self.track:getPos()
-end
-
-function Music:getLength()
-  return self.track:getLength()
-end
-
-function Music:stop()
-  self.stopped = true
-end
-
-function Music:close()
-  self:onClose()
-  self.closed = true
-  self.track = nil
-end
 
 
 
@@ -489,10 +415,162 @@ local WaveTrack = {}
 WaveTrack.__name = "WaveTrack"
 
 function WaveTrack:new()
-  local o = {}
+  local o = {data={},pos=1,length=math.huge,info={}}
   setmetatable(o, self)
   self.__index = self
   return self
+end
+
+function WaveTrack:add(buf)
+  checkType(1, buf, "WaveBuffer")
+  table.insert(self.data, buf)
+end
+
+function WaveTrack:get()
+  self:getLength()
+  if not self.data[self.pos] then
+    return false, "end"
+  end
+  local result = self.data[self.pos]:play()
+  if result == nil then
+    self.pos = self.pos + 1
+    if self.data[self.pos] then
+      self.data[self.pos]:seek(1)
+    end
+    return self:get()
+  end
+  return result
+end
+
+function WaveTrack:getLength()
+  self.length = 0
+  for _, buf in pairs(self.data) do
+    self.length = self.length + buf:getLength()
+  end
+  return self.length
+end
+
+function WaveTrack:getPos()
+  return self.pos
+end
+
+function WaveTrack:play(length)
+  checkType(1, length, "number")
+  for i = 1, length, 1 do
+    local success, reason = self:get()
+    if not success then
+      return success, reason
+    end
+    coroutine.yield(success)
+  end
+end
+
+function WaveTrack:seek(newPos)
+  if newPos > self:getLength() then
+    newPos = self.length
+  elseif newPos < 1 then
+    newPos = 1
+  end
+  for _, buf in pairs(self.data) do
+    if buf:getLength() >= newPos then
+      buf:seek(newPos)
+    end
+    newPos = newPos - buf:getLength()
+  end
+end
+
+function WaveTrack:setInfo(info)
+  checkType(1, info, "table")
+  self.info = info
+end
+
+function WaveTrack:__pairs()
+  local pos = 0
+  return function()
+    pos = pos + 1
+    return self.data[pos]
+  end
+end
+
+WaveTrack.__ipairs = WaveTrack.__pairs
+
+
+
+--  Music
+--    A handle, connects Track (or WaveTrack) and devices.
+
+local Music = {}
+Music.__name = "Music"
+
+function Music:new(track, onCloseImpl)
+  checkType(1, track, "Track", "WaveTrack")
+  onCloseImpl = onCloseImpl or function() end
+  checkType(2, onCloseImpl, "function")
+  local o = {track = track, devices = {}, timer = false, stopped = false, onClose = onCloseImpl, trackType = track.__name == "Track" and "NOTE" or "WAVE"}
+  setmetatable(o, self)
+  self.__index = self
+  return o
+end
+
+function Music:connect(device)
+  checkType(1, device, "Device")
+  assert(device.format == "BOTH" or device.format == self.trackType, "device doesn't support track's format")
+  table.insert(self.devices, device)
+end
+
+function Music:disconnect(device)
+  checkType(1, device, "Device")
+  local _, pos = isin(self.devices, device)
+  if not pos then
+    error("no such device")
+  end
+  table.remove(self.devices, pos)
+end
+
+function Music:seek(pos)
+  self.track:seek(pos)
+end
+
+function Music:play(...)
+  local c = coroutine.create(self.track.play)
+  local args = {c, ...}
+  while true do
+    local data = {coroutine.resume(c, table.unpack(args))}
+    if #args > 0 then
+      for i = #args, 1, -1 do
+        table.remove(args, i)
+      end
+    end
+    if data[1] == false then
+      -- Something wrong happened, panic
+      error(data[2], 2)
+    end
+    if coroutine.status(c) == "dead" then
+      -- Return, the coroutine is now dead
+      return table.unpack(data, 2)
+    end
+    for _, dev in pairs(self.devices) do
+      dev:play(table.unpack(data, 2))
+    end
+  end
+end
+
+function Music:getPos()
+  return self.track:getPos()
+end
+
+function Music:getLength()
+  return self.track:getLength()
+end
+
+function Music:stop()
+  self.stopped = true
+end
+
+function Music:close()
+  self:onClose()
+  self.closed = true
+  self.track = nil
 end
 
 
@@ -562,9 +640,12 @@ return {
   },
   [formatTypes.WAVE] = {
     WaveBuffer = callable(WaveBuffer),
-    Instruction = callable(Instruction)
+    Instruction = callable(Instruction),
+    WaveTrack = callable(WaveTrack)
   },
-  Device = callable(Device)
+  Device = callable(Device),
+  Music = callable(Music),
+  formatTypes = formatTypes
 }
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
