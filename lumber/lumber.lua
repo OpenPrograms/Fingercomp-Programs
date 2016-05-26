@@ -10,6 +10,7 @@ local INTERVAL = 30
 local com = require("component")
 local robot = require("robot")
 local term = require("term")
+local comp = require("computer")
 
 local magnet = com.tractor_beam
 local inv = com.inventory_controller
@@ -140,7 +141,7 @@ local function field()
   dropAll()
   r.around()
   robot.select(1)
-  r.useDown()
+  robot.useDown()
 end
 
 while true do
@@ -149,11 +150,21 @@ while true do
   term.setCursor(x, y)
   io.write("Running")
   field()
-  for i = 0, INTERVAL, 1 do
-    term.setCursor(x, y)
-    term.clearLine(y)
-    io.write("Sleep: " .. i .. " out of " .. INTERVAL)
-    os.sleep(1)
+  if type(INTERVAL) == "number" then
+    for i = 0, INTERVAL, 1 do
+      term.setCursor(x, y)
+      term.clearLine(y)
+      io.write("Sleep: " .. i .. " out of " .. INTERVAL)
+      os.sleep(1)
+    end
+  else
+    local time = 0
+    repeat
+      term.setCursor(x, y)
+      term.clearLine(y)
+      io.write("Sleep: " .. time .. " (" .. comp.energy() .. "/" .. comp.maxEnergy() .. ")")
+      os.sleep(1)
+    until comp.energy() / comp.maxEnergy() > .98
   end
   os.sleep(0)
   term.setCursor(x, y)
