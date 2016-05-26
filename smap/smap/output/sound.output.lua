@@ -3,7 +3,7 @@
 local com = require("component")
 NAME = "sound"
 DEVICE = "sound"
-FORMATTYPE = formatTypes.WAVE
+FORMATTYPE = audio.formatTypes.WAVE
 
 local function checkChannel(c)
   if c > 0 and c <= 8 then
@@ -38,7 +38,10 @@ local instrActions = {
     return dev.delay(duration)
   end,
   process = function(dev)
-    return dev.process()
+    while not dev.process() do
+      os.sleep(.05)
+    end
+    os.sleep(.05)
   end,
   resetAM = function(dev, channel)
     local validChannel, reason = checkChannel(channel)
@@ -143,6 +146,7 @@ function new(addr)
       end
     end
   end,
+  FORMATTYPE,
   function(self, volume)
     sound.setVolume(volume)
   end)

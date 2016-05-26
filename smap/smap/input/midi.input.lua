@@ -350,7 +350,7 @@ function loadpath(path)
   tracks = nil
   t:add(buf)
 
-  return noteAudio.Music(t)
+  return audio.Music(t)
 end
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :

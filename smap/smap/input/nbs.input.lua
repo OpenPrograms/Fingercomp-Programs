@@ -160,7 +160,7 @@ function loadpath(path)
     track:add(firstBuffer)
   end
 
-  return noteAudio.Music(track, function()
+  return audio.Music(track, function()
     file:close()
   end)
 end

@@ -4,7 +4,7 @@ local com = require("component")
 
 NAME = "beep"
 DEVICE = "beep"
-FORMATTYPE = formatTypes.NOTE
+FORMATTYPE = audio.formatTypes.NOTE
 
 function new(addr)
   if not com.isAvailable("beep") then

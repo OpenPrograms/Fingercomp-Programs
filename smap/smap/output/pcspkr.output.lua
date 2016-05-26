@@ -2,7 +2,7 @@
 
 NAME = "pcspkr"
 DEVICE = "computer"
-FORMATTYPE = formatTypes.NOTE
+FORMATTYPE = audio.formatTypes.NOTE
 
 local comp = require("computer")
 
