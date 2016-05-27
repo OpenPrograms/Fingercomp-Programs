@@ -121,7 +121,7 @@ local success, reason = pcall(function()
   local lastSleep = os.clock()
   local lastTime = -1
   local lastTick = 0
-  -- FIXME: delays
+  -- FIXME: MAKE IT WORK
   for i = 1, len, 1 do
     if exit then
       break

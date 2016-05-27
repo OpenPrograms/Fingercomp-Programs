@@ -34,8 +34,19 @@ local function checkType(name, value, ...)
   elseif #types > 2 then
     exp = table.concat(types, ", ", 1, #types - 1) .. ", or " .. types[#types]
   end
-  error(("bad argument %s (%s expected, got %s)"):format(tonumber(name) and ("#" .. name) or ('"' .. name .. '"'), exp, getType(value)))
+  error(("bad argument %s (%s expected, got %s)"):format(tonumber(name) and ("#" .. name) or ('"' .. name .. '"'), exp, getType(value)), 2)
 end
+
+
+
+local formatTypes = {
+  "NOTE",
+  "WAVE",
+  "BOTH",
+  NOTE = 1,
+  WAVE = 2,
+  BOTH = 3
+}
 
 
 --  Chord
@@ -506,7 +517,7 @@ function Music:new(track, onCloseImpl)
   checkType(1, track, "Track", "WaveTrack")
   onCloseImpl = onCloseImpl or function() end
   checkType(2, onCloseImpl, "function")
-  local o = {track = track, devices = {}, timer = false, stopped = false, onClose = onCloseImpl, trackType = track.__name == "Track" and "NOTE" or "WAVE"}
+  local o = {track = track, devices = {}, timer = false, stopped = false, onClose = onCloseImpl, trackType = track.__name == "Track" and formatTypes.NOTE or formatTypes.WAVE}
   setmetatable(o, self)
   self.__index = self
   return o
@@ -514,7 +525,7 @@ end
 
 function Music:connect(device)
   checkType(1, device, "Device")
-  assert(device.format == "BOTH" or device.format == self.trackType, "device doesn't support track's format")
+  assert(device.format == formatTypes.BOTH or device.format == self.trackType, "device doesn't support track's format")
   table.insert(self.devices, device)
 end
 
@@ -533,7 +544,7 @@ end
 
 function Music:play(...)
   local c = coroutine.create(self.track.play)
-  local args = {c, ...}
+  local args = {self.track, ...}
   while true do
     local data = {coroutine.resume(c, table.unpack(args))}
     if #args > 0 then
