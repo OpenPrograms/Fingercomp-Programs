@@ -607,6 +607,11 @@ end
 --  Instruments
 
 local instr = {
+  "piano",
+  "drum",
+  "snare",
+  "click",
+  "bass",
   piano = 1,
   drum = 2,
   snare = 3,

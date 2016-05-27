@@ -3,7 +3,7 @@
 local com = require("component")
 NAME = "sound"
 DEVICE = "sound"
-FORMATTYPE = audio.formatTypes.WAVE
+FORMATTYPE = audio.formatTypes.BOTH
 
 local function checkChannel(c)
   if c > 0 and c <= 8 then
@@ -13,7 +13,7 @@ local function checkChannel(c)
 end
 
 local instrActions = {
-  ADSR = function(dev, channel, attack, decay, attenuation, release)
+  adsr = function(dev, channel, attack, decay, attenuation, release)
     local validChannel, reason = checkChannel(channel)
     if validChannel then
       return dev.setADSR(channel, attack, decay, attenuation, release)
@@ -36,12 +36,6 @@ local instrActions = {
   end,
   delay = function(dev, duration)
     return dev.delay(duration)
-  end,
-  process = function(dev)
-    while not dev.process() do
-      os.sleep(.05)
-    end
-    os.sleep(.05)
   end,
   resetAM = function(dev, channel)
     local validChannel, reason = checkChannel(channel)
@@ -121,8 +115,26 @@ local instrActions = {
       func = "setLFSR"
       waveNum = ({...})[1]
       args = table.pack(table.unpack({...}, 2))
+    else
+      return false, "invalid arguments"
     end
     return dev[func](channel, waveNum, table.unpack(args))
+  end
+}
+
+-- Wave type, freq, attack, decay, attenuation, release, volume
+local noteInstructions = {
+  [audio[audio.formatTypes.NOTE].instr.piano] = function(freq, len)
+    return "SINE", freq, 1, len * .5, 0, len * .1, 1
+  end,
+  [audio[audio.formatTypes.NOTE].instr.drum] = function(freq, len)
+  end,
+  [audio[audio.formatTypes.NOTE].instr.snare] = function(freq, len)
+  end,
+  [audio[audio.formatTypes.NOTE].instr.click] = function(freq, len)
+  end,
+  [audio[audio.formatTypes.NOTE].instr.bass] = function(freq, len)
+    return "SINE", freq / 4, 1, len * .7, 0, len * .175, 1
   end
 }
 
@@ -138,12 +150,32 @@ function new(addr)
   if not sound.type == "sound" then
     return false, "wrong device"
   end
-  return audio.Device(function(self, instrs)
-    for instruction in pairs(instrs) do
-      local name = instruction.name
-      if instrActions[name] then
-        instrActions[name](sound, table.unpack(instruction))
+  return audio.Device(function(self, tbl)
+    local notes = 0
+    for _, item in pairs(instrs) do
+      if item.__name == "Instruction" then
+        local name = instruction.name
+        if instrActions[name] then
+          instrActions[name](sound, table.unpack(instruction))
+        end
+      elseif item.__name == "Chord" and notes < 8 then
+        notes = notes + 1
+        local waveType, freq, attack, decay, attenuation, release, volume = noteInstructions[item[3]](item[1], item[2])
+        local i = audio[audio.formatTypes.WAVE].Instruction
+        local queve = {
+          i("open", notes),
+          i("wave", notes, waveType),
+          i("freq", notes, freq),
+          i("adsr", notes, attack, decay, attenuation, release),
+          i("volume", notes, volume)
+        }
+        for _, instruction in pairs(queve) do
+          instrActions[instruction.name](sound, table.unpack(instruction))
+        end
       end
+    end
+    while not sound.process() do
+      os.sleep(.05)
     end
   end,
   FORMATTYPE,
