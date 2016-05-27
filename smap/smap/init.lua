@@ -96,15 +96,9 @@ local function addEnv(e)
   local o = copy(e)
   setmetatable(o, {
     __index = function(self, k)
-      for _, tbl in ipairs({globals, e._TYPE == INPUT and ienv or (e._TYPE == OUTPUT and oenv) or {}, env, _G}) do
+      for _, tbl in pairs({globals, e._TYPE == INPUT and ienv or (e._TYPE == OUTPUT and oenv) or {}, env, _G}) do
         if tbl[k] then
-          if type(tbl[k]) == "function" then
-            return function(...)
-              return tbl[k](...)
-            end
-          else
-            return tbl[k]
-          end
+          return tbl[k]
         end
       end
     end,
@@ -113,7 +107,7 @@ local function addEnv(e)
   return o, globals
 end
 
-local audio = loadfile("/usr/lib/smap/audio/init.lua", "audio library", "t", addEnv({_TYPE = 0}))
+local audio = loadfile("/usr/lib/smap/audio/init.lua", "t", addEnv({_TYPE = 0}))()
 smap.audio = audio
 
 env.audio = audio
@@ -122,11 +116,6 @@ env.getType = getType
 env.checkType = checkType
 env.copy = copy
 env.concat = concat
-env.formatTypes = {
-  NOTE = 0,
-  WAVE = 1,
-  BOTH = 2
-}
 
 
 
@@ -141,11 +130,11 @@ for _, modtype in pairs({"input", "output"}) do
         _TYPE = modtype == "input" and INPUT or OUTPUT
       })
       local success, chunk, reason = pcall(loadfile, p, "t", mEnv)
-      if not success then
+      if success ~= true then
         return false, "fatal", chunk, p
       else
         local success, module = xpcall(chunk, debug.traceback)
-        if not success then
+        if success ~= true then
           return false, "fatal", module, p
         else
           if globals.NAME and not smap.modules[modtype][globals.NAME] then
@@ -159,8 +148,8 @@ end
 
 
 
-function smap.load(path, format)
-  checkArg(1, path, "string")
+function smap.load(p, format)
+  checkArg(1, p, "string")
   checkArg(2, format, "string")
   format = format:lower(format)
   if not smap.modules.input[format] then
@@ -169,10 +158,10 @@ function smap.load(path, format)
   if not smap.modules.input[format].loadpath then
     return false, "load is not implemented in module"
   end
-  if not fs.exists(path) then
+  if not fs.exists(p) then
     return false, "no such file"
   end
-  return smap.modules.input[format].loadpath(path)
+  return smap.modules.input[format].loadpath(p)
 end
 
 
@@ -185,17 +174,17 @@ function smap.device(dev, addr)
   return smap.modules.output[dev].new(addr)
 end
 
-function smap.guessFormat(path)
-  checkArg(1, path, "string")
-  if not fs.exists(path) then
+function smap.guessFormat(p)
+  checkArg(1, p, "string")
+  if not fs.exists(p) then
     return false, "no such file"
   end
-  if fs.isDirectory(path) then
+  if fs.isDirectory(p) then
     return false, "not a file"
   end
   for module, value in pairs(smap.modules.input) do
     if type(value.guess) == "function" then
-      local result = value.guess(path)
+      local result = value.guess(p)
       if result then
         return module
       end
