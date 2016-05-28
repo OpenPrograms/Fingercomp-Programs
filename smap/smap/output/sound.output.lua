@@ -6,7 +6,7 @@ DEVICE = "sound"
 FORMATTYPE = audio.formatTypes.BOTH
 
 local function checkChannel(c)
-  if c > 0 and c <= 8 then
+  if c <= 0 or c > 8 then
     return false, "invalid channel"
   end
   return true
