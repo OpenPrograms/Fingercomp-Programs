@@ -7,7 +7,7 @@ local srl = require("serialization")
 
 local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
-local config = "/etc/chat.json"
+local config = "/etc/opg-chat.json"
 local exit = false
 local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.5" and "1.5" or (io.stderr:write("Warning: unknown OS! The program may eventually crash or work incorrectly.") and "1.5" or "1.5"))
 local guid = openos == "1.6" and require("guid") or {
@@ -106,6 +106,34 @@ end
 local bridge = reqcom("openperipheral_bridge", true, "This program needs an Openperipheral bridge to work!")
 
 local json = require("json")
+
+if not fs.exists(config) then
+  local f = io.open(config, "w")
+  f:write(json:encode_pretty({
+    server = "%SERVER%",
+    admins = {"Fingercomp"},
+    main_channel = "#main",
+    net = {
+      enabled = true,
+      modem_strength = 400,
+      ports = {
+        ["6667"] = true,
+        ["6666"] = {"244d"}
+      },
+      ping = {
+        enabled = true,
+        interval = 180,
+        timeout = 180
+      }
+    },
+    users = {},
+    max_chan_lines = 750
+  }))
+  f:close()
+  print("No configuration file found, created a new one. Path to the config: " .. config)
+  print("Edit the settings and relaunch the program.")
+  return 0
+end
 
 -- Let's load the config here to be sure the program
 -- can access it if I'd need it somewhere in program init
