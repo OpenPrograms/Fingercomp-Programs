@@ -13,7 +13,7 @@ local modem = com.modem
 local data
 
 if modem.isWireless() then
-  modem.setStrength(cfg.net.modemStrength)
+  modem.setStrength(cfg.net.modem_strength)
 end
 
 for port in pairs(cfg.net.ports) do
