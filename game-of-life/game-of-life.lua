@@ -197,7 +197,7 @@ local function render()
   gpu.setForeground(0xffffff)
   if pause then
     gpu.setBackground(0x808000)
-    gpu.set(w - 13, 1, " " .. unicode.char(0x23f8) .. " Paused    ")
+    gpu.set(w - 13, 1, " ┃┃ Paused    ")
   else
     gpu.setBackground(0x008000)
     gpu.set(w - 13, 1, " " .. unicode.char(0x25ba) .. " Simulation ")
