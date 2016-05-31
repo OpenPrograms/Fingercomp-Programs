@@ -21,7 +21,7 @@
 ## Installation
 The things you'll need are a terminal bridge, terminal glasses, an adapter and either a data card or a data block.
 Connect an adapter to a computer, place a bridge next to a adapter. Insert your data card into a computer if you've crafted it, or connect your data block to a computer.
-Now type `edit /etc/chat.json` and configure this program as you wish. You'll probably want to change a list of admins to be able to stop the chat.
+Run 'opg-chat' to generate a new configuration file. Then type `edit /etc/chat.json` and configure the program as you wish. You'll probably want to change a list of admins to be able to stop the chat.
 When you're finally done, simply run `opg-chat`.
 
 ## Basic usage
