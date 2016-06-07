@@ -457,7 +457,7 @@ local function sendNotifyChan(chan, notify, parts, rec)
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
   truncate(chan)
-  event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec), srl.serialize(parts))
+  event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(rec == "all" and {rec} or rec), srl.serialize(parts))
 end
 
 local function sendPM(addressee, user, msg)
