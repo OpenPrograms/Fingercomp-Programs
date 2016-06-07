@@ -9,8 +9,8 @@ local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
 local config = "/etc/opg-chat.json"
 local exit = false
-local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.5" and "1.5" or (io.stderr:write("Warning: unknown OS! The program may eventually crash or work incorrectly.") and "1.5" or "1.5"))
-local guid = openos == "1.6" and require("guid") or {
+local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.5" and "1.5" or (io.stderr:write("Warning: unknown OS! The program may eventually crash or work incorrectly.\n") and "1.5" or "1.5"))
+local guid = {
   toHex = function(n)
     if type(n) ~= 'number' then
       return nil, string.format("toHex only converts numbers to strings, %s is not a string, but a %s", tostring(n), type(n))
