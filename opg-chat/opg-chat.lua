@@ -442,7 +442,7 @@ local function sendMsgChan(chan, nick, msg, rec)
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, level = channels[chan].users[nick], nick, msg, rec})
   truncate(chan)
-  event.push("chat_event_msg", os.time(), chan, nick, msg, rec == "all" or #rec, table.unpack(type(rec) == "all" and {rec} or rec))
+  event.push("chat_event_msg", os.time(), chan, nick, msg, rec == "all" or #rec, table.unpack(rec == "all" and {rec} or rec))
 end
 
 local function sendNotifyChan(chan, notify, parts, rec)
