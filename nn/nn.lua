@@ -12,6 +12,14 @@ _G.effectscomb = _G.effectscomb or {}
 _G.groups = _G.groups or {}
 _G.init = _G.init or false
 
+codes = {
+  success    =  0x000,
+  fail       = -0x001,
+  initfail   = -0x100,
+  uninit     = -0x101,
+  noresponse = -0x102
+}
+
 local function s(...)
   m.broadcast(_G.port, "nanomachines", ...)
 end
@@ -31,9 +39,9 @@ local function init(rqpt, prpt)
   _G.max = (g("getTotalInputCount") or {})[8]
   if not _G.max then
     io.stderr:write("Failed to init.\n")
-    print("Are you sure you're near enough to modem and you have nanomachines?")
+    io.write("Are you sure you're near enough to modem and you have nanomachines?\n")
     _G.max = 15
-    return
+    return codes.initfail
   end
   if fs.exists(CONF) then
     dofile(CONF)
@@ -42,7 +50,8 @@ local function init(rqpt, prpt)
   end
   _G.groups = group
   _G.init = true
-  print("Configured: PORT " .. _G.port .. ", MAX " .. _G.max)
+  io.write("Configured: PORT " .. _G.port .. ", MAX " .. _G.max .. "\n")
+  return codes.success
 end
 
 local function isIn(tbl, value)
@@ -57,27 +66,28 @@ end
 local function test(...)
   if not _G.init then
     io.stderr:write("Run nn init first!\n")
-    return -1
+    return -codes.uninit
   end
   local exclude = {...}
-  print("Starting basic testing")
-  print("Total runs: " .. _G.max)
-  print("Testing starts in 3s...")
+  io.write("Starting basic testing\n")
+  io.write("Total runs: " .. _G.max .. "\n")
+  io.write("Testing starts in 3s...\n")
   os.sleep(3)
-  print("Beginning test")
+  io.write("Beginning test\n")
   _G.effects = {}
   for i = 1, _G.max, 1 do
     if not isIn(exclude, i) then
-      print("Run #" .. i)
+      io.write("Run #" .. i .. "\n")
       g("setInput", i, true)
       _G.effects[i] = g("getActiveEffects")[8]
       g("setInput", i, false)
-      print("Effects found:")
-      print(_G.effects[i])
+      io.write("Effects found:\n")
+      io.write(_G.effects[i] .. "\n")
     else
-      print("Run #" .. i .. " skipped per user's request")
+      io.write("Run #" .. i .. " skipped per user's request\n")
     end
   end
+  return codes.success
 end
 
 local function recurSum(num)
@@ -105,29 +115,29 @@ end
 local function combotest(...)
   if not _G.init then
     io.stderr:write("Run nn init first!\n")
-    return -1
+    return -codes.uninit
   end
-  print("Combinatoric test")
-  print("Total runs: " .. recurSum(_G.max - 1))
-  print("It may take very long time!")
-  print("Testing begins is 3s...")
+  io.write("Combinatoric test\n")
+  io.write("Total runs: " .. recurSum(_G.max - 1) .. "\n")
+  io.write("It may take very long time!\n")
+  io.write("Testing begins is 3s...\n")
   os.sleep(3)
   if #_G.effects == 0 then
-    print("No input info, starting basic testing")
+    io.write("No input info, starting basic testing\n")
     test(...)
   end
-  print("Started combinatoric test")
+  io.write("Started combinatoric test\n")
   _G.effectscomb = {}
   local exclude = {...}
   for i = 1, _G.max, 1 do
     if not isIn(exclude, i) then
       _G.effectscomb[i] = {}
-      print("Run #" .. i)
+      io.write("Run #" .. i .. "\n")
       g("setInput", i, true)
       for j = i, _G.max, 1 do
         if i ~= j then
           if not isIn(exclude, j) and not isIn(exclude, i .. "-" .. j) then
-            print("Run #" .. i .. "." .. j .. "...")
+            io.write("Run #" .. i .. "." .. j .. "...\n")
             g("setInput", j, true)
             local effComb = g("getActiveEffects")[8] or "{}"
             local effI, effJ = splitComma(_G.effects[i]), splitComma(_G.effects[j])
@@ -154,81 +164,89 @@ local function combotest(...)
             end
             effComb = ser.serialize(effCombUS)
             _G.effectscomb[i][j] = effComb
-            print("Found effects:")
-            print(_G.effectscomb[i][j])
+            io.write("Effects found:\n")
+            io.write(_G.effectscomb[i][j] .. "\n")
             g("setInput", j, false)
           else
-            print("Run #" .. i .. "." .. j .. " skipped per user's request")
+            io.write("Run #" .. i .. "." .. j .. " skipped per user's request\n")
           end
         end
       end
       g("setInput", i, false)
     else
-      print("Run #" .. i .. " skipped per user's request")
+      io.write("Run #" .. i .. " skipped per user's request\n")
     end
   end
+  return codes.success
 end
 
 local function clear()
   for i = 1, _G.max, 1 do
-    print("Turning off #" .. i)
+    io.write("Turning off #" .. i .. "\n")
     g("setInput", i, false)
   end
+  return codes.success
 end
 
 local function ge()
   if not _G.init then
     io.stderr:write("Run nn init first!\n")
-    return -1
+    return -codes.uninit
   end
   for i = 1, _G.max, 1 do
     if _G.effects[i] then
-      print("Input #" .. i .. ":\t" .. _G.effects[i])
+      io.write("Input #" .. i .. ":\t" .. _G.effects[i] .. "\n")
     end
   end
+  return codes.success, _G.effects
 end
 
 local function getCombo()
   if not _G.init then
     io.stderr:write("Run nn init first!\n")
-    return -1
+    return -codes.uninit
   end
   for numi, i in pairs(_G.effectscomb) do
     for numj, j in pairs(_G.effectscomb[numi]) do
       if j ~= "{}" then
-        print("Input #" .. numi .. "+" .. numj .. ":\t" .. j)
+        io.write("Input #" .. numi .. "+" .. numj .. ":\t" .. j .. "\n")
       end
     end
   end
+  return codes.success, _G.effectscomb
 end
 
 local function reset()
   _G.max, _G.port, _G.effects = 15, 27091, {}
   _G.init = false
+  return codes.success
 end
 
 local function info()
-  print("PORT: " .. (_G.port) or "none")
-  print("MAX: " .. (_G.max) or "none")
-  print("EFFECTS: ")
-  ge()
+  io.write("PORT: " .. ((_G.port) or "none") .. "\n")
+  io.write("MAX: " .. ((_G.max) or "none") .. "\n")
+  io.write("EFFECTS: \n")
+  return ge()
 end
 
 local function gc(...)
   local data = g(...)
-  io.write("FROM " .. data[4] .. " in " .. data[5] .. " msg: ")
+  io.write("FROM " .. data[4] .. " in " .. data[5] .. " msg: \n")
   for i = 7, #data, 1 do
     io.write(data[i] .. " ")
   end
   print()
+  return codes.success, data
 end
 
 local function on(i)
   g("setInput", i, true)
+  return codes.success
 end
 
 local function off(i)
   g("setInput", i, false)
+  return codes.success
 end
 
 local function getHP()
@@ -236,8 +254,10 @@ local function getHP()
   if data then
     io.write("HP: " .. string.rep("♥", data[8]) .. string.rep("♡", data[9] - data[8]) .. " (" .. data[8] .. "/" .. data[9] .. ")\n")
   else
-    print("Oops, no response")
+    io.write("Oops, no response\n")
+    return codes.noresponse
   end
+  return codes.success, data[8], data[9]
 end
 
 local function getHung()
@@ -245,17 +265,21 @@ local function getHung()
   if data then
     io.write("Hunger: " .. data[8] .. " | Saturation: " .. data[9])
   else
-    print("Oops, no response")
+    io.write("Oops, no response\n")
+    return codes.noresponse
   end
+  return codes.success, data[8], data[9]
 end
 
 local function getEnergy()
   local data = g("getPowerState")
   if data then
-    io.write("↯: " .. data[8] .. "/" .. data[9] .. " (" .. math.floor(data[8] / data[9] * 100) .. "%)")
+    io.write("↯: " .. data[8] .. "/" .. data[9] .. " (" .. math.floor(data[8] / data[9] * 100) .. "%)\n")
   else
-    print("Opps, no response")
+    io.write("Opps, no response\n")
+    return codes.noresponse
   end
+  return codes.success, data[8], data[9]
 end
 
 local function formatNum(num)
@@ -263,70 +287,80 @@ local function formatNum(num)
 end
 
 local function usage()
-  print("Requesting data...")
+  io.write("Requesting data...\n")
   local data = {}
   for run = 1, 2, 1 do
     data[run] = g("getPowerState")
     if not data[run] then
-      print("Oops, no response")
-      return
+      io.write("Oops, no response\n")
+      return codes.noresponse
     end
     os.sleep(1)
   end
-  print("Usage: " .. formatNum(data[2][8] - data[1][8]) .. " per second")
+  io.write("Usage: " .. formatNum(data[2][8] - data[1][8]) .. " per second\n")
+  return codes.success, data[2][8] - data[1][8]
 end
 
 local function getAge()
   local data = g("getAge")
   if data then
-    io.write("Age: " .. data[8] .. "s")
+    io.write("Age: " .. data[8] .. "s\n")
   else
-    print("Oops, no response")
+    io.write("Oops, no response\n")
+    return codes.noresponse
   end
+  return codes.success, data[8]
 end
 
 local function getName()
   local data = g("getName")
   if data then
-    io.write("Player's name is " .. data[8])
+    io.write("Player's name is " .. data[8] .. "\n")
   else
-    print("Oops, no response")
+    io.write("Oops, no response\n")
+    return codes.noresponse
   end
+  return codes.success, data[8]
 end
 
 local function getInputsInfo()
   local safe = g("getSafeActiveInputs")
   local max = g("getMaxActiveInputs")
-  print("Safe: " .. (safe[8] or "none") .. ", max: " .. (max[8] or "none"))
+  io.write("Safe: " .. (safe[8] or "none") .. ", max: " .. (max[8] or "none") .. "\n")
+  return codes.success, safe[8], max[8]
 end
 
 local function getActiveEffects()
   local data = g("getActiveEffects")
   if data then
-    print(data[8])
+    io.write(data[8] .. "\n")
   else
-    print("Oops, no response")
+    io.write("Oops, no response\n")
+    return codes.noresponse
   end
+  return codes.success, data[8]
 end
 
 local function copy()
   local data = g("saveConfiguration")
   if data then
     if data[8] == false then
-      io.stderr("There was a problem: " .. (data[9] or "unknown") .. " =\\")
-      return
+      io.stderr("There was a problem: " .. (data[9] or "unknown") .. " \n")
+      return codes.fail
     else
-      print("Copied!")
+      io.write("Copied!\n")
     end
   else
-    print("Oops, no response")
+    io.write("Oops, no response\n")
+    return codes.noresponse
   end
+  return codes.success
 end
 
 local function group(...)
   if not _G.init then
     io.stderr:write("Run nn init first!\n")
-    return -1
+    return -codes.uninit
   end
   local args = {...}
   local command = args[1]
@@ -341,11 +375,11 @@ local function group(...)
       end
     end
     _G.groups[name] = inputs
-    print("Added group \"" .. name .. "\" with inputs:\t" .. unicode.sub(ser.serialize(inputs), 2, -2))
+    io.write("Added group \"" .. name .. "\" with inputs:\t" .. unicode.sub(ser.serialize(inputs), 2, -2) .. "\n")
   elseif command == "del" then
     local name = args[1]
     _G.groups[name] = nil
-    print("Removed group \"" .. name .. "\"")
+    io.write("Removed group \"" .. name .. "\"\n")
   elseif command == "save" then
     local f = io.open(CONF, "w")
     f:write("group={")
@@ -360,7 +394,7 @@ local function group(...)
     grstr = unicode.sub(grstr, 1, -2)
     f:write(grstr.."}")
     f:close()
-    print("Saved to file")
+    io.write("Saved to file\n")
   elseif command == "on" or command == "off" then
     local name = args[1]
     table.remove(args, 1)
@@ -372,17 +406,19 @@ local function group(...)
           off(i)
         end
       end
-      print("Group \"" .. name .. "\" " .. (command == "on" and "activated" or "disabled"))
+      io.write("Group \"" .. name .. "\" " .. (command == "on" and "activated" or "disabled") .. "\n")
     end
   elseif command == "list" then
     for name, value in pairs(_G.groups) do
-      print("Group \"" .. name .. "\":\t" .. unicode.sub(ser.serialize(value), 2, -2))
+      io.write("Group \"" .. name .. "\":\t" .. unicode.sub(ser.serialize(value), 2, -2) .. "\n")
     end
   end
+  return codes.success
 end
 
 local function help()
-  print("Run man nn for help!")
+  io.write("Run man nn for help!\n")
+  return codes.success
 end
 
 local actions = {
@@ -422,10 +458,10 @@ for num, i in ipairs(args) do
 end
 
 if not command then
-  actions["init"]()
+  return actions["init"]()
 end
 if actions[command] then
-  actions[command](table.unpack(args))
+  return actions[command](table.unpack(args))
 end
 
 -- vim: autoindent expandtab tabstop=2 shiftwidth=2 :
