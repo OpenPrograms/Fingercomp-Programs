@@ -180,7 +180,7 @@ local function combotest(...)
   return codes.success
 end
 
-local function clear()
+local function reset()
   for i = 1, _G.max, 1 do
     io.write("Turning off #" .. i .. "\n")
     g("setInput", i, false)
@@ -216,7 +216,7 @@ local function getCombo()
   return codes.success, _G.effectscomb
 end
 
-local function reset()
+local function clear()
   _G.max, _G.port, _G.effects = 15, 27091, {}
   _G.init = false
   return codes.success
