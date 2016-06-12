@@ -5,40 +5,40 @@ SYNOPSIS
   nn [action] [arguments...]
 
 DESCRIPTION
-  This program allows the player to control their's nanomachines.
+  This program allows a player to control their's nanomachines.
   
   This program requires a wireless modem card.
 
 ACTIONS
   get
-    Show result of the basic test.
-  
-  clear
-    Turn off all the inputs.
-  
-  test [exclude...]
-    Run the basic test. Type the inputs you don't want to turn on if you want.
-  
-  init [port]
-    The main action: sets the response port and initializes program. Run this first.
-  
-  g <msg> [other parts...]
-    Send the message to nanomachines. Show the reply.
-  
-  s <msg> [other parts...]
-    Send the message to nanomachines. Doesn't wait for processing and the reply.
+    Show basic test result.
   
   reset
-    Clear the testing results.
+    Turn off all inputs.
+  
+  test [exclude...]
+    Run the basic test. Type inputs you don't want to turn on if you want.
+  
+  init [port]
+    Set a response port and initialize the program. Run this first.
+  
+  g <msg> [other parts...]
+    Send a message to nanomachines. Show a response.
+  
+  s <msg> [other parts...]
+    Send a message to nanomachines. Don't wait for processing and response.
+  
+  clear
+    Clear testing results and reset the program to uninitialized state.
   
   info
     Get info about nanomachines.
   
   on <input>
-    Turn on the input.
+    Turn on an input.
   
   off <input>
-    Turn off the input.
+    Turn off an input.
   
   hp
     Get player's health.
@@ -47,7 +47,7 @@ ACTIONS
     Get player's hunger and saturation levels.
   
   energy
-    Get nanomachines' energy.
+    Get nanomachines' stored energy.
   
   usage
     Get nanomachines' energy usage.
@@ -62,36 +62,36 @@ ACTIONS
     Get max safe and hard max active input limits.
   
   copy
-    Save the nanomachines configuration to other nanomachines in inventory.
+    Copy nanomachines configuration to other nanomachines in inventory.
   
   efon
     Get turned on effects.
   
   combo [exclude...]
-    Run combinatoric test (1-1, 8-14, etc). Type the input nums to exclude them for testing. If you want to exclude a specific combination, type <first input>-<second input>. Right part should be greater than left one.
+    Run combinatoric test (1-1, 8-14, etc). Type input nums to exclude them from testing. If you want to exclude a specific combination, type <first input>-<second input>. The right part should be greater than the left one.
   
   getcombo
     Show combinatoric test results.
   
   group
     group set <name> <input 1> [other inputs...]
-      Add a group or modify group's settings with the name <name>.
+      Add a group or modify group's settings with a specific name.
     
     group del <name>
       Remove a group.
     
     group save
-      Save the group settings to a file.
+      Save group settings to file.
     
     group on <name>
-      Turn on all the inputs in the group with the name <name>.
+      Turn on all inputs in the group with a specific name.
     
     group off <name>
-      Turn off all the inputs in the group with the name <name>.
+      Turn off all inputs in the group with a specific name.
     
     group list
       List groups and their inputs.
 
 EXAMPLES
   nn combo 1-5 12 8-15
-    Runs the combinatoric test and excludes input #12 and combinations 1+5 and 8+15 from testing.
+    Runs combinatoric test and excludes input #12 and combinations 1+5 and 8+15 from testing.
