@@ -10,50 +10,56 @@ local env = {}
 local config = "/etc/opg-chat.json"
 local exit = false
 local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.5" and "1.5" or (io.stderr:write("Warning: unknown OS! The program may eventually crash or work incorrectly.\n") and "1.5" or "1.5"))
-local guid = {
-  toHex = function(n)
-    if type(n) ~= 'number' then
-      return nil, string.format("toHex only converts numbers to strings, %s is not a string, but a %s", tostring(n), type(n))
-    end
-    if n == 0 then
-      return '0'
-    end
-
-    local hexchars = "0123456789abcdef"
-    local result = ""
-    local prefix = "" -- maybe later allow for arg to request 0x prefix
-    if n < 0 then
-      prefix = "-"
-      n = -n
-    end
-
-    while n > 0 do
-      local next = math.floor(n % 16) + 1 -- lua has 1 based array indices
-      n = math.floor(n / 16)
-      result = hexchars:sub(next, next) .. result
-    end
-
-    return prefix .. result
-  end,
-  next = function()
-    -- e.g. 3c44c8a9-0613-46a2-ad33-97b6ba2e9d9a
-    -- 8-4-4-4-12
-    local sets = {8, 4, 4, 12}
-    local result = ""
-
-    local i
-    for _,set in ipairs(sets) do
-      if result:len() > 0 then
-        result = result .. "-"
+local lua = math.tointeger and "5.3" or (io.stderr:write("Warning: Lua version is not 5.3! This may cause issues with the program.\n") and "5.2" or "5.2")
+local guid
+if openos == "1.6" then
+  guid = require("guid")
+else
+  guid = {
+    toHex = function(n)
+      if type(n) ~= 'number' then
+        return nil, string.format("toHex only converts numbers to strings, %s is not a string, but a %s", tostring(n), type(n))
       end
-      for i = 1,set do
-        result = result .. guid.toHex(math.random(0, 15))
+      if n == 0 then
+        return '0'
       end
-    end
 
-    return result
-  end
-}
+      local hexchars = "0123456789abcdef"
+      local result = ""
+      local prefix = "" -- maybe later allow for arg to request 0x prefix
+      if n < 0 then
+        prefix = "-"
+        n = -n
+      end
+
+      while n > 0 do
+        local next = math.floor(n % 16) + 1 -- lua has 1 based array indices
+        n = math.floor(n / 16)
+        result = hexchars:sub(next, next) .. result
+      end
+
+      return prefix .. result
+    end,
+    next = function()
+      -- e.g. 3c44c8a9-0613-46a2-ad33-97b6ba2e9d9a
+      -- 8-4-4-4-12
+      local sets = {8, 4, 4, 4, 12}
+      local result = ""
+
+      local i
+      for _,set in ipairs(sets) do
+        if result:len() > 0 then
+          result = result .. "-"
+        end
+        for i = 1,set do
+          result = result .. guid.toHex(math.random(0, 15))
+        end
+      end
+
+      return result
+    end
+  }
+end
 
 event.push = event.push or require("computer").pushSignal
 
@@ -383,7 +389,6 @@ end
 local function addUser(user, isNetUser)
   checkArg(1, user, "string")
   checkArg(2, isNetUser, "boolean", "nil")
-  -- TODO kick net users if normal one tries to connect
   assert(not users[user], "user already exists")
   cfg.users[user] = cfg.users[user] or {
     pass = ""
