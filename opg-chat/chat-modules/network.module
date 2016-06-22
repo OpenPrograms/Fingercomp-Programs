@@ -3,6 +3,7 @@ if not cfg.net.enabled then
 end
 
 local com = require("component")
+local comp = require("computer")
 local event = require("event")
 local srl = require("serialization")
 
@@ -88,7 +89,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       return -1
     end
     local session = random(8)
-    connections[sender] = {user = user, port = port, pass = session, ping = os.time(), sentPing = false, pingMsg = ""}
+    connections[sender] = {user = user, port = port, pass = session, ping = comp.uptime(), sentPing = false, pingMsg = ""}
     joinN(cfg.main_channel, user)
     modem.send(sender, port, true, "keep", "auth", session)
   else
@@ -124,7 +125,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       end
       connections[sender].pingMsg = ""
       connections[sender].sentPing = false
-      connections[sender].ping = os.time()
+      connections[sender].ping = comp.uptime()
     elseif cmd == "chaninfo" then
       if not channels[tostring(msg)] or not channels[tostring(msg)].users[connections[sender].user] then
         modem.send(sender, port, false, "keep", "you are not in the channel")
@@ -148,14 +149,14 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       local user = tostring(msg)
       local self = user == connections[sender].user
       local data = {
-        channels =          self and  users[user].channels        or nil,
-        modes =             self and  users[user].modes           or nil,
-        prompt =            self and  users[user].prompt          or nil,
-        history =           self and  users[user].history         or nil,
-        tabStart =          self and  users[user].tabStart        or nil,
-        shown =             self and  users[user].shown           or nil,
-        channelOffsets =    self and  users[user].channelOffsets  or nil,
-        net =                         users[user].net
+        channels =          self and users[user].channels       or nil,
+        modes =             self and users[user].modes          or nil,
+        prompt =            self and users[user].prompt         or nil,
+        history =           self and users[user].history        or nil,
+        tabStart =          self and users[user].tabStart       or nil,
+        shown =             self and users[user].shown          or nil,
+        channelOffsets =    self and users[user].channelOffsets or nil,
+        net =                        users[user].net
       }
       modem.send(sender, port, true, "keep", srl.serialize(data))
     end
@@ -164,17 +165,17 @@ end)
 
 local timer = cfg.net.ping.enabled and event.timer(1, function()
     for conn, value in pairs(connections) do
-      if value.ping + cfg.net.ping.interval * 100 < os.time() and not value.sentPing then
+      if value.ping + cfg.net.ping.interval < comp.uptime() and not value.sentPing then
         value.sentPing = true
         value.pingMsg = random(16)
-        modem.send(conn, value.port, "ping", value.pingMsg, os.time())
-      elseif value.sentPing and value.ping + cfg.net.ping.interval * 100 + cfg.net.ping.timeout * 100 < os.time() then
+        modem.send(conn, value.port, "ping", value.pingMsg, comp.uptime())
+      elseif value.sentPing and value.ping + cfg.net.ping.interval + cfg.net.ping.timeout < comp.uptime() then
         modem.send(conn, value.port, false, "close", "ping timeout")
         quitN(value.user, "Ping timeout (" .. tostring(math.tointeger(cfg.net.ping.timeout)) .. " seconds)")
         connections[conn] = nil
       end
     end
-  end, math.huge) or false
+  end, math.huge)
 
 addListener("chat_event_msg", "network.chat.msg", function(evt, time, chan, nick, msg, all, ...)
   local rec = all and "all" or {...}
