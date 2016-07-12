@@ -216,7 +216,7 @@ do
       end
       local match, matchEnd = baseRe(versionString)
       if not (match) then
-        error(('Version string lacks a numerical component: %s'):format(versionString))
+        error('Version string lacks a numerical component: #{versionString}')
       end
       local version = versionString:sub(1, #matchEnd)
       if not partial then
@@ -275,7 +275,7 @@ do
         coerce = false
       end
       if not versionString or type(versionString) ~= 'string' or versionString == '' then
-        error(('Invalid empty version string: %s'):format(versionString))
+        error('Invalid empty version string: #{tostring versionString}')
       end
       local versionRe
       if partial then
@@ -285,16 +285,16 @@ do
       end
       local major, minor, patch, prerelease, build = versionRe(self.__class, versionString)
       if not major then
-        error(('Invalid version string: %s'):format(versionString))
+        error('Invalid version string: #{versionString}')
       end
       if hasLeadingZero(major) then
-        error(('Invalid leading zero in major: %s'):format(versionString))
+        error('Invalid leading zero in major: #{versionString}')
       end
       if hasLeadingZero(minor) then
-        error(('Invalid leading zero in minor: %s'):format(versionString))
+        error('Invalid leading zero in minor: #{versionString}')
       end
       if hasLeadingZero(patch) then
-        error(('Invalid leading zero in patch: %s'):format(versionString))
+        error('Invalid leading zero in patch: #{versionString}')
       end
       major = tonumber(major)
       minor = self:_coerce(minor, partial)
@@ -360,10 +360,10 @@ do
       for _index_0 = 1, #identifiers do
         local item = identifiers[_index_0]
         if not item then
-          error(('Invalid empty identifier %s in %s'):format(item, concat(identifiers, '.')))
+          error('Invalid empty identifier #{item} in #{concat identifiers, "."}')
         end
         if item:sub(1, 1) == '0' and tonumber(item) and item ~= '0' and not allowLeadingZeroes then
-          error(('Invalid leading zero in identifier %s'):format(item))
+          error('Invalid leading zero in identifier #{item}')
         end
       end
     end,
@@ -600,7 +600,7 @@ do
   local _base_0 = {
     parse = function(self, requirementString)
       if not requirementString or type(requirementString) ~= 'string' or requirementString == '' then
-        error(('Invalid empty requirement specification: %s'):format(requirementString))
+        error('Invalid empty requirement specification: #{tostring requirementString}')
       end
       if requirementString == '*' then
         return {
@@ -610,12 +610,12 @@ do
       end
       local kind, version = self.__class:reSpec(requirementString)
       if not kind then
-        error(('Invalid requirement specification: %s'):format(requirementString))
+        error('Invalid requirement specification: #{requirementString}')
       end
       kind = self.__class.KIND_ALIASES[kind] or kind
       local spec = Version(version, true)
       if spec.build ~= nil and kind ~= self.__class.KIND_EQUAL and kind ~= self.__class.KIND_NEQ then
-        error(('Invalid requirement specification %s: build numbers have no ordering'):format(requirementString))
+        error('Invalid requirement specification #{requirementString}: build numbers have no ordering')
       end
       return {
         kind,
@@ -643,7 +643,7 @@ do
       elseif self.__class.KIND_TILDE == _exp_0 then
         return self.spec <= version and version < self.spec:next_minor()
       else
-        return error(('Unexpected match kind: %s'):format(self.kind))
+        return error('Unexpected match kind: #{@kind}')
       end
     end,
     __tostring = function(self)
@@ -720,8 +720,7 @@ do
     end,
     filter = function(self, versions)
       local i = 0
-      local iter
-      iter = function()
+      return function()
         while true do
           i = i + 1
           local version = versions[i]
@@ -733,7 +732,6 @@ do
           end
         end
       end
-      return iter
     end,
     select = function(self, versions)
       local options
