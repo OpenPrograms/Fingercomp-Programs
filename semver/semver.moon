@@ -141,7 +141,7 @@ class Version
       s, t
 
     match, matchEnd = baseRe versionString
-    error 'Version string lacks a numerical component: #{versionString}' unless match
+    error "Version string lacks a numerical component: #{versionString}" unless match
     version = versionString\sub 1, #matchEnd
     if not partial
       while ({version\gsub('.', '')})[2] < 2
@@ -184,7 +184,7 @@ class Version
 
   parse: (versionString, partial=false, coerce=false) =>
     if not versionString or type(versionString) != 'string' or versionString == ''
-      error 'Invalid empty version string: #{tostring versionString}'
+      error "Invalid empty version string: #{tostring versionString}"
 
     versionRe = if partial
       @@partialVersionRe
@@ -193,14 +193,14 @@ class Version
 
     major, minor, patch, prerelease, build = versionRe @@, versionString
     if not major
-      error 'Invalid version string: #{versionString}'
+      error "Invalid version string: #{versionString}"
 
     if hasLeadingZero major
-      error 'Invalid leading zero in major: #{versionString}'
+      error "Invalid leading zero in major: #{versionString}"
     if hasLeadingZero minor
-      error 'Invalid leading zero in minor: #{versionString}'
+      error "Invalid leading zero in minor: #{versionString}"
     if hasLeadingZero patch
-      error 'Invalid leading zero in patch: #{versionString}'
+      error "Invalid leading zero in patch: #{versionString}"
 
     major = tonumber major
     minor = @_coerce minor, partial
@@ -233,9 +233,9 @@ class Version
   _validateIdentifiers: (identifiers, allowLeadingZeroes=false) =>
     for item in *identifiers do
       if not item
-        error 'Invalid empty identifier #{item} in #{concat identifiers, "."}'
+        error "Invalid empty identifier #{item} in #{concat identifiers, '.'}"
       if item\sub(1, 1) == '0' and tonumber(item) and item != '0' and not allowLeadingZeroes
-        error 'Invalid leading zero in identifier #{item}'
+        error "Invalid leading zero in identifier #{item}"
 
   __pairs: =>
     pairs {@major, @minor, @patch, @prerelease, @build}
@@ -375,20 +375,20 @@ class SpecItem
 
   parse: (requirementString) =>
     if not requirementString or type(requirementString) != 'string' or requirementString == ''
-      error 'Invalid empty requirement specification: #{tostring requirementString}'
+      error "Invalid empty requirement specification: #{tostring requirementString}"
 
     if requirementString == '*'
       return {@@KIND_ANY, ''}
 
     kind, version = @@reSpec requirementString
     if not kind
-      error 'Invalid requirement specification: #{requirementString}'
+      error "Invalid requirement specification: #{requirementString}"
 
     kind = @@KIND_ALIASES[kind] or kind
 
     spec = Version version, true
     if spec.build != nil and kind != @@KIND_EQUAL and kind != @@KIND_NEQ
-      error 'Invalid requirement specification #{requirementString}: build numbers have no ordering'
+      error "Invalid requirement specification #{requirementString}: build numbers have no ordering"
 
     {kind, spec}
 
@@ -413,7 +413,7 @@ class SpecItem
       when @@KIND_TILDE
         @spec <= version and version < @spec\next_minor!
       else
-        error 'Unexpected match kind: #{@kind}'
+        error "Unexpected match kind: #{@kind}"
 
   __tostring: =>
     @kind .. @spec
