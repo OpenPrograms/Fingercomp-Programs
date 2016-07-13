@@ -216,7 +216,7 @@ do
       end
       local match, matchEnd = baseRe(versionString)
       if not (match) then
-        error('Version string lacks a numerical component: #{versionString}')
+        error("Version string lacks a numerical component: " .. tostring(versionString))
       end
       local version = versionString:sub(1, #matchEnd)
       if not partial then
@@ -275,7 +275,7 @@ do
         coerce = false
       end
       if not versionString or type(versionString) ~= 'string' or versionString == '' then
-        error('Invalid empty version string: #{tostring versionString}')
+        error("Invalid empty version string: " .. tostring(tostring(versionString)))
       end
       local versionRe
       if partial then
@@ -285,16 +285,16 @@ do
       end
       local major, minor, patch, prerelease, build = versionRe(self.__class, versionString)
       if not major then
-        error('Invalid version string: #{versionString}')
+        error("Invalid version string: " .. tostring(versionString))
       end
       if hasLeadingZero(major) then
-        error('Invalid leading zero in major: #{versionString}')
+        error("Invalid leading zero in major: " .. tostring(versionString))
       end
       if hasLeadingZero(minor) then
-        error('Invalid leading zero in minor: #{versionString}')
+        error("Invalid leading zero in minor: " .. tostring(versionString))
       end
       if hasLeadingZero(patch) then
-        error('Invalid leading zero in patch: #{versionString}')
+        error("Invalid leading zero in patch: " .. tostring(versionString))
       end
       major = tonumber(major)
       minor = self:_coerce(minor, partial)
@@ -360,10 +360,10 @@ do
       for _index_0 = 1, #identifiers do
         local item = identifiers[_index_0]
         if not item then
-          error('Invalid empty identifier #{item} in #{concat identifiers, "."}')
+          error("Invalid empty identifier " .. tostring(item) .. " in " .. tostring(concat(identifiers, '.')))
         end
         if item:sub(1, 1) == '0' and tonumber(item) and item ~= '0' and not allowLeadingZeroes then
-          error('Invalid leading zero in identifier #{item}')
+          error("Invalid leading zero in identifier " .. tostring(item))
         end
       end
     end,
@@ -600,7 +600,7 @@ do
   local _base_0 = {
     parse = function(self, requirementString)
       if not requirementString or type(requirementString) ~= 'string' or requirementString == '' then
-        error('Invalid empty requirement specification: #{tostring requirementString}')
+        error("Invalid empty requirement specification: " .. tostring(tostring(requirementString)))
       end
       if requirementString == '*' then
         return {
@@ -610,12 +610,12 @@ do
       end
       local kind, version = self.__class:reSpec(requirementString)
       if not kind then
-        error('Invalid requirement specification: #{requirementString}')
+        error("Invalid requirement specification: " .. tostring(requirementString))
       end
       kind = self.__class.KIND_ALIASES[kind] or kind
       local spec = Version(version, true)
       if spec.build ~= nil and kind ~= self.__class.KIND_EQUAL and kind ~= self.__class.KIND_NEQ then
-        error('Invalid requirement specification #{requirementString}: build numbers have no ordering')
+        error("Invalid requirement specification " .. tostring(requirementString) .. ": build numbers have no ordering")
       end
       return {
         kind,
@@ -643,7 +643,7 @@ do
       elseif self.__class.KIND_TILDE == _exp_0 then
         return self.spec <= version and version < self.spec:next_minor()
       else
-        return error('Unexpected match kind: #{@kind}')
+        return error("Unexpected match kind: " .. tostring(self.kind))
       end
     end,
     __tostring = function(self)
