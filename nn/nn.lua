@@ -11,22 +11,23 @@ _G.effects = _G.effects or {}
 _G.effectscomb = _G.effectscomb or {}
 _G.groups = _G.groups or {}
 _G.init = _G.init or false
+_G.nnaddress = _G.nnaddress or false
 
 codes = {
-  success    =  0x000,
-  fail       = -0x001,
-  initfail   = -0x100,
-  uninit     = -0x101,
-  noresponse = -0x102
+  success    = 0x000,
+  fail       = 0x001,
+  initfail   = 0x100,
+  uninit     = 0x101,
+  noresponse = 0x102
 }
 
 local function s(...)
-  m.broadcast(_G.port, "nanomachines", ...)
+  m.send(_G.nnaddress, _G.port, "nanomachines", ...)
 end
 
 local function g(...)
   s(...)
-  return {event.pull(6, "modem_message")}
+  return {event.pull(6, "modem_message", _G.nnaddress)}
 end
 
 local function init(rqpt, prpt)
@@ -36,13 +37,15 @@ local function init(rqpt, prpt)
   event.pull(6, "modem_message")
   m.close(prpt)
   m.open(_G.port)
-  _G.max = (g("getTotalInputCount") or {})[8]
+  resp = g("getTotalInputCount") or {}
+  _G.max = resp[8]
   if not _G.max then
     io.stderr:write("Failed to init.\n")
     io.write("Are you sure you're near enough to modem and you have nanomachines?\n")
     _G.max = 15
     return codes.initfail
   end
+  _G.nnaddress = resp[2]
   if fs.exists(CONF) then
     dofile(CONF)
   else
@@ -218,7 +221,7 @@ end
 
 local function clear()
   _G.max, _G.port, _G.effects = 15, 27091, {}
-  _G.init = false
+  _G.init, _G.nnaddress = false, false
   return codes.success
 end
 
