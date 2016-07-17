@@ -13,3 +13,7 @@ This is a place where brilliant ideas become the programs.
   * IRC-like OpenPeripheral glasses chat.
 * `smap`
   * A *s*imple *M*inecraft *a*udio *p*layer.
+* `lumber`
+  * Basic lumberjack program for OC robot which uses an axe that can chop the whole tree, e.g., thaumcraft's axe of the stream.
+* `libsemver`
+  * A MoonScript port of a parser of semantic version strings originally written in Python.
