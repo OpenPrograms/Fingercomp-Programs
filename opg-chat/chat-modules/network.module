@@ -69,6 +69,10 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       modem.send(sender, port, false, "error", "there is already an open connection for this address")
       return -1
     end
+    if not user:match("^[a-zA-Z0-9-`_^]+$") then
+      modem.send(sender, port, false, "error", "erroneous nickname")
+      return -1
+    end
     if users[user] then
       modem.send(sender, port, false, "error", "nickname is already in use")
       return -1
