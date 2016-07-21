@@ -148,6 +148,7 @@ There is a "net" section in a configuration file (`/etc/chat.json`). Example con
 Error | Comment
 ----- | -------
 `false, "error", "there is already an open connection for this address"` | -
+`false, "error", "erroneous nickname"` | A nickname contains illegal characters
 `false, "error", "nickname is already in use"` | -
 `false, "error", "no password given"` | -
 `false, "error", "wrong password"` | -
