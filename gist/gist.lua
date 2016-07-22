@@ -89,18 +89,18 @@ local function requestUrl(url, data, headers, opts)
     return opts.default
   end
   while true do
-    local chunk = req:read()
+    local chunk = req.read()
     if chunk == nil then break end
     response = response .. chunk
     if opts.resp then
       local res = opts.resp(req, response, chunk)
       if res then
-        req:close()
+        req.close()
         return res
       end
     end
   end
-  req:close()
+  req.close()
   if opts.cache then
     _G.gist.gResponse[url] = response
   end
