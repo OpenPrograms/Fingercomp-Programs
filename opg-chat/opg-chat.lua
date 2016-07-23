@@ -368,7 +368,7 @@ local function createChannel(chan, nick)
   checkArg(2, nick, "string")
   assert(users[nick], "no such nickname")
   assert(chan:sub(1, 1) == "#", "not a channel")
-  assert(chan:match("^#%w[%w%._]*$"), "invalid chars in chan name")
+  assert(chan:match("^#%w[%w%._-]*$"), "invalid chars in chan name")
   channels[chan] = {
     info = {
       ["creation-date"] = os.date("%Y-%m-%d %H:%M:%S")
