@@ -1,12 +1,30 @@
 local com = require("component")
 local event = require("event")
-local unicode = require("unicode")
 local fs = require("filesystem")
-local text = require("text")
 local srl = require("serialization")
+local text = require("text")
+local unicode = require("unicode")
+
+local EvEng = require("aevent")()
 
 local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
+local events = {
+  createChannel = EvEng:event("create_channel"),
+  msg = EvEng:event("msg"),
+  notice = EvEng:event("notice"),
+  pm = EvEng:event("pm"),
+  join = EvEng:event("join"),
+  part = EvEng:event("part"),
+  quit = EvEng:event("quit"),
+  init = EvEng:event("init"),
+  load = EvEng:event("load"),
+  start = EvEvg:event("start"),
+  update = EvEng:event("update"),
+  moduleLoaded = EvEng:event("moduleLoaded"),
+  glassesAttach = EvEng:event("glassesAttach"),
+  glassesDetach = EvEng:event("glassesDetach")
+}
 local config = "/etc/opg-chat.json"
 local exit = false
 local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.5" and "1.5" or (io.stderr:write("Warning: unknown OS! The program may eventually crash or work incorrectly.\n") and "1.5" or "1.5"))
@@ -383,7 +401,7 @@ local function createChannel(chan, nick)
     exempt = {}
   }
   table.insert(users[nick].channels, chan)
-  event.push("chat_event_createChannel", os.time(), chan, nick)
+  EvEng:push(events.createChannel{time = os.time(), chan = chan, nick = nick})
 end
 
 local function addUser(user, isNetUser)
@@ -447,7 +465,7 @@ local function sendMsgChan(chan, nick, msg, rec)
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, level = channels[chan].users[nick], nick, msg, rec})
   truncate(chan)
-  event.push("chat_event_msg", os.time(), chan, nick, msg, rec == "all" or #rec, table.unpack(rec == "all" and {rec} or rec))
+  EvEng:push(events.msg{time = os.time(), chan = chan, nick = nick, msg = msg, rec = (rec == "all" and {rec} or rec)})
 end
 
 local function sendNotifyChan(chan, notify, parts, rec)
@@ -462,7 +480,7 @@ local function sendNotifyChan(chan, notify, parts, rec)
   rec = rec or "all"
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
   truncate(chan)
-  event.push("chat_event_notice", os.time(), chan, notify, notifications[notify].pattern:format(table.unpack(parts)), rec == "all" or #rec, table.unpack(rec == "all" and {rec} or rec), srl.serialize(parts))
+  EvEng:push(events.notice{time = os.time(), chan = chan, noticeType = notify, notice = notifications[notify].pattern:format(table.unpack(parts)), rec = (rec == "all" and {rec} or rec), parts = parts})
 end
 
 local function sendPM(addressee, user, msg)
@@ -472,7 +490,7 @@ local function sendPM(addressee, user, msg)
   assert(users[addressee], "no such user")
   assert(users[user], "no such nickname")
   sendNotifyChan(cfg.main_channel, "pm", {user, addressee, msg}, {user, addressee})
-  event.push("chat_event_pm", os.time(), user, addressee, msg)
+  EvEng:push(events.pm{time = os.time(), user = user, addressee = addressee, msg = msg})
 end
 
 modes.o = function(chan, user, set, arg)
@@ -552,14 +570,14 @@ end
 local function joinN(chan, user)
   join(chan, user)
   sendNotifyChan(chan, "join_chan", {user, chan})
-  event.push("chat_event_join", os.time(), chan, user)
+  EvEng:push(events.join{time = os.time(), time = chan, user = user})
 end
 
 local function partN(chan, user, reason)
   reason = reason or ""
   part(chan, user)
   sendNotifyChan(chan, "part_chan", {user, chan, reason})
-  event.push("chat_event_part", os.time(), chan, user, reason)
+  EvEng:push(events.part{time = os.time(), chan = chan, user = user, reason = reason})
 end
 
 local function quitN(user, reason)
@@ -571,7 +589,7 @@ local function quitN(user, reason)
     sendNotifyChan(chan, "quit", {user, reason})
   end
   users[user] = nil
-  event.push("chat_event_quit", os.time(), user, reason, table.unpack(chans))
+  EvEng:push(events.quit{time = os.time(), user = user, reason = reason, chans = chans})
 end
 
 local function sendMsgChanN(chan, user, msg)
@@ -626,6 +644,8 @@ env.togglableMode = togglableMode
 env.storage = storage
 env.reqcom = reqcom
 env.copy = copy
+env.EvEng = EvEng
+env.events = events
 env._MODULE = ""
 env._FILE = ""
 env.NORMAL = NORMAL
@@ -656,12 +676,15 @@ function env.delListener(eventName, name)
   end
 end
 
-local function cmdWrapper(cmdInfo)
-  return function(evt, chan, user, raw, cmd, ...)
-    if checkLevel(chan, user, cmdInfo.level, true) then
-      cmdInfo.func(evt, chan, user, raw, cmd, ...)
-    else
-      sendPM(user, cfg.server, "no permission")
+local function cmdWrapper(cmdName, cmdInfo)
+  return function(evt)
+    if evt.cmd == cmdName then
+      local chan, user, raw, cmd, parts = evt.chan, evt.user, evt.raw, evt.cmd, evt.parts
+      if checkLevel(chan, user, cmdInfo.level, true) then
+        cmdInfo.func(evt, chan, user, raw, cmd, table.unpack(parts))
+      else
+        sendPM(user, cfg.server, "no permission")
+      end
     end
   end
 end
@@ -689,7 +712,7 @@ local function command(setEnv)
     commands[name] = {level = level, help = help, doc = doc, aliases = aliases, func = func}
     local cmds = {name, table.unpack(aliases or {})}
     for _, cmd in pairs(cmds) do
-      env.addListener("chat_slash_cmd_" .. cmd, setEnv._MODULE .. ".commands." .. name .. "." .. cmd, cmdWrapper(commands[name]))
+      EvEng:subscribe("slash_cmd", 0, cmdWrapper(name, commands[name]))
     end
   end
 end
@@ -730,8 +753,8 @@ local function saveCfg()
 end
 
 local coreHandlers = {
-  chat_init = {
-    function(evt, time)
+  init = {
+    function(evt)
       addUser(cfg.server)
       join(cfg.main_channel, cfg.server)
       channels[cfg.main_channel].users[cfg.server] = OP
@@ -744,16 +767,17 @@ local coreHandlers = {
       end
     end
   },
-  chat_start = {
-    function(evt, time)
+  start = {
+    function(evt)
       for user in pairs(surfaces) do
         addUser(user)
         joinN(cfg.main_channel, user)
       end
     end
   },
-  glasses_attach = {
-    function(evt, addr, user, uuid)
+  glassesAttach = {
+    function(evt)
+      local user = evt.user
       surfaces[user] = {surface = bridge.getSurfaceByName(user)}
       surfaces[user].surface.clear()
       surfaces[user].objects = {}
@@ -764,8 +788,9 @@ local coreHandlers = {
       joinN(cfg.main_channel, user)
     end
   },
-  glasses_detach = {
-    function(evt, addr, user, uuid)
+  glassesDetach = {
+    function(evt)
+      local user = evt.user
       local _ = surfaces[user] and surfaces[user].surface and surfaces[user].surface.clear()
       surfaces[user] = nil
       if users[user] then
@@ -774,7 +799,8 @@ local coreHandlers = {
     end
   },
   chat_update = {
-    function(evt, time, tick)
+    function(evt)
+      local tick = evt.tick
       if tick % 5 == 0 then
         for user, surface in pairs(surfaces) do
           local userinfo = users[user]
@@ -924,7 +950,7 @@ local coreHandlers = {
         end
       end
     end,
-    function(evt, time, tick)
+    function(evt)
       for user, surface in pairs(surfaces) do
         local userinfo = users[user]
         if not userinfo then goto nextInputUser end
@@ -948,29 +974,30 @@ local coreHandlers = {
         ::nextInputUser::
       end
     end,
-    function(evt, time, tick)
+    function(evt)
       bridge.sync()
     end,
-    function(evt, time, tick)
+    function(evt)
+      local tick = evt.tick
       if tick % 600 == 0 then
         saveCfg()
       end
     end
   },
-  chat_stop = {
-    function(evt, time)
+  stop = {
+    function(evt)
       exit = true
     end,
-    function(evt, time)
+    function(evt)
       bridge.clear()
       bridge.sync()
     end,
-    function(evt, time)
+    function(evt)
       saveCfg()
     end
   },
-  chat_load = {
-    function(evt, time)
+  load = {
+    function(evt)
       for file in fs.list(modulesPath) do
         if file:match("%.([^.]+)$") == "module" then
           local module = file:match("^[^.]+")
@@ -989,7 +1016,7 @@ local coreHandlers = {
             if not success then
               io.stderr:write(reason)
             else
-              event.push("chat_loaded_module", file, os.time())
+              EvEng:push(events.moduleLoaded{file = file, time = os.time()})
             end
           end
         end
@@ -1001,32 +1028,39 @@ local coreHandlers = {
 for eventName, hdlrs in pairs(coreHandlers) do
   for id, hdlr in pairs(hdlrs) do
     --print("Starting \"" .. eventName .. "\" listener [" .. id .. "]")
-    event.listen(eventName, hdlr)
+    EvEng:subscribe(eventName, hdlr)
   end
 end
 
+local function glassesFunc(evt, addr, user, uuid)
+  local e = "glassesAttach"
+  if evt == "glasses_detach" then
+    e = "glassesDetach"
+  end
+  EvEng:push(events[e]{addr = addr, user = user, uuid = uuid})
+end
+event.listen("glasses_attach", glassesFunc)
+event.listen("glasses_detach", glassesFunc)
+
 print("init")
-event.push("chat_init", os.time())
-os.sleep(.5) -- Allow to process init
+EvEng:push(events.init{time = os.time()})
 
 print("load")
-event.push("chat_load", os.time())
-os.sleep(.5)
+EvEng:push(events.load{time = os.time()})
 
 for eventName, hdlrs in pairs(moduleHandlers) do
   for name, hdlr in pairs(hdlrs) do
     --print("Starting module \"" .. eventName .. "\" listener [" .. name .. "]")
-    event.listen(eventName, hdlr)
+    EvEng:subscribe(eventName, hdlr)
   end
 end
 
 print("start")
-event.push("chat_start", os.time())
-os.sleep(.5)
+EvEng:push(chat.start{time = os.time()})
 
 local tick = 0
 local upd = event.timer(.1, function()
-  event.push("chat_update", os.time(), tick)
+  EvEng:push(events.update{time = os.time(), tick = tick})
   tick = tick + 1
 end, math.huge)
 
@@ -1036,20 +1070,9 @@ end
 
 os.sleep(.5)
 
-for eventName, hdlrs in pairs(moduleHandlers) do
-  for name, hdlr in pairs(hdlrs) do
-    --print("Stopping module \"" .. eventName .. "\" listener [" .. name .. "]")
-    event.ignore(eventName, hdlr)
-  end
-end
-
-for eventName, hdlrs in pairs(coreHandlers) do
-  for id, hdlr in pairs(hdlrs) do
-    --print("Stopping \"" .. eventName .. "\" listener [" .. id .. "]")
-    event.ignore(eventName, hdlr)
-  end
-end
-
 event.cancel(upd)
+
+event.ignore("glasses_attach", glassesFunc)
+event.ignore("glasses_detach", glassesFunc)
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
