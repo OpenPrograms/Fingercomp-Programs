@@ -1,6 +1,8 @@
 # Libaevent
 *An advanced event library*
 
+The library was written by @LeshaInc. I only packaged it here so it's now available to be downloaded with OPPM, and wrote the documentation.
+
 ## Advantages
 Advantages over the standard event library:
 * It features the thing I really needed: pushing event with payload of **any** types, including functions and tables.
