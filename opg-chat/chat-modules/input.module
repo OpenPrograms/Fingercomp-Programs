@@ -122,6 +122,36 @@ addListener("glasses_key_down", "input.input", function(evt, addr, user, uuid, c
       move(prompt, 1)
     elseif kbd.keys[code] == "end" then
       move(prompt, math.huge)
+    elseif kbd.keys[code] == "tab" then
+      local line = unicode.sub(prompt[1], 1, prompt[2] - 1)
+      local word = ""
+      for i = unicode.len(line), 1, -1 do
+        local char = unicode.sub(line, i, i)
+        if char:match("[%w^`%.#]") then
+          word = char .. word
+        else
+          break
+        end
+      end
+      if word:sub(1, 1) ~= "#" then
+        for user in pairs(users) do
+          if user:find(word) == 1 then
+            local suffix = " "
+            if prompt[2] == 1 then
+              suffix = ": "
+            end
+            prompt[1] = unicode.sub(prompt[1], 1, prompt[2] - 1) .. user .. suffix .. unicode.sub(prompt[1], prompt[2], -1)
+            move(prompt, unicode.len(user) + #suffix)
+          end
+        end
+      else
+        for chan in pairs(channels) do
+          if chan:find(word) == 1 then
+            prompt[1] = unicode.sub(prompt[1], 1, prompt[2] - 1) .. chan .. " " .. unicode.sub(prompt[1], prompt[2], -1)
+            move(prompt, unicode.len(chan) + 1)
+          end
+        end
+      end
     end
   end
 end)
@@ -138,4 +168,4 @@ command {
   end
 }
 
--- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua filetype=lua :
