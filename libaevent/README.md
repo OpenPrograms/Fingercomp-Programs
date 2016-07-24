@@ -20,6 +20,7 @@ local EvEngine = require("aevent")()
 ### Methods
 
 The resulting instance has the following methods:
+
 Method | Description
 ------ | -----------
 `engine:event(name: string)` | Creates an event with a name `name`. It may be then called to get an instance of the event.
