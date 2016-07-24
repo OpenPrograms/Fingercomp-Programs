@@ -1,6 +1,5 @@
-local event = require("event")
-
-addListener("chat_event_part", "admin.event.onUserPart", function(evt, time, chan, user)
+EvEng:subscribe("part", 1, function(evt)
+  local time, chan, user = evt.time, evt.chan, evt.user
   local users = {}
   for k, _ in pairs(channels[chan].users) do
     table.insert(users, k)
@@ -10,7 +9,8 @@ addListener("chat_event_part", "admin.event.onUserPart", function(evt, time, cha
   end
 end)
 
-addListener("chat_event_join", "admin.event.onUserJoin", function(evt, time, chan, user)
+EvEng:subscribe("join", 1, function(evt)
+  local time, chan, user = evt.time, evt.chan, evt.user
   if isin(cfg.admins, user) or cfg.server == user then
     setMode(chan, cfg.server, "+o", user)
   end
@@ -38,8 +38,8 @@ command {
   help = "Shut down the server",
   aliases = {"shutdown", "halt"},
   func = function(evt, chan, user, raw, cmd)
-    event.push("chat_stop", os.time())
+    EvEng:push(events.stop{time = os.time()})
   end
 }
 
--- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua filetype=lua :

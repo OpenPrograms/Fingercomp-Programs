@@ -1,4 +1,3 @@
-local event = require("event")
 local srl = require("serialization")
 
 cfg.chanserv = cfg.chanserv or {
@@ -79,7 +78,8 @@ command {
   end
 }
 
-addListener("chat_event_createChannel", "chanserv.event.create", function(evt, time, chan, user)
+EvEng:subscribe("createChannel", 1, function(evt)
+  local time, chan, user = evt.time, evt.chan, evt.user
   if cfg.chanserv.channels[chan] then
     apcall(joinN, chan, cfg.chanserv.nick)
     apcall(setMode, chan, cfg.server, "+o", cfg.chanserv.nick)
@@ -95,7 +95,8 @@ addListener("chat_event_createChannel", "chanserv.event.create", function(evt, t
   end
 end)
 
-addListener("chat_event_join", "chanserv.event.join", function(evt, time, chan, user)
+EvEng:subscribe("join", 1, function(evt)
+  local time, chan, user = evt.time, evt.chan, evt.user
   if cfg.chanserv.channels[chan] then
     if not channels[chan].users[cfg.chanserv.nick] then
       apcall(joinN, chan, cfg.chanserv.nick)
@@ -117,14 +118,13 @@ addListener("chat_event_join", "chanserv.event.join", function(evt, time, chan, 
   end
 end)
 
-addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, chan, notice, ...)
+EvEng:subscribe("notice", 1, function(evt)
+  local time, chan, noticeType, parts = evt.time, evt.chan, evt.noticeType, evt.parts
   if cfg.chanserv.channels[chan] then
     if not channels[chan].users[cfg.chanserv.nick] then
       apcall(joinN, chan, cfg.chanserv.nick)
       apcall(setMode, chan, cfg.server, "+o", cfg.chanserv.nick)
     end
-    local args = {...}
-    local parts = srl.unserialize(args[#args])
     if notice == "mode" then
       cfg.chanserv.channels[chan].modes = copy(channels[chan].modes)
       for user, level in pairs(channels[chan].users) do
@@ -154,8 +154,8 @@ addListener("chat_event_notice", "chanserv.event.notice", function(evt, time, ch
   end
 end)
 
-addListener("chat_start", "chanserv.hack.#main", function()
-  event.push("chat_event_createChannel", os.time(), "#main", cfg.server)
+EvEng:("start", 1, function()
+  EvEng:push(events.createChannel{time = os.time(), chan = "#main", user = cfg.server})
 end)
 
--- vim: autoindent expandtab tabstop=2 shiftwidth=2 syntax=lua :
+-- vim: autoindent expandtab tabstop=2 shiftwidth=2 syntax=lua filetype=lua :

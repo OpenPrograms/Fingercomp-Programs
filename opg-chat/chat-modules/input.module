@@ -1,4 +1,3 @@
-local event = require("event")
 local kbd = require("keyboard")
 local unicode = require("unicode")
 local keysDown = {}

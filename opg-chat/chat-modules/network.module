@@ -4,7 +4,6 @@ end
 
 local com = require("component")
 local comp = require("computer")
-local event = require("event")
 local srl = require("serialization")
 
 assert(com.isAvailable("os_datablock") or com.isAvailable("data"), "data card/block required")
@@ -21,6 +20,8 @@ for port in pairs(cfg.net.ports) do
   assert(type(port) == "string", "not a string: " .. tostring(port))
   modem.open(tonumber(port))
 end
+
+EvEng:stdEvent("modem_message")
 
 local connections = {}
 storage.connections = {}
@@ -45,9 +46,14 @@ local function random(len)
   return byte2hex(data.random(len))
 end
 
-addListener("modem_message", "network.modem", function(evt, addr, sender, port, distance, user, cmd, pass, msg, ...)
+EvEng:subscribe("modem_message", 0, function(evt)
+  local addr, sender, port, distance, user, cmd, pass, msg = evt[1], evt[2], evt[3], evt[4], evt[5], evt[6], evt[7], evt[8]
+  local data = evt.get()
+  local args = {}
+  for i = 9, #data, 1 do
+    args[#args] = data[i]
+  end
   port = math.tointeger(port)
-  local args = {...}
   if cfg.net.ports[tostring(port)] == nil then
     -- Ignore
     return -1
@@ -116,7 +122,7 @@ addListener("modem_message", "network.modem", function(evt, addr, sender, port, 
       return -1
     end
     if cmd == "msg" then
-      event.push("chat_chat_message", addr, user, sender, tostring(msg))
+      EvEng:push(events.chat_message{addr = addr, user = user, sender = sender, msg = tostring(msg)})
       modem.send(sender, port, true, "keep", "ok")
     elseif cmd == "pong" then
       if not connections[sender].sentPing then
@@ -181,25 +187,26 @@ local timer = cfg.net.ping.enabled and event.timer(1, function()
     end
   end, math.huge)
 
-addListener("chat_event_msg", "network.chat.msg", function(evt, time, chan, nick, msg, all, ...)
-  local rec = all and "all" or {...}
+EvEng:subscribe("msg", 0, function(evt)
+  local time, chan, nick, msg, rec = evt.time, evt.chan, evt.nick, evt.msg, evt.rec
   for conn, value in pairs(connections) do
-    if rec == "all" or isin(rec, value.user) then
-      modem.send(conn, value.port, "event", "chat", chan, nick, msg, all, srl.serialize(rec))
+    if #rec == 0 or isin(rec, value.user) then
+      modem.send(conn, value.port, "event", "chat", chan, nick, msg, srl.serialize(rec))
     end
   end
 end)
 
-addListener("chat_event_notice", "network.chat.notice", function(evt, time, chan, noticeType, notice, all, ...)
-  local rec = all and "all" or {...}
+EvEng:subscribe("notice", 0, function(evt)
+  local time, chan, noticeType, notice, rec = evt.time, evt.chan, evt.noticeType, evt.notice, evt.rec
   for conn, value in pairs(connections) do
-    if rec == "all" or isin(rec, value.user) then
+    if #rec == 0 or isin(rec, value.user) then
       modem.send(conn, value.port, "event", "notice", chan, noticeType, notice, srl.serialize(rec))
     end
   end
 end)
 
-addListener("chat_event_pm", "network.chat.pm", function(evt, time, user, addressee, msg)
+EvEng:subscribe("pm", 0, function(evt)
+  local time, user, addressee, msg = evt.time, evt.user, evt.addressee, evt.msg
   for conn, value in pairs(connections) do
     if isin({addressee, user}, value.user) then
       modem.send(conn, value.port, "event", "pm", user, addressee, msg)
@@ -207,7 +214,8 @@ addListener("chat_event_pm", "network.chat.pm", function(evt, time, user, addres
   end
 end)
 
-addListener("chat_event_join", "network.chat.join", function(evt, time, chan, user)
+EvEng:subscribe("join", 0, function(evt)
+  local time, chan, user = evt.time, evt.chan, evt.user
   for conn, value in pairs(connections) do
     if channels[chan].users[value.user] then
       modem.send(conn, value.port, "event", "join", chan, user)
@@ -215,7 +223,8 @@ addListener("chat_event_join", "network.chat.join", function(evt, time, chan, us
   end
 end)
 
-addListener("chat_event_part", "network.chat.part", function(evt, time, chan, user, reason)
+EvEng:subscribe("part", 0, function(evt)
+  local time, chan, user, reason = evt.time, evt.chan, evt.user, evt.reason
   for conn, value in pairs(connections) do
     if channels[chan] and channels[chan].users[value.user] then
       modem.send(conn, value.port, "event", "part", chan, user, reason)
@@ -223,8 +232,8 @@ addListener("chat_event_part", "network.chat.part", function(evt, time, chan, us
   end
 end)
 
-addListener("chat_event_quit", "network.chat.quit", function(evt, time, user, reason, ...)
-  local chans = {...}
+EvEng:subscribe("quit", 0, function(evt)
+  local time, user, reason, chans = evt.time, evt.user, evt.reason, evt.chans
   for conn, value in pairs(connections) do
     for _, chan in pairs(chans) do
       if channels[chan] and channels[chan].users[value.user] then
@@ -235,7 +244,8 @@ addListener("chat_event_quit", "network.chat.quit", function(evt, time, user, re
   end
 end)
 
-addListener("chat_stop", "network.stop", function(evt, time)
+EvEng:subscribe("stop", 0, function(evt)
+  local time = evt.time
   for conn, value in pairs(connections) do
     modem.send(conn, value.port, false, "close", "server is stopping")
     connections[conn] = nil
@@ -248,4 +258,4 @@ addListener("chat_stop", "network.stop", function(evt, time)
   end
 end)
 
--- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua filetype=lua :

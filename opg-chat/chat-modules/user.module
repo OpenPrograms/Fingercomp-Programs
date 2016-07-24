@@ -56,4 +56,4 @@ Password §cshould not§r contain spaces.
   }
 end
 
--- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua :
+-- vim: expandtab tabstop=2 shiftwidth=2 syntax=lua filetype=lua :

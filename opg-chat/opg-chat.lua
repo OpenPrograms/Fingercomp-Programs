@@ -10,7 +10,7 @@ local EvEng = require("aevent")()
 local modulesPath = "/usr/lib/chat-modules/"
 local env = {}
 local events = {
-  createChannel = EvEng:event("create_channel"),
+  createChannel = EvEng:event("createChannel"),
   msg = EvEng:event("msg"),
   notice = EvEng:event("notice"),
   pm = EvEng:event("pm"),
@@ -460,10 +460,10 @@ local function sendMsgChan(chan, nick, msg, rec)
   assert(channels[chan], "no such channel")
   assert(users[nick], "no such nickname")
   local date = os.date("%Y-%m-%d %H:%M:%S")
-  rec = rec or "all"
+  rec = rec or {}
   table.insert(channels[chan].lines, {date = date, level = channels[chan].users[nick], nick, msg, rec})
   truncate(chan)
-  EvEng:push(events.msg{time = os.time(), chan = chan, nick = nick, msg = msg, rec = (rec == "all" and {rec} or rec)})
+  EvEng:push(events.msg{time = os.time(), chan = chan, nick = nick, msg = msg, rec = rec})
 end
 
 local function sendNotifyChan(chan, notify, parts, rec)
@@ -475,10 +475,10 @@ local function sendNotifyChan(chan, notify, parts, rec)
   assert(channels[chan], "no such channel")
   assert(notifications[notify], "no such notification")
   local date = os.date("%Y-%m-%d %H:%M:%S")
-  rec = rec or "all"
+  rec = rec or {}
   table.insert(channels[chan].lines, {date = date, notify = {notify, parts}, rec})
   truncate(chan)
-  EvEng:push(events.notice{time = os.time(), chan = chan, noticeType = notify, notice = notifications[notify].pattern:format(table.unpack(parts)), rec = (rec == "all" and {rec} or rec), parts = parts})
+  EvEng:push(events.notice{time = os.time(), chan = chan, noticeType = notify, notice = notifications[notify].pattern:format(table.unpack(parts)), rec = rec, parts = parts})
 end
 
 local function sendPM(addressee, user, msg)
@@ -861,7 +861,7 @@ local coreHandlers = {
             else
               rec = line[1]
             end
-            if rec == "all" or isin(rec, user) then
+            if #rec == 0 or isin(rec, user) then
               local name = ""
               if not notify then
                 local userPrefix = PREFIXES[line.level or NORMAL]
