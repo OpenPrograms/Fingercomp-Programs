@@ -3,8 +3,11 @@ local kbd = require("keyboard")
 local unicode = require("unicode")
 local keysDown = {}
 
+EvEng:stdEvent("glasses_chat_command")
+EvEng:stdEvent("glasses_key_down")
+EvEng:stdEvent("glasses_key_up")
+
 events.slashCmd = EvEng:event("slashCmd")
-events.glassesChatCommand = EvEng:event("glassesChatCommand")
 
 local function typeLine(evt, addr, user, uuid, msg)
   if users[user] then
@@ -28,9 +31,7 @@ local function typeLine(evt, addr, user, uuid, msg)
   end
 end
 
---EvEng:subscribe("msg", 0, typeLine)
-
-addListener("glasses_chat_command", "input.glassesinput", typeLine)
+EvEng:subscribe("glasses_chat_command", 0, typeLine)
 
 local function toggleDown(evt, addr, user, uuid, code)
   keysDown[user] = keysDown[user] or {}
@@ -87,10 +88,11 @@ local function history(chan, user, prompt, step)
   end
 end
 
-addListener("glasses_key_down", "input.keys_down.down", toggleDown)
-addListener("glasses_key_up", "input.keys_down.up", toggleDown)
+EvEng:subscribe("glasses_key_down", 1, toggleDown)
+EvEng:subscribe("glasses_key_up", 1, toggleDown)
 
-addListener("glasses_key_down", "input.input", function(evt, addr, user, uuid, code, char)
+EvEng:subscribe("glasses_key_down", 1, function(evt)
+  local addr, user, uuid, code, char = evt[1], evt[2], evt[3], evt[4], evt[5]
   local chan = getActiveChannel(user)
   if chan then
     local prompt = users[user].prompt[chan]

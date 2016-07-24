@@ -21,9 +21,7 @@ local events = {
   load = EvEng:event("load"),
   start = EvEvg:event("start"),
   update = EvEng:event("update"),
-  moduleLoaded = EvEng:event("moduleLoaded"),
-  glassesAttach = EvEng:event("glassesAttach"),
-  glassesDetach = EvEng:event("glassesDetach")
+  moduleLoaded = EvEng:event("moduleLoaded")
 }
 local config = "/etc/opg-chat.json"
 local exit = false
@@ -775,9 +773,9 @@ local coreHandlers = {
       end
     end
   },
-  glassesAttach = {
+  glasses_attach = {
     function(evt)
-      local user = evt.user
+      local user = evt[2]
       surfaces[user] = {surface = bridge.getSurfaceByName(user)}
       surfaces[user].surface.clear()
       surfaces[user].objects = {}
@@ -788,9 +786,9 @@ local coreHandlers = {
       joinN(cfg.main_channel, user)
     end
   },
-  glassesDetach = {
+  glasses_detach = {
     function(evt)
-      local user = evt.user
+      local user = evt[2]
       local _ = surfaces[user] and surfaces[user].surface and surfaces[user].surface.clear()
       surfaces[user] = nil
       if users[user] then
@@ -798,7 +796,7 @@ local coreHandlers = {
       end
     end
   },
-  chat_update = {
+  update = {
     function(evt)
       local tick = evt.tick
       if tick % 5 == 0 then
@@ -1025,6 +1023,9 @@ local coreHandlers = {
   }
 }
 
+EvEng:stdEvent("glasses_attach")
+EvEng:stdEvent("glasses_detach")
+
 for eventName, hdlrs in pairs(coreHandlers) do
   for id, hdlr in pairs(hdlrs) do
     --print("Starting \"" .. eventName .. "\" listener [" .. id .. "]")
@@ -1037,16 +1038,6 @@ for eventName, hdlrs in pairs(moduleHandlers) do
     event.listen(eventName, hdlr)
   end
 end
-
-local function glassesFunc(evt, addr, user, uuid)
-  local e = "glassesAttach"
-  if evt == "glasses_detach" then
-    e = "glassesDetach"
-  end
-  EvEng:push(events[e]{addr = addr, user = user, uuid = uuid})
-end
-event.listen("glasses_attach", glassesFunc)
-event.listen("glasses_detach", glassesFunc)
 
 print("init")
 EvEng:push(events.init{time = os.time()})
@@ -1083,8 +1074,5 @@ end
 os.sleep(.5)
 
 event.cancel(upd)
-
-event.ignore("glasses_attach", glassesFunc)
-event.ignore("glasses_detach", glassesFunc)
 
 -- vim: expandtab tabstop=2 shiftwidth=2 :
