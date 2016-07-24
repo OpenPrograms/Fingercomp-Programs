@@ -21,7 +21,7 @@ local EvEngine = require("aevent")()
 
 The resulting instance has the following methods:
 Method | Description
-:------|:-----------
+------ | -----------
 `engine:event(name: string)` | Creates an event with a name `name`. It may be then called to get an instance of the event.
 `engine:event(name: string)(data: table[, once: bool])` | Returns an instance of the event with the specified payload. The `once` arguments makes the event be processed by only one subscriber. Generally you'd use `instance{test="test"}`.
 `engine:event(name: string)(data: table[, once: bool]):cancel()` | Cancels an event.
