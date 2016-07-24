@@ -20,6 +20,7 @@ local EvEngine = require("aevent")()
 ### Methods
 
 The resulting instance has the following methods:
+
 Method | Description
 =======|============
 `engine:event(name: string)` | Creates an event with a name `name`. It may be then called to get an instance of the event.
@@ -28,6 +29,7 @@ Method | Description
 `engine:event(name: string)(data: table[, once: bool]):get()` | Returns the event's payload.
 `engine:push(evtinst: table)` | Pushes the event instance.
 `engine:subscribe(name: string, priority: number, handler: function)` | Assigns a callable (function or table with defined `__call`) to an event with a specific priority.
+`engine:stdEvent(name: string)` | Registers a signal listener, which converts signal to the advanced event.
 
 ### Sample code
 ```lua
