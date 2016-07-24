@@ -3,6 +3,9 @@ local kbd = require("keyboard")
 local unicode = require("unicode")
 local keysDown = {}
 
+events.slashCmd = EvEng:event("slashCmd")
+events.glassesChatCommand = EvEng:event("glassesChatCommand")
+
 local function typeLine(evt, addr, user, uuid, msg)
   if users[user] then
     local chan = getActiveChannel(user)
@@ -19,14 +22,13 @@ local function typeLine(evt, addr, user, uuid, msg)
         end
         cmd = args[1]:sub(2, -1)
         table.remove(args, 1)
-        event.push("chat_slash_cmd", chan, user, raw, cmd, table.unpack(args))
-        event.push("chat_slash_cmd_" .. cmd, chan, user, raw, cmd, table.unpack(args))
+        EvEng:push(events.slashCmd{chan = chan, user = user, raw = raw, cmd = cmd, args = args})
       end
     end
   end
 end
 
-addListener("chat_chat_message", "input.input", typeLine)
+--EvEng:subscribe("msg", 0, typeLine)
 
 addListener("glasses_chat_command", "input.glassesinput", typeLine)
 
