@@ -1032,6 +1032,12 @@ for eventName, hdlrs in pairs(coreHandlers) do
   end
 end
 
+for eventName, hdlrs in pairs(moduleHandlers) do
+  for id, hdlr in pairs(hdlrs) do
+    event.listen(eventName, hdlr)
+  end
+end
+
 local function glassesFunc(evt, addr, user, uuid)
   local e = "glassesAttach"
   if evt == "glasses_detach" then
@@ -1066,6 +1072,12 @@ end, math.huge)
 
 while not exit do
   os.sleep(.1)
+end
+
+for eventName, hdlrs in pairs(moduleHandlers) do
+  for id, hdlr in pairs(hdlrs) do
+    event.ignore(eventName, hdlr)
+  end
 end
 
 os.sleep(.5)
