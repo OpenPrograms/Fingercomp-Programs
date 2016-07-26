@@ -392,7 +392,7 @@ decoders[0x18] = function(s, id, len) -- GeneralizedTime
   }
 end
 
-local function decode(s, kwargs)
+return function decode(s, kwargs)
   local id = decodeID(s)
   local len = decodeLen(s)
   if kwargs.sametag and kwargs.sametag ~= id.tag then
