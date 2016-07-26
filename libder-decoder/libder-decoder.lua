@@ -10,7 +10,7 @@ end
 local function decodeID(s)
   local data = read(s, 1):byte()
   local tag = data & 0x1f
-  data = data >> 4
+  data = data >> 5
   local pc = data & 0x1
   local class = data >> 1
   if tag ~= 0x1f then
@@ -34,7 +34,7 @@ local function decodeID(s)
 end
 
 local function decodeLen(s)
-  local data = read(s, 1)
+  local data = read(s, 1):byte()
   if data == 0x80 then
     error("DER doesn't allow indefinite length")
     -- return "eoc"
@@ -45,7 +45,7 @@ local function decodeLen(s)
   else
     local bytes = data & 0x7f
     local len = 0x0
-    for i = 1, len, 1 do
+    for i = 1, bytes, 1 do
       data = read(s, 1):byte()
       len = (len << 8) | data
     end
@@ -72,6 +72,8 @@ local function bitlen(num)
   return math.ceil(math.log(num, 2))
 end
 
+local decode
+
 local decoders = {}
 
 decoders[0x01] = function(s, id, len) -- BOOLEAN
@@ -92,20 +94,17 @@ decoders[0x02] = function(s, id, len) -- INTEGER
   len = getNextEOC(s, len)
   assert(id.pc == 0x0, "INTEGER shall be primitive")
   assert(len > 0, "INTEGER must have content of length ≥ 1")
-  local firstByte = read(s, 1):byte()
+  local firstByte = s[0]:sub(1, 1):byte()
   if len > 1 then
     local second8Bit = s[0]:sub(1, 1):byte()
     assert(not (firstByte == 0xff and second8Bit == 1 or firstByte == 0x00 and second8Bit == 0), "invalid value: first 9 bits are " .. second8Bit)
   end
   local result = 0
-  if s[0]:sub(1, 1):byte() & 0x80 then
+  if (s[0]:sub(1, 1):byte() >> 7) == 1 then
     result = -1
   end
   for i = 1, len, 1 do
     result = (result << 8) | read(s, 1):byte()
-  end
-  if result > (256^len)/2 then
-    result = result - 256^len
   end
   return result
 end
@@ -173,7 +172,7 @@ decoders[0x09] = function(s, id, len) -- REAL
     local firstByte = read(s, 1)
     if firstByte == 0x40 then
       return math.huge
-    elseif firstByte = 0x41 then
+    elseif firstByte == 0x41 then
       return -math.huge
     end
   end
@@ -251,10 +250,9 @@ decoders[0x04] = function(s, id, len) -- OCTET STRING
     -- return data
   else -- primitive
     len = getNextEOC(s, len)
-    local data = read(s, len)
     local result = 0
-    for i = 1, #data, 1 do
-      result = (result << 8) | decode(s)
+    for i = 1, len, 1 do
+      result = (result << 8) | read(s, 1):byte()
     end
     return result
   end
@@ -267,7 +265,7 @@ decoders[0x05] = function(s, id, len) -- NULL
   return nil
 end
 
-decoders[0x10] = function(s, id, len) -- SEQUENCE & SEQUENCE OF
+decoders[0x10] = function(s, id, len, kwargs) -- SEQUENCE & SEQUENCE OF
   assert(id.pc == 1, "SEQUENCE shall be constructed")
   local result = {}
   local lenleft = len
@@ -276,11 +274,13 @@ decoders[0x10] = function(s, id, len) -- SEQUENCE & SEQUENCE OF
     if len ~= "eoc" then
       prevlen = #s[0]
     end
-    local decoded = decode(s)
+    local decoded = decode(s, kwargs)
     result[#result+1] = decoded
+    -- print("P", prevlen, #s[0], lenleft, len)
     if len ~= "eoc" then
       lenleft = lenleft - (prevlen - #s[0])
     end
+    -- print("P2", lenleft)
     if len ~= "eoc" then
       if lenleft == 0 then
         break
@@ -297,7 +297,7 @@ decoders[0x10] = function(s, id, len) -- SEQUENCE & SEQUENCE OF
   return result
 end
 
-decoders[0x11] = function(s, id, len) -- SET & SET OF
+decoders[0x11] = function(s, id, len, kwargs) -- SET & SET OF
   assert(id.pc == 1, "SET shall be constructed")
   local result = {}
   local lenleft = len
@@ -306,7 +306,7 @@ decoders[0x11] = function(s, id, len) -- SET & SET OF
     if len ~= "eoc" then
       prevlen = #s[0]
     end
-    local decoded = decode(s)
+    local decoded = decode(s, kwargs)
     result[#result+1] = decoded
     if len ~= "eoc" then
       lenleft = lenleft - (prevlen - #s[0])
@@ -337,7 +337,7 @@ decoders[0x06] = function(s, id, len) -- OBJECT IDENTIFIER
       error("The leading byte is of value 0x80, which is not allowed")
     end
     if #result == 0 then result = {false} end
-    result[#result] = (result[#result] << 7) | (byte & 0x7f)
+    result[#result] = ((result[#result] or 0) << 7) | (byte & 0x7f)
     if byte >> 7 == 0 then
       result[#result+1] = false
     end
@@ -353,11 +353,23 @@ decoders[0x0D] = function(s, id, len) -- RELATIVE OBJECT IDENTIFIER
   return decoders[0x06](s, id, len)
 end
 
+decoders[0x12] = function(s, id, len) -- NumericString
+  assert(id.pc == 0, "DER requires NumericString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x13] = function(s, id, len) -- PrintableString
+  assert(id.pc == 0, "DER requires NumericString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
 decoders[0x17] = function(s, id, len) -- UTCTime
-  assert(id.pc == 0, "DER requires UTCTime to be primitive, bit it isn't")
+  assert(id.pc == 0, "DER requires UTCTime to be primitive, but it isn't")
   len = getNextEOC(s, len)
   local data = read(s, len)
-  local year, month, day, hour, min, sec = data:match("^(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)Z$")
+  local year, month, day, hour, min, sec = data:match("^(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)Z$")
   if not year then
     error("Corrupt data: time pattern not matched")
   end
@@ -392,11 +404,25 @@ decoders[0x18] = function(s, id, len) -- GeneralizedTime
   }
 end
 
-return function decode(s, kwargs)
+function decode(s, kwargs)
+  if type(s) == "string" then
+    s = {[0]=s}
+  end
+  kwargs = kwargs or {}
   local id = decodeID(s)
   local len = decodeLen(s)
-  if kwargs.sametag and kwargs.sametag ~= id.tag then
-    error(("Decoder for type 0x%s required the decoded tag to be the same, but it isn't"):format(kwargs.sametag))
+  -- print(s[0]:gsub(".",function(c)return("%02X"):format(c:byte())end))
+  -- print(id.class, id.tag, id.pc, len)
+  -- if kwargs.sametag and kwargs.sametag ~= id.tag then
+  --   error(("Decoder for type 0x%s required the decoded tag to be the same, but it isn't"):format(kwargs.sametag))
+  -- end
+  if id.class == 0x02 and kwargs.context[1] then
+    id.tag = kwargs.context[1]
+    table.remove(kwargs.context, 1)
   end
-  return decoders[id.tag](s, id, len)
+  local result = decoders[id.tag](s, id, len, kwargs)
+  -- print(tostring(result):gsub(".",function(c)return("%02X"):format(c:byte())end))
+  return result
 end
+
+return decode
