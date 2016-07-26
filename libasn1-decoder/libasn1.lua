@@ -1,4 +1,5 @@
--- An implementation of DER decoder
+-- An implementation of DER decoder.
+-- It only implements the basic types.
 
 local function read(s, len)
   local result = s[0]:sub(1, len)
@@ -35,7 +36,8 @@ end
 local function decodeLen(s)
   local data = read(s, 1)
   if data == 0x80 then
-    return "eoc"
+    error("DER doesn't allow indefinite length")
+    -- return "eoc"
   elseif data == 0xff then
     return false
   elseif data >> 7 == 0 then
@@ -53,16 +55,17 @@ end
 
 local function getNextEOC(s, len)
   if len ~= "eoc" then return len end
-  local buf = {s[0]}
-  len = 0
-  while true do
-    if buf[0]:sub(1, 2) == "\x00\x00" then
-      break
-    end
-    local data = read(buf, 1)
-    len = len + 1
-  end
-  return len
+  error("DER doesn't allow indefinite length")
+  -- local buf = {s[0]}
+  -- len = 0
+  -- while true do
+  --   if buf[0]:sub(1, 2) == "\x00\x00" then
+  --     break
+  --   end
+  --   local data = read(buf, 1)
+  --   len = len + 1
+  -- end
+  -- return len
 end
 
 local function bitlen(num)
@@ -86,7 +89,7 @@ decoders[0x01] = function(s, id, len) -- BOOLEAN
 end
 
 decoders[0x02] = function(s, id, len) -- INTEGER
-  len = getNextEOC(len)
+  len = getNextEOC(s, len)
   assert(id.pc == 0x0, "INTEGER shall be primitive")
   assert(len > 0, "INTEGER must have content of length ≥ 1")
   local firstByte = read(s, 1):byte()
@@ -178,31 +181,32 @@ end
 
 decoders[0x03] = function(s, id, len) -- BIT STRING
   if id.pc == 1 then -- constructed
-    local data = 0
-    local lenleft = len
-    while true do
-      local prevlen = 0
-      if len ~= "eoc" then
-        prevlen = #s[0]
-      end
-      local decoded = decode(s, {sametag = id.tag})
-      if len ~= "eoc" then
-        lenleft = lenleft - (prevlen - #s[0])
-      end
-      data = (data << bitlen(decoded)) | decoded
-      if len ~= "eoc" then
-        if lenleft == 0 then
-          break
-        elseif lenleft < 0 then
-          error("Corrupt data: contents length is more than length of container")
-        end
-      else
-        if s[0]:sub(1, 2) == "\x00\x00" then
-          read(s, 2) -- read EOC
-          break
-        end
-      end
-    end
+    error("DER doesn't allow constructed strings")
+    -- local data = 0
+    -- local lenleft = len
+    -- while true do
+    --   local prevlen = 0
+    --   if len ~= "eoc" then
+    --     prevlen = #s[0]
+    --   end
+    --   local decoded = decode(s, {sametag = id.tag})
+    --   if len ~= "eoc" then
+    --     lenleft = lenleft - (prevlen - #s[0])
+    --   end
+    --   data = (data << bitlen(decoded)) | decoded
+    --   if len ~= "eoc" then
+    --     if lenleft == 0 then
+    --       break
+    --     elseif lenleft < 0 then
+    --       error("Corrupt data: contents length is more than length of container")
+    --     end
+    --   else
+    --     if s[0]:sub(1, 2) == "\x00\x00" then
+    --       read(s, 2) -- read EOC
+    --       break
+    --     end
+    --   end
+    -- end
   else -- primitive
     len = getNextEOC(s, len)
     local rShift = read(s, 1):byte()
@@ -218,34 +222,35 @@ end
 
 decoders[0x04] = function(s, id, len) -- OCTET STRING
   if id.pc == 1 then -- constructed
-    local data = 0
-    local lenleft = len
-    while true do
-      local prevlen = 0
-      if len ~= "eoc" then
-        prevlen = #s[0]
-      end
-      local decoded = decode(s, {sametag = id.tag})
-      data = (data << 8) | decoded
-      if len ~= "eoc" then
-        lenleft = lenleft - (prevlen - #s[0])
-      end
-      if len ~= "eoc" then
-        if lenleft == 0 then
-          break
-        elseif lenleft < 0 then
-          error("Corrupt data: contents length is more than length of container")
-        end
-      else
-        if s[0]:sub(1, 2) == "\x00\x00" then
-          read(s, 2) -- read EOC
-          break
-        end
-      end
-    end
-    return data
+    error("DER doesn't allow constructed strings")
+    -- local data = 0
+    -- local lenleft = len
+    -- while true do
+    --   local prevlen = 0
+    --   if len ~= "eoc" then
+    --     prevlen = #s[0]
+    --   end
+    --   local decoded = decode(s, {sametag = id.tag})
+    --   data = (data << 8) | decoded
+    --   if len ~= "eoc" then
+    --     lenleft = lenleft - (prevlen - #s[0])
+    --   end
+    --   if len ~= "eoc" then
+    --     if lenleft == 0 then
+    --       break
+    --     elseif lenleft < 0 then
+    --       error("Corrupt data: contents length is more than length of container")
+    --     end
+    --   else
+    --     if s[0]:sub(1, 2) == "\x00\x00" then
+    --       read(s, 2) -- read EOC
+    --       break
+    --     end
+    --   end
+    -- end
+    -- return data
   else -- primitive
-    len = getNextEOC(len)
+    len = getNextEOC(s, len)
     local data = read(s, len)
     local result = 0
     for i = 1, #data, 1 do
@@ -256,7 +261,7 @@ decoders[0x04] = function(s, id, len) -- OCTET STRING
 end
 
 decoders[0x05] = function(s, id, len) -- NULL
-  len = getNextEOC(len)
+  len = getNextEOC(s, len)
   assert(id.pc == 0, "NULL shall be primitive")
   assert(len == 0, "NULL must not have a content")
   return nil
@@ -292,7 +297,100 @@ decoders[0x10] = function(s, id, len) -- SEQUENCE & SEQUENCE OF
   return result
 end
 
-decoders[0x11] = function(s, id, len) --
+decoders[0x11] = function(s, id, len) -- SET & SET OF
+  assert(id.pc == 1, "SET shall be constructed")
+  local result = {}
+  local lenleft = len
+  while true do
+    local prevlen = 0
+    if len ~= "eoc" then
+      prevlen = #s[0]
+    end
+    local decoded = decode(s)
+    result[#result+1] = decoded
+    if len ~= "eoc" then
+      lenleft = lenleft - (prevlen - #s[0])
+    end
+    if len ~= "eoc" then
+      if lenleft == 0 then
+        break
+      elseif lenleft < 0 then
+        error("Corrupt data: contents length is more then length of container")
+      end
+    else
+      if s[0]:sub(1, 2) == "\x00\x00" then
+        read(s, 2) -- read EOC
+        break
+      end
+    end
+  end
+  return result
+end
+
+decoders[0x06] = function(s, id, len) -- OBJECT IDENTIFIER
+  assert(id.pc == 0, "OBJECT IDENTIFIER shall be primitive")
+  len = getNextEOC(s, len)
+  local result = {}
+  for i = 1, len, 1 do
+    local byte = read(s, 1):byte()
+    if byte == 0x80 then
+      error("The leading byte is of value 0x80, which is not allowed")
+    end
+    if #result == 0 then result = {false} end
+    result[#result] = (result[#result] << 7) | (byte & 0x7f)
+    if byte >> 7 == 0 then
+      result[#result+1] = false
+    end
+  end
+  if result[#result] == false then
+    result[#result] = nil
+  end
+  return result
+end
+
+decoders[0x0D] = function(s, id, len) -- RELATIVE OBJECT IDENTIFIER
+  assert(id.pc == 0, "RELATIVE OBJECT IDENTIFIER shall be primitive")
+  return decoders[0x06](s, id, len)
+end
+
+decoders[0x17] = function(s, id, len) -- UTCTime
+  assert(id.pc == 0, "DER requires UTCTime to be primitive, bit it isn't")
+  len = getNextEOC(s, len)
+  local data = read(s, len)
+  local year, month, day, hour, min, sec = data:match("^(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)Z$")
+  if not year then
+    error("Corrupt data: time pattern not matched")
+  end
+  return {
+    year = tonumber(year),
+    month = tonumber(month),
+    day = tonumber(day),
+    hour = tonumber(hour),
+    minute = tonumber(min),
+    second = tonumber(sec)
+  }
+end
+
+decoders[0x18] = function(s, id, len) -- GeneralizedTime
+  assert(id.pc == 0, "DER requires GeneralizedTime to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  local data = read(s, len)
+  local year, month, day, hour, min, sec, fr = data:match("^(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(.*)Z$")
+  if not year then
+    error("Corrupt data: time pattern not matched")
+  end
+  if not fr:match("^%.(%d+)$") then
+    error("Corrupt data: time pattern not matched")
+  end
+  return {
+    year = tonumber(year),
+    month = tonumber(month),
+    day = tonumber(day),
+    hour = tonumber(hour),
+    minute = tonumber(min),
+    second = tonumber(sec)
+  }
+end
 
 local function decode(s, kwargs)
   local id = decodeID(s)
