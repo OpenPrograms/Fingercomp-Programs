@@ -399,3 +399,20 @@ local function PRF(pHash)
     return pHash(secret, label .. seed, len)
   end
 end
+
+local function generateKeyBlock(masterSecret, clientRandom, serverRandom, prf, macKeyLen, keyLen, ivLength)
+  local totalLen = keyLen * 2 + macKeyLen * 2 + (ivLength and ivLength * 2 or 0)
+  local data = ""
+  repeat
+    data = data .. prf(masterSecret, "key expansion", serverRandom .. clientRandom)
+  until #data >= totalLen
+  data = {data}
+  return {
+    clientWriteMACKey = read(data, macKeyLen),
+    serverWriteMACKey = read(data, macKeyLen),
+    clientWriteKey = read(data, keyLen),
+    serverWriteKey = read(data, keyLen),
+    clientWriteIV = ivLength and read(data, ivLength),
+    serverWriteIV = ivLength and read(data, ivLength)
+  }
+end
