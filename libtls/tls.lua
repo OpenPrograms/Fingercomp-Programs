@@ -2,17 +2,53 @@ local derdecode = require("der-decoder")
 
 local VERSION = 0x0303
 
-local HANDSHAKE_CODE = 0x16
-local CHANGE_CIPHER_SPEC_CODE = 0x14
+local function copy(tbl)
+  if type(tbl) ~= "table" then return tbl end
+  local result = {}
+  for k, v in pairs(tbl) do
+    result[k] = copy(v)
+  end
+  return result
+end
 
-local HANDSHAKE_TYPES = {
+local function isin(tbl, value)
+  for k, v in pairs(tbl) do
+    if v = value then
+      return true, k
+    end
+  end
+  return false
+end
+
+local function enum(tbl)
+  setmetatable(tbl, {
+    __index = function(self, k)
+      local e, pos = isin(self, k)
+      if e then
+        return pos
+      else
+        return nil
+      end
+    end
+  })
+  return tbl
+end
+
+local TLS_CONTENT_TYPES = enum({
+  ChangeCipherSpec = 0x14,
+  Alert = 0x15,
+  Handshake = 0x16,
+  ApplicationData = 0x17
+})
+
+local HANDSHAKE_TYPES = enum({
   ClientHello = 0x01,
   ServerHello = 0x02,
   ServerCertificate = 0x11,
   ServerHelloDone = 0x0e,
   ClientKeyExchange = 0x10,
   Finished = 0x14
-}
+})
 
 local TLS_VERSION = 0x0303
 
@@ -415,4 +451,82 @@ local function generateKeyBlock(masterSecret, clientRandom, serverRandom, prf, m
     clientWriteIV = ivLength and read(data, ivLength),
     serverWriteIV = ivLength and read(data, ivLength)
   }
+end
+
+local function newSequenceNum()
+  return {
+    read = 0,
+    write = 0
+  }
+end
+
+local function createTLSPlaintext(contentType, data)
+  assert(type(data) == "string", "data of string type expected")
+  assert(type(contentType) == "number", "contentType of number type expected")
+  assert(TLS_CONTENT_TYPES[contentType], "unknown content type")
+  assert(contentType == 0x17 or #data ~= 0, "length of non-application data must not be 0")
+  local version = TLS_VERSION
+  local length = #data
+  -- Prevent modification of struct to prevent screwups
+  return setmetatable({}, {
+    __index = {
+      packet = function(self)
+        return uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. self.data
+      end,
+      contentType = contentType,
+      version = version,
+      length = length
+      data = data
+    },
+    __newindex = function(self, k, v)
+      error("the struct is read-only")
+    end,
+    __pairs = function(self)
+      return pairs({
+        contentType = contentType,
+        version = version,
+        length = length,
+        data = data
+      })
+    end,
+    __ipairs = function(self)
+      return pairs({
+        contentType = contentType,
+        version = version,
+        length = length,
+        data = data
+      })
+    end
+  })
+end
+
+local function readRecord(s)
+  local result = {}
+  result.contentType = uint8:unpack(read(s, 1))
+  assert(TLS_CONTENT_TYPES[result.contentType], "record of unknown content type: " .. result.contentType)
+  result.length = uint16:unpack(read(s, 2))
+  result.fragment = read(s, result.length)
+  return result
+end
+
+-- Parses TLS records, and concatenates records of the same content type
+local function parseTLSRecords(packets)
+  assert(type(packets) == "string", "packets of string type expected")
+  local result = {}
+  local data = {[0] = packets}
+  local prevRecord
+  while #data[0] > 0 do
+    local record = readRecord(data)
+    if prevRecord then
+      if prevRecord.contentType == record.contentType then
+        record.length = prevRecord.length + record.length
+        record.data = prevRecord.data .. record.data
+      else
+        result[#result+1] = prevRecord
+      end
+    end
+    prevRecord = record
+  end
+  result[#result+1] = prevRecord
+  return result
 end
