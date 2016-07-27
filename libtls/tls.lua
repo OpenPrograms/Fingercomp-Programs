@@ -3,12 +3,15 @@ local derdecode = require("der-decoder")
 local VERSION = 0x0303
 
 local HANDSHAKE_CODE = 0x16
+local CHANGE_CIPHER_SPEC_CODE = 0x14
 
 local HANDSHAKE_TYPES = {
   ClientHello = 0x01,
   ServerHello = 0x02,
   ServerCertificate = 0x11,
-  ServerHelloDone = 0x0e
+  ServerHelloDone = 0x0e,
+  ClientKeyExchange = 0x10,
+  Finished = 0x14
 }
 
 local TLS_VERSION = 0x0303
@@ -102,15 +105,33 @@ local function read(ts, len)
   return result
 end
 
+local function number2bytes(number)
+  local result = ""
+  for i = 1, math.ceil(math.ceil(math.log(number, 2)) / 8), 1 do
+    local byte = number & 0xff
+    result = result .. string.char(byte)
+    number = number >> 8
+  end
+  return result
+end
+
+local function bytes2number(bytes)
+  local result = 0
+  for i = 1, #bytes, 1 do
+    result = (result << 8) | bytes:sub(i, i):byte()
+  end
+  return result
+end
+
 local function packageClientHello(ciphersA, compressionA, extensionsA)
-  -- [HANDSHAKE_CODE: 1] [Body: [Length: 3] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Version: 2] [Random: 32 = [GMT Unix time: 4] [RANDOM: 28] ] [Session ID: [Length: 1] = [Session ID] ] [Ciphers: [Length: 2] = [ [Cipher 1: 2] [Cipher 2: 2] … ] ] [Compression: [Length: 1] = [ [Method 1: 1] [Method 2: 1] … ] ] [Extensions: [Length: 2] = [ [Extension 1: … = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ] ] ] ] ]
+  -- [HANDSHAKE_CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Version: 2] [Random: 32 = [GMT Unix time: 4] [RANDOM: 28] ] [Session ID: [Length: 1] = [Session ID] ] [Ciphers: [Length: 2] = [ [Cipher 1: 2] [Cipher 2: 2] … ] ] [Compression: [Length: 1] = [ [Method 1: 1] [Method 2: 1] … ] ] [Extensions: [Length: 2] = [ [Extension 1: … = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ] ] ] ] ]
 
   -- 1. Random
   local random = ""
   do
     local time = getRealTime("%s")
     local rand = genRandom(28)
-    random = (">I4"):pack(time) .. rand
+    random = uint32:pack(time) .. rand
   end
 
   -- 2. Ciphers
@@ -119,7 +140,7 @@ local function packageClientHello(ciphersA, compressionA, extensionsA)
     local c = ciphersA or {
       "\x00\x2f" -- TLS_RSA_WITH_AES_128_CBC_SHA
     }
-    ciphers = (">I2"):pack(#c * 2) .. table.concat(c)
+    ciphers = uint16:pack(#c * 2) .. table.concat(c)
   end
 
   -- 3. Compression
@@ -128,7 +149,7 @@ local function packageClientHello(ciphersA, compressionA, extensionsA)
     local c = compressionA or {
       "\x00" -- No compression
     }
-    compression = (">I2"):pack(#c * 2) .. table.concat(c)
+    compression = uint8:pack(#c * 2) .. table.concat(c)
   end
 
   -- 4. Extensions
@@ -140,24 +161,25 @@ local function packageClientHello(ciphersA, compressionA, extensionsA)
     for i, j in pairs(c) do
       c[i] = table.concat(j)
     end
-    extensions = (">I2"):pack(#table.concat(c)) .. table.concat(c)
+    extensions = uint16:pack(#table.concat(c)) .. table.concat(c)
   end
 
   -- 5. Packet
-  local packet = TLS_VERSION .. random .. "\x00" .. ciphers .. compression .. extensions
-  packet = HANDSHAKE_TYPES.ClientHello .. #packet .. packet
-  return HANDSHAKE_CODE .. #packet .. packet
+  local packet = uint16:pack(TLS_VERSION) .. random .. "\x00" .. ciphers .. compression .. extensions
+  packet = uint8:pack(HANDSHAKE_TYPES.ClientHello) .. uint24:pack(#packet) .. packet
+  return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#packet) .. packet, random
 end
 
 local function parseServerHello(packet)
-  -- [HANDSHAKE CODE: 1] [Body: [Length: 3] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Version: 2] [Random: 32 = [ [GMT Unix time: 4] [RANDOM: 28] ] ] [Session ID: [Length: 1] ] [Cipher: 2] [Compression: 1] [Extensions: [Length: 2] = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ] ] ]
+  -- [HANDSHAKE CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Version: 2] [Random: 32 = [ [GMT Unix time: 4] [RANDOM: 28] ] ] [Session ID: [Length: 1] ] [Cipher: 2] [Compression: 1] [Extensions: [Length: 2] = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ] ] ]
   packet = {packet}
   local result = {}
   result.tlsCode = uint8:unpack(read(packet, 1)) -- tls packet code (handshake expected)
   if result.tlsCode ~= HANDSHAKE_CODE then
     error("bad packet: wrong tls packet code")
   end
-  local len = uint24:unpack(read(packet, 3))
+  result.tlsVersion = uint16:unpack(read(packet, 2))
+  local len = uint16:unpack(read(packet, 2))
   local data = {read(packet, len)}
   result.handshakeMsg = uint8:unpack(read(data, 1))
   if result.handshakeMsg ~= HANDSHAKE_TYPES.ServerHello then
@@ -187,14 +209,15 @@ local function parseServerHello(packet)
 end
 
 local function parseServerCertificate(packet)
-  -- [HANDSHAKE CODE: 1] [Body: [Length: 3] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Certificates: [Length: 3] = [ [Certificate 1: [Length: 3] ] [Certificate 2: [Length: 3] ] … ] ] ] ] ] ]
+  -- [HANDSHAKE CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Certificates: [Length: 3] = [ [Certificate 1: [Length: 3] ] [Certificate 2: [Length: 3] ] … ] ] ] ] ] ]
   packet = {packet}
   local result = {}
   result.tlsCode = uint8:unpack(read(packet, 1)) -- tls packet code (handshake expected)
   if result.tlsCode ~= HANDSHAKE_CODE then
     error("bad packet: wrong tls packet code")
   end
-  local len = uint24:unpack(read(packet, 3))
+  result.tlsVersion = uint16:unpack(read(packet, 2))
+  local len = uint16:unpack(read(packet, 2))
   local data = {read(packet, len)}
   result.handshakeMsg = uint8:unpack(read(data, 1))
   if result.handshakeMsg ~= HANDSHAKE_TYPES.ServerCertificate then
@@ -299,14 +322,15 @@ local function parseServerCertificate(packet)
 end
 
 local function parseServerHelloDone(packet)
-  -- [HANDSHAKE CODE: 1] [Body: [Length: 3] = [ [Handshake message type: 1] [Handshake message: [Length: 3] ] ] ]
+  -- [HANDSHAKE CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] ] ] ]
   packet = {packet}
   local result = {}
   result.tlsCode = uint8:unpack(read(packet, 1)) -- tls packet code (handshake expected)
   if result.tlsCode ~= HANDSHAKE_CODE then
     error("bad packet: wrong tls packet code")
   end
-  local len = uint24:unpack(read(packet, 3))
+  result.tlsVersion = uint16:unpack(read(packet, 2))
+  local len = uint16:unpack(read(packet, 2))
   local data = {read(packet, len)}
   result.handshakeMsg = uint8:unpack(read(data, 1))
   if result.handshakeMsg ~= HANDSHAKE_TYPES.ServerHelloDone then
@@ -314,4 +338,64 @@ local function parseServerHelloDone(packet)
   end
   -- The body is empty, len is always 0
   return result
+end
+
+local function packetClientKeyExchange(packet, publicKey)
+  -- [HANDSHAKE code: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [Encrypted PreMasterSecret: 48] ] ] ]
+  local preMasterSecret = {[0] = uint16:pack(TLS_VERSION) .. getRandom(46)}
+  local encryptedPreMasterSecret = encryptRSA(preMasterSecret[0], publicKey)
+  local result = uint8:pack(HANDSHAKE_TYPES.ClientKeyExchange) .. uint24:pack(#encryptedPreMasterSecret) .. encryptedPreMasterSecret
+  return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#result) .. result, {
+    preMasterSecret = preMasterSecret
+  }
+end
+
+local function generateMasterSecret(preMasterSecret, clientRandom, serverRandom, prf)
+  local result = prf(preMasterSecret[0], "master secret", clientRandom .. serverRandom)
+  preMasterSecret[0] = nil
+  return result
+end
+
+local function packetChangeCipherSpec()
+  -- [ChangeCipherSpec code: 1] [TLS version: 2] [Body: [Length: 2] = [ [ChangeCipherSpec message: 1] ] ]
+  return uint8:pack(CHANGE_CIPHER_SPEC_CODE) .. uint16:pack(TLS_VERSION) .. "\x00\x01\x01"
+end
+
+local function packetClientFinished(packets, masterSecret, prf, hashHMAC)
+  -- [HANDSHAKE code: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [Encrypted data] ] ] ]
+  local data = prf(masterSecret, "client finished", hashHMAC(table.concat(packets)))
+  local result = uint8:pack(HANDSHAKE_TYPES.Finished) .. uint24:pack(#data) .. data
+  return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#result) .. result
+end
+
+local function HMAC(hash, blockLength)
+  return function(key, data)
+    assert(#key <= blockLength, "Key length must be less than " .. blockLength .. " bytes!")
+    local ipad = ("\x36"):rep(blockLength)
+    local opad = ("\x5C"):rep(blockLength)
+    local paddedKey = key .. ("\x00"):rep(blockLength - #key)
+    return hash(number2bytes(bytes2number(key) ~ bytes2number(opad)) .. hash(number2bytes(bytes2number(key) ~ bytes2number(ipad)) .. text))
+  end
+end
+
+local function P_hash(hashHmac)
+  return function(secret, seed, len)
+    local seedH = seed
+    local result = ""
+    for i = 1, math.huge, 1 do
+      seedH = hashHmac(secret, seedH)
+      result = result .. hashHmac(secret, seedH .. seed)
+      if not len or len == #result then
+        return result
+      elseif len < #result then
+        return result:sub(1, len)
+      end
+    end
+  end
+end
+
+local function PRF(pHash)
+  return function(secret, label, seed, len)
+    return pHash(secret, label .. seed, len)
+  end
 end
