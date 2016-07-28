@@ -47,9 +47,10 @@ local TLS_CONTENT_TYPES = enum({
 })
 
 local HANDSHAKE_TYPES = enum({
+  HelloRequest = 0x00,
   ClientHello = 0x01,
   ServerHello = 0x02,
-  ServerCertificate = 0x11,
+  Certificate = 0x11,
   ServerHelloDone = 0x0e,
   ClientKeyExchange = 0x10,
   Finished = 0x14
@@ -198,53 +199,6 @@ local function getRandom(len)
   return data.random(len)
 end
 
-local function packageClientHello(ciphersA, compressionA, extensionsA)
-  -- [HANDSHAKE_CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Version: 2] [Random: 32 = [GMT Unix time: 4] [RANDOM: 28] ] [Session ID: [Length: 1] = [Session ID] ] [Ciphers: [Length: 2] = [ [Cipher 1: 2] [Cipher 2: 2] … ] ] [Compression: [Length: 1] = [ [Method 1: 1] [Method 2: 1] … ] ] [Extensions: [Length: 2] = [ [Extension 1: … = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ] ] ] ] ]
-
-  -- 1. Random
-  local random = ""
-  do
-    local time = getRealTime("%s")
-    local rand = genRandom(28)
-    random = uint32:pack(time) .. rand
-  end
-
-  -- 2. Ciphers
-  local ciphers = ""
-  do
-    local c = ciphersA or {
-      "\x00\x2f" -- TLS_RSA_WITH_AES_128_CBC_SHA
-    }
-    ciphers = uint16:pack(#c * 2) .. table.concat(c)
-  end
-
-  -- 3. Compression
-  local compression = ""
-  do
-    local c = compressionA or {
-      "\x00" -- No compression
-    }
-    compression = uint8:pack(#c * 2) .. table.concat(c)
-  end
-
-  -- 4. Extensions
-  local extensions = ""
-  do
-    local c = extensionsA or {
-      {"\x00\x0d", "\x00\x02\x06\x01"} -- signature_algorithms: SHA512 + RSA
-    }
-    for i, j in pairs(c) do
-      c[i] = table.concat(j)
-    end
-    extensions = uint16:pack(#table.concat(c)) .. table.concat(c)
-  end
-
-  -- 5. Packet
-  local packet = uint16:pack(TLS_VERSION) .. random .. "\x00" .. ciphers .. compression .. extensions
-  packet = uint8:pack(HANDSHAKE_TYPES.ClientHello) .. uint24:pack(#packet) .. packet
-  return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#packet) .. packet, random
-end
-
 hsDecoders[HANDSHAKE_TYPES.ServerHello] = function(data)
   -- [Version: 2] [Random: 32 = [ [GMT Unix time: 4] [RANDOM: 28] ] ] [Session ID: [Length: 1] ] [Cipher: 2] [Compression: 1] [Extensions: [Length: 2] = [ [Type: 2] [Data: [Length: 2] ] ] ]
   local result = {}
@@ -269,7 +223,7 @@ hsDecoders[HANDSHAKE_TYPES.ServerHello] = function(data)
   return result
 end
 
-hsDecoders[HANDSHAKE_TYPES.ServerCertificate] = function(data)
+hsDecoders[HANDSHAKE_TYPES.Certificate] = function(data)
   -- [Certificates: [Length: 3] = [ [Certificate 1: [Length: 3] ] [Certificate 2: [Length: 3] ] … ] ]
   len = uint24:unpack(read(data, 3))
   result.certificates = {}
@@ -368,38 +322,10 @@ hsDecoders[HANDSHAKE_TYPES.ServerCertificate] = function(data)
   return result
 end
 
-local function parseServerHelloDone(data)
+hsDecoders[HANDSHAKE_TYPES.ServerHelloDone] = function(data)
   -- [Empty]
   -- The body is empty, len is always 0
   return {}
-end
-
-local function packetClientKeyExchange(packet, publicKey)
-  -- [HANDSHAKE code: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [Encrypted PreMasterSecret: 48] ] ] ]
-  local preMasterSecret = {[0] = uint16:pack(TLS_VERSION) .. getRandom(46)}
-  local encryptedPreMasterSecret = encryptRSA(preMasterSecret[0], publicKey)
-  local result = uint8:pack(HANDSHAKE_TYPES.ClientKeyExchange) .. uint24:pack(#encryptedPreMasterSecret) .. encryptedPreMasterSecret
-  return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#result) .. result, {
-    preMasterSecret = preMasterSecret
-  }
-end
-
-local function generateMasterSecret(preMasterSecret, clientRandom, serverRandom, prf)
-  local result = prf(preMasterSecret[0], "master secret", clientRandom .. serverRandom)
-  preMasterSecret[0] = nil
-  return result
-end
-
-local function packetChangeCipherSpec()
-  -- [ChangeCipherSpec code: 1] [TLS version: 2] [Body: [Length: 2] = [ [ChangeCipherSpec message: 1] ] ]
-  return uint8:pack(CHANGE_CIPHER_SPEC_CODE) .. uint16:pack(TLS_VERSION) .. "\x00\x01\x01"
-end
-
-local function packetClientFinished(packets, masterSecret, prf, hashHMAC)
-  -- [HANDSHAKE code: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [Encrypted data] ] ] ]
-  local data = prf(masterSecret, "client finished", hashHMAC(table.concat(packets)))
-  local result = uint8:pack(HANDSHAKE_TYPES.Finished) .. uint24:pack(#data) .. data
-  return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#result) .. result
 end
 
 local function HMAC(hash, blockLength)
@@ -543,8 +469,13 @@ local function parseHandshakeMessages(record)
     end
     local len = uint24:unpack(read(data, 3))
     local hsData = read(data, len)
-    result[#result+1] = hsDecoders[handshakeType](hsData)
+    result[#result+1] = {
+      handshakeType = handshakeType,
+      length = len,
+      data = hsData
+    }
   end
+  return result
 end
 
 local function createTLSCompressed(tlsPlaintext, compression)
@@ -589,7 +520,7 @@ local function createTLSCompressed(tlsPlaintext, compression)
 end
 
 -- Only supports block ciphers
-local function createCipherMac(isBlock, cipherEncrypt, cipherDecrypt, mac, iv, ivLen, cipherBlockLength, macBlockLength, cipherKey, macKey)
+local function createCipherMac(isBlock, cipherEncrypt, cipherDecrypt, mac, iv, ivLen, cipherBlockLength, macBlockLength, keyLength, macKeyLength, cipherKey, macKey)
   assert(type(cipherEncrypt) == "function", "bad value for `cipherEncrypt`: function expected")
   assert(type(cipherDecrypt) == "function", "bad value for `cipherDecrypt`: function expected")
   assert(type(mac) == "function", "bad value for `mac`: function expected")
@@ -598,6 +529,8 @@ local function createCipherMac(isBlock, cipherEncrypt, cipherDecrypt, mac, iv, i
   assert(type(macBlockLength) == "number", "bad value for `macBlockLength`: number expected")
   assert(type(iv) == "function", "bad value for `iv`: function expected")
   assert(type(isBlock) == "boolean", "bad value for `isBlock`: boolean expected")
+  assert(type(keyLength) == "number", "bad value for `keyLength`: number expected")
+  assert(type(macKeyLength) == "number", "bad value for `macKeyLength`: number expected")
   assert(({"string", "nil"})[type(cipherKey)], "bad value for `cipherKey`: string or nil expected")
   assert(({"string", "nil"})[type(macKey)], "bad value for `macKey`: string or nil expected")
   if cipherKey and not macKey or macKey and not cipherKey then
@@ -609,40 +542,52 @@ local function createCipherMac(isBlock, cipherEncrypt, cipherDecrypt, mac, iv, i
   end
   return setmetatable({}, {
     __index = {
+      isBlock = isBlock,
       cipherEncrypt = cipherEncrypt,
       cipherDecrypt = cipherDecrypt,
       mac = mac,
-      cipherKey = cipherKey,
-      macKey = macKey,
-      ivLength = ivLength,
+      iv = iv,
+      ivLength = ivLen,
       cipherBlockLength = cipherBlockLength,
-      macBlockLength = macBlockLength
+      macBlockLength = macBlockLength,
+      keyLength = keyLength,
+      macKeyLength = macKeyLength,
+      cipherKey = cipherKey,
+      macKey = macKey
     },
     __newindex = function(self, k, v)
       error("the struct is read-only")
     end,
     __pairs = function(self)
       return pairs({
-        cipher = cipher,
+        isBlock = isBlock,
+        cipherEncrypt = cipherEncrypt,
+        cipherDecrypt = cipherDecrypt,
         mac = mac,
-        cipherKey = cipherKey,
-        macKey = macKey,
-        ivGen = iv,
-        ivLength = ivLength,
+        iv = iv,
+        ivLength = ivLen,
         cipherBlockLength = cipherBlockLength,
         macBlockLength = macBlockLength,
-        isBlock = isBlock
+        keyLength = keyLength,
+        macKeyLength = macKeyLength,
+        cipherKey = cipherKey,
+        macKey = macKey
       })
     end,
     __ipairs = function(self)
       return ipairs({
-        cipher = cipher,
+        isBlock = isBlock,
+        cipherEncrypt = cipherEncrypt,
+        cipherDecrypt = cipherDecrypt,
         mac = mac,
-        cipherKey = cipherKey,
-        macKey = macKey,
-        ivLength = ivLength,
+        iv = iv,
+        ivLength = ivLen,
         cipherBlockLength = cipherBlockLength,
-        macBlockLength = macBlockLength
+        macBlockLength = macBlockLength,
+        keyLength = keyLength,
+        macKeyLength = macKeyLength,
+        cipherKey = cipherKey,
+        macKey = macKey
       })
     end,
     __call = function(self, cipherKeyArg, macKeyArg)
@@ -651,6 +596,7 @@ local function createCipherMac(isBlock, cipherEncrypt, cipherDecrypt, mac, iv, i
         assert(type(macKeyArg) == "string", "bad value for `macKey`: string expected")
         cipherKey = cipherKeyArg
         macKey = macKeyArg
+        return self
       end
     end
   })
@@ -754,12 +700,12 @@ local function createAlert(alert)
 end
 
 -- Splits the data so that each part's length isn't more than 16383 bytes
-local function splitData(contentType, version, data)
+local function splitData(contentType,  data)
   local data = {[0] = data}
   local result = {}
   while #data[0] > 0 do
     local fragment = read(data, 2^14 - 1)
-    result[#result+1] = createTLSPlaintext(contentType, version, #fragment, fragment)
+    result[#result+1] = createTLSPlaintext(contentType, fragment)
   end
   return result
 end
@@ -782,6 +728,8 @@ local ciphers = {
     0, -- ivLen
     0, -- cipherBlockLength
     0, -- macBlockLength
+    0, -- keyLength
+    0, -- macKeyLength
     "", -- cipherKey
     "" -- macKey
   )
@@ -797,7 +745,7 @@ local function newStateManager()
     __index = {
       -- Splits data into records, compresses each one, encrypts and returns them
       TLSRecord = function(self, contentType, data)
-        local plaintextRecords = splitData(contentType, TLS_VERSION, data)
+        local plaintextRecords = splitData(contentType, data)
         local compressedRecords = {}
         for k, record in pairs(plaintextRecords) do
           compressedRecords[k] = createTLSCompressed(record, self.compression)
@@ -812,6 +760,96 @@ local function newStateManager()
       end
     }
   })
+end
+
+local function createHandshakePacket(code, data)
+  assert(HANDSHAKE_TYPES[code], "unknown handshake code")
+  return uint8:pack(code) .. uint24:pack(#data) .. data
+end
+
+local function packetClientHello(ciphersA, compressionA, extensionsA)
+  -- [Version: 2] [Random: 32 = [GMT Unix time: 4] [RANDOM: 28] ] [Session ID: [Length: 1] = [Session ID] ] [Ciphers: [Length: 2] = [ [Cipher 1: 2] [Cipher 2: 2] … ] ] [Compression: [Length: 1] = [ [Method 1: 1] [Method 2: 1] … ] ] [Extensions: [Length: 2] = [ [Extension 1: … = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ]
+
+  -- 1. Random
+  local random = ""
+  do
+    local time = getRealTime("%s")
+    local rand = genRandom(28)
+    random = uint32:pack(time) .. rand
+  end
+
+  -- 2. Ciphers
+  local ciphers = ""
+  do
+    local c = ciphersA or {
+      "\x00\x2f" -- TLS_RSA_WITH_AES_128_CBC_SHA
+    }
+    ciphers = uint16:pack(#c * 2) .. table.concat(c)
+  end
+
+  -- 3. Compression
+  local compression = ""
+  do
+    local c = compressionA or {
+      "\x00" -- No compression
+    }
+    compression = uint8:pack(#c * 2) .. table.concat(c)
+  end
+
+  -- 4. Extensions
+  local extensions = ""
+  do
+    local c = extensionsA or {
+      {"\x00\x0d", "\x00\x02\x06\x01"} -- signature_algorithms: SHA512 + RSA
+    }
+    for i, j in pairs(c) do
+      c[i] = table.concat(j)
+    end
+    extensions = uint16:pack(#table.concat(c)) .. table.concat(c)
+  end
+
+  -- 5. Packet
+  local packet = uint16:pack(TLS_VERSION) .. random .. "\x00" .. ciphers .. compression .. extensions
+  return createHandshakePacket(HANDSHAKE_TYPES.ClientHello, packet), random
+end
+
+local function packetClientCertificate(certificates)
+  local packet = ""
+  for _, cert in ipairs(certificates) do
+    packet = packet .. uint24:pack(#cert) .. cert
+  end
+  return createHandshakePacket(HANDSHAKE_TYPES.Certificate, uint24:pack(#packet) .. packet)
+end
+
+local function packetClientKeyExchange(publicKey, rsaCrypt)
+  -- [Encrypted PreMasterSecret: 48]
+  local preMasterSecret = {[0] = uint16:pack(TLS_VERSION) .. getRandom(46)}
+  local encryptedPreMasterSecret = rsaCrypt(preMasterSecret[0], publicKey)
+  return createHandshakePacket(HANDSHAKE_TYPES.ClientKeyExchange, encryptedPreMasterSecret), {[0] = preMasterSecret}
+end
+
+local function generateMasterSecret(preMasterSecret, clientRandom, serverRandom, prf)
+  local result = prf(preMasterSecret[0], "master secret", clientRandom .. serverRandom)
+  preMasterSecret[0] = nil
+  return result
+end
+
+local function packetChangeCipherSpec()
+  -- [ChangeCipherSpec message: 1]
+  return "\x01"
+end
+
+local function packetClientFinished(packets, masterSecret, prf, hashHMAC)
+  -- [Encrypted data]
+  -- The data will be encrypted by the state manager,
+  -- so we'll create a plaintext record.
+  local data = prf(masterSecret, "client finished", hashHMAC(table.concat(packets)))
+  return createHandshakePacket(HANDSHAKE_TYPES.Finished, data), data
+end
+
+local function alertClose(close, alert)
+  close(alert)
+  error((alert.fatal and "Fatal alert" or "Alert") .. " [" .. alert.code .. "] " .. (alert.description or "no description"))
 end
 
 -- Makes sure the connection is always properly closed.
@@ -859,8 +897,20 @@ local function wrapSocket(sock)
     if isClosed then
       return nil, "socket is closed"
     end
-    local data = {pcall(sock.read, n)}
-    return table.unpack(data, 2)
+    if not ({"number", "nil"})[type(n)] then
+      return nil, "bad argument #1: number or nil expected"
+    end
+    if n then
+      local data = ""
+      repeat
+        local chunk = sock.read()
+        if chunk then
+          data = data .. chunk
+        end
+      until not chunk
+      return data
+    end
+    return sock.read(n)
   end
   local function read()
     if isClosed then
@@ -874,16 +924,26 @@ local function wrapSocket(sock)
         local result = {pcall(readTLSCiphertext, record, stateMgr.seqNum, stateMgr.cipher, stateMgr.compression)}
         if not result[1] then
           if result[2].__name == "Alert" then
-            if result[2].fatal then
-              close(result[2])
-              error("Fatal alert: [" .. ALERTS[result[2].code] .. "] " .. (result[2].description or "no description"))
-            else
-              write(TLS_CONTENT_TYPES.Alert, createAlert(result[2]))
-              return nil, "Alert: [" .. ALERTS[result[2].code] .. "] " .. (result[2].description or "no description")
-            end
+            alertClose(result[2])
           end
         end
         decryptedRecords[k] = result[2]
+        if result[2].contentType == TLS_CONTENT_TYPES.Alert then
+          local alertData = {[0] = result[2].data}
+          local fatal, code = read(alertData, 1), read(alertData, 1)
+          if not fatal or fatal == "" or not code or code == "" then
+            close(Alert(true, ALERTS.decode_error))
+            error("Could not decode the alert")
+          end
+          if fatal then
+            close(Alert(fatal, code))
+            if code ~= ALERTS.close_notify then
+              error("Fatal alert sent by the server: " .. ALERTS[result[2].code])
+            else
+              return nil, "closed by the server"
+            end
+          end
+        end
         records[k] = nil
       end
       return decryptedRecords
@@ -895,8 +955,164 @@ local function wrapSocket(sock)
     socket.close()
     isClosed = true
   end
+
+  local handshakePackets = {}
+
+  -- ClientHello
+  local packet, clientRandom = packetClientHello()
+  write(TLS_CONTENT_TYPES.Handshake, packet)
+  table.insert(handshakePackets, packet)
+
+  -- ServerHello, Certificate, ServerKeyExchange*, CertificateRequest*, ServerHelloDone
+  local record = read()
+  local serverHello
+  if #record > 1 then
+    alertClose(Alert(true, ALERTS.unexpected_message, "too many records were recieved"))
+  end
+  record = record[1]
+  if record.contentType ~= TLS_CONTENT_TYPES.Handshake then
+    alertClose(Alert(true, ALERTS.unexpected_message, "unexpected message was sent by the server"))
+  end
+  local handshakeMessages = parseHandshakeMessages(record)
+  while handshakeMessages[1].handshakeType == HANDSHAKE_TYPES.HelloRequest do
+    -- Ignore HelloRequest messages.
+    table.remove(handshakeMessages, 1)
+  end
+  if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.ServerHello then
+    alertClose(Alert(true, ALERTS.unexpected_message, "unexpected handshake message was sent by the server"))
+  end
+  local result, serverHello = pcall(hsDecoders[handshakeMessages[1].handshakeType], handshakeMessages[1].data)
+  if not result then
+    if type(serverHello) == "table" and serverHello.__name == "Alert" then
+      alertClose(serverHello)
+    else
+      alertClose(Alert(true, ALERTS.internal_error, tostring(serverHello)))
+    end
+  end
+  table.insert(handshakePackets, handshakeMessages[1].data)
+  table.remove(handshakeMessages, 1)
+  if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Certificate then
+    alertClose(Alert(true, ALERTS.unexpected_message, "unexpected handshake message was sent by the server"))
+  end
+  local result, serverCertificate = pcall(hsDecoders[handshakeMessages[1].handshakeType], handshakeMessages[1].data)
+  if not result then
+    if type(serverCertificate) == "table" and serverCertificate.__name == "Alert" then
+      alertClose(serverCertificate)
+    else
+      alertClose(Alert(true, ALERTS.internal_error, tostring(serverCertificate)))
+    end
+  end
+  table.insert(handshakePackets, handshakeMessages[1].data)
+  table.remove(handshakeMessages, 1)
+  if handshakeMessages[1].handshakeType == HANDSHAKE_TYPES.ServerKeyExchange then
+    alertClose(Alert(true, ALERTS.unexpected_message, "the server sent ServerKeyExchange message, which isn't legal with RSA"))
+  end
+  local certificateRequested = false
+  if handshakeMessages[1].handshakeType == HANDSHAKE_TYPES.CertificateRequest then
+    -- don't parse, as we won't need that data: we aren't gonna send any certificate
+    certificateRequested = true
+    table.insert(handshakePackets, handshakeMessages[1].data)
+    table.remove(handshakeMessage, 1)
+  end
+  if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.ServerHelloDone then
+    alertClose(Alert(true, ALERTS.unexpected_message, "the server sent unexpected message"))
+  end
+  local result, serverHelloDone = pcall(hsDecoders[handshakeMessages[1].handshakeType], handshakeMessages[1].data)
+  if not result then
+    if type(serverHelloDone) == "table" and serverHelloDone.__name == "Alert" then
+      alertClose(serverHelloDone)
+    else
+      alertClose(Alert(true, ALERTS.internal_error, tostring(serverHelloDone)))
+    end
+  end
+
+  -- ClientCertificate
+  if certificateRequested then
+    local clientCertificate = packetClientCertificate({})
+    write(TLS_CONTENT_TYPES.Handshake, clientCertificate)
+    table.insert(handshakePackets, clientCertificate)
+  end
+
+  -- ClientKeyExchange
+  local clientKeyExchange, preMasterSecret = packetClientKeyExchange(serverCertificate[1].certificate.subjectPublicKeyInfo.subjectPublicKey, rsaCrypt)
+  write(TLS_CONTENT_TYPES.Handshake, clientKeyExchange)
+  table.insert(handshakePackets, clientKeyExchange)
+
+  -- CertificateVerify -- omitted
+
+  -- Master secret generation
+  local serverRandom = uint32:pack(serverHello.random.time) .. serverHello.random.random
+  local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, prf)
+
+  local cipherRsaAesSha = "TLS_RSA_WITH_AES_128_CBC_SHA"
+
+  -- Key block
+  local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, prf, ciphers[cipherRsaAesSha].macKeyLength, ciphers[cipherRsaAesSha].keyLength, ciphers[cipherRsaAesSha].ivLength)
+
+  -- [ChangeCipherSpec]
+  -- Updates the state
+  write(TLS_CONTENT_TYPES.ChangeCipherSpec, packetChangeCipherSpec())
+  stateMgr.cipher = ciphers.TLS_RSA_WITH_AES_128_CBC_SHA(keys.clientWriteKey, keys.clientWriteMACKey)
+
+  -- Client Finished
+  local clientFinished = packetClientFinished(handshakePackets, masterSecret, prf, hashHMAC)
+  write(TLS_CONTENT_TYPES.Handshake, clientFinished)
+  table.insert(handshakePackets, clientFinished)
+
+  -- [ChangeCipherSpec]
+  local records = read()
+  if records[1].contentType ~= TLS_CONTENT_TYPES.ChangeCipherSpec then
+    alertClose(Alert(true, ALERTS.unexpected_message, "ChangeCipherSpec message was expected"))
+  end
+
+  -- Server Finished
+  if records[2].contentType ~= TLS_CONTENT_TYPES.Handshake then
+    alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
+  end
+  result, handshakeMessages = pcall(parseHandshakeMessages, records[2])
+  if not result then
+    if type(handshakeMessages) == "table" and handshakeMessages.__name == "Alert" then
+      alertClose(handshakeMessages)
+    else
+      alertClose(Alert(true, ALERTS.internal_error))
+    end
+  end
+  if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Finished then
+    alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
+  end
+  local _, expectedServerFinished = packetClientFinished(handshakePackets, masterSecret, prf, hashHMAC)
+  if expectedServerFinished ~= handshakeMessages[1].data then
+    alertClose(Alert(true, ALERTS.handshake_failture, "expected server finished isn't equal to the recieved one"))
+  end
+
+  -- FINALLY, the handshake is over.
+  -- Return a table of functions.
+  return {
+    write = function(data)
+      return write(TLS_CONTENT_TYPES.ApplicationData, data)
+    end,
+    read = function()
+      local packets = read()
+      local data = ""
+      for _, packet in ipairs(packets) do
+        data = data .. packet.data
+      end
+      return data
+    end,
+    close = function()
+      close()
+    end,
+    id = function()
+      return sock.id()
+    end
+  }
 end
 
 local function newTLSSocket(url)
   local socket = wrapSocket(inet.connect(url))
+  return socket
 end
+
+return {
+  tlsSocket = newTLSSocket
+}
