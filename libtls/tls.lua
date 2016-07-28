@@ -13,7 +13,7 @@ end
 
 local function isin(tbl, value)
   for k, v in pairs(tbl) do
-    if v = value then
+    if v == value then
       return true, k
     end
   end
@@ -135,6 +135,34 @@ local x509oid = {
   ['42.840.113549.1.1.12'] = 'sha384WithRsaEncryption',
   ['42.840.113549.1.1.13'] = 'sha512WithRSAEncryption'
 }
+
+local ALERTS = enum({
+  close_notify = 0,
+  unexpected_message = 10,
+  bad_record_mac = 20,
+  decryption_failed_RESERVED = 21,
+  record_overflow = 22,
+  decompression_failture = 30,
+  handshake_failture = 40,
+  no_certificate_RESERVED = 41,
+  bad_certificate = 42,
+  unsupported_certificate = 43,
+  certificate_revoked = 44,
+  certificate_expired = 45,
+  certificate_unknown = 46,
+  illegal_parameter = 47,
+  unknown_ca = 48,
+  access_denied = 49,
+  decode_error = 50,
+  decrypt_error = 51,
+  export_restriction_RESERVED = 60,
+  protocol_version = 70,
+  insufficient_security = 71,
+  internal_error = 80,
+  user_canceled = 90,
+  no_renegotiation = 100,
+  unsupported_extension = 110
+})
 
 local function read(ts, len)
   local s = ts[0]
@@ -397,6 +425,8 @@ local function PRF(pHash)
   end
 end
 
+local Alert
+
 local function generateKeyBlock(masterSecret, clientRandom, serverRandom, prf, macKeyLen, keyLen, ivLength)
   local totalLen = keyLen * 2 + macKeyLen * 2 + (ivLength and ivLength * 2 or 0)
   local data = ""
@@ -550,7 +580,24 @@ local function createTLSCompressed(tlsPlaintext, compression)
 end
 
 -- Only supports block ciphers
-local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, macKey, ivLen, cipherBlockLength, macBlockLength)
+local function createCipherMac(isBlock, cipherEncrypt, cipherDecrypt, mac, iv, ivLen, cipherBlockLength, macBlockLength, cipherKey, macKey)
+  assert(type(cipherEncrypt) == "function", "bad value for `cipherEncrypt`: function expected")
+  assert(type(cipherDecrypt) == "function", "bad value for `cipherDecrypt`: function expected")
+  assert(type(mac) == "function", "bad value for `mac`: function expected")
+  assert(type(ivLen) == "number", "bad value for `ivLen`: number expected")
+  assert(type(cipherBlockLength) == "number", "bad value for `cipherBlockLength`: number expected")
+  assert(type(macBlockLength) == "number", "bad value for `macBlockLength`: number expected")
+  assert(type(iv) == "function", "bad value for `iv`: function expected")
+  assert(type(isBlock) == "boolean", "bad value for `isBlock`: boolean expected")
+  assert(({"string", "nil"})[type(cipherKey)], "bad value for `cipherKey`: string or nil expected")
+  assert(({"string", "nil"})[type(macKey)], "bad value for `macKey`: string or nil expected")
+  if cipherKey and not macKey or macKey and not cipherKey then
+    error("both keys are expected to be provided")
+  end
+  local setKeys = false
+  if cipherKey and macKey then
+    setKeys = true
+  end
   return setmetatable({}, {
     __index = {
       cipherEncrypt = cipherEncrypt,
@@ -571,9 +618,11 @@ local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, mac
         mac = mac,
         cipherKey = cipherKey,
         macKey = macKey,
+        ivGen = iv,
         ivLength = ivLength,
         cipherBlockLength = cipherBlockLength,
-        macBlockLength = macBlockLength
+        macBlockLength = macBlockLength,
+        isBlock = isBlock
       })
     end,
     __ipairs = function(self)
@@ -586,6 +635,14 @@ local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, mac
         cipherBlockLength = cipherBlockLength,
         macBlockLength = macBlockLength
       })
+    end,
+    __call = function(self, cipherKeyArg, macKeyArg)
+      if not setKeys then
+        assert(type(cipherKeyArg) == "string", "bad value for `cipherKey`: string expected")
+        assert(type(macKeyArg) == "string", "bad value for `macKey`: string expected")
+        cipherKey = cipherKeyArg
+        macKey = macKeyArg
+      end
     end
   })
 end
@@ -594,11 +651,13 @@ end
 local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
   local contentType, version, length, data = tlsCompressed.contentType, tlsCompressed.version, tlsCompressed.length, tlsCompressed.data
   seqNum.write = seqNum.write + 1
-  local iv = getRandom(cipherMac.ivLength)
   local mac = cipherMac.mac(cipherMac.macKey, number2bytes(seqNum.write) .. uint8:pack(contentType) .. uint16:pack(version) .. data)
   local cipherData = data .. mac
-  local padding = (#cipheredData + 1) % cipherMac.cipherBlockLength
-  cipherData = cipherData .. uint8:pack(padding):rep(padding + 1)
+  local iv = cipherMac.ivGen()
+  if cipherMac.blockCipher then
+    local padding = (#cipheredData + 1) % cipherMac.cipherBlockLength
+    cipherData = cipherData .. uint8:pack(padding):rep(padding + 1) .. uint8:pack(padding)
+  end
   local encryptedData = iv .. cipherMac.cipherEncrypt(cipherData, cipherMac.cipherKey, iv)
   return setmetatable({}, {
     __index = {
@@ -635,11 +694,16 @@ end
 -- Only supports block ciphers
 local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   local contentType, version, length, encryptedDataWithIV = record.contentType, record.version, record.length, record.fragment
+  assert(length <= 2^14 + 2048, Alert(true, ALERTS.record_overflow))
   local iv = encryptedDataWithIV:sub(1, cipherMac.ivLength)
   local encryptedData = encryptedDataWithIV:sub(cipherMac.ivLength + 1, -1)
   local cipherData = cipherMac.cipherDecrypt(encryptedData, cipherMac.cipherKey, iv)
-  local padding = cipherData:sub(-1, -1)
-  local dataWithMac = cipherData:sub(1, -uint8:unpack(padding) - 1)
+  local dataWithMac = cipherData
+  local padding
+  if cipherMac.isBlock then
+    padding = cipherData:sub(-1, -1)
+    dataWithMac = cipherData:sub(1, -uint8:unpack(padding) - 1)
+  end
   local compressedData = dataWithMac:sub(1, -cipherMac.macBlockLength - 1)
   local recordMac = dataWithMac:sub(-cipherMac.macBlockLength, -1)
   seqNum.read = seqNum.read + 1
@@ -647,8 +711,10 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   if mac ~= recordMac then
     error("the given MAC and the computed MAC don't match!")
   end
-  if dataWithMac:sub(-uint8:unpack(padding) - 1, -2) ~= padding:rep(uint8:unpack(padding)) then
-    error("bad padding!")
+  if cipherMac.isBlock then
+    if dataWithMac:sub(-uint8:unpack(padding) - 1, -2) ~= padding:rep(uint8:unpack(padding)) then
+      error("bad padding!")
+    end
   end
   local data
   if compression == "\x00" then
@@ -657,4 +723,73 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
     error(("unknown compression type: %x"):format(compression:byte()))
   end
   return createTLSPlaintext(contentType, version, length, data)
+end
+
+function Alert(fatal, code)
+  assert(ALERTS[code], "unknown alert")
+  return {
+    fatal = fatal,
+    code = code
+  }
+end
+
+-- Splits the data so that each part's length isn't more than 16383 bytes
+local function splitData(contentType, version, data)
+  local data = {[0] = data}
+  local result = {}
+  while #data[0] > 0 do
+    local fragment = read(data, 2^14 - 1)
+    result[#result+1] = createTLSPlaintext(contentType, version, #fragment, fragment)
+  end
+  return result
+end
+
+local ciphers = {
+  TLS_NULL_WITH_NULL_NULL = createCipherMac(
+    false -- isBlock
+    function(data, key, iv) -- cipherEncrypt
+      return data
+    end,
+    function(data, key, iv) -- cipherDecrypt
+      return data
+    end,
+    function(secret, data) -- mac
+      return ""
+    end,
+    function() -- iv
+      return ""
+    end,
+    0, -- ivLen
+    0, -- cipherBlockLength
+    0, -- macBlockLength
+    "", -- cipherKey
+    "" -- macKey
+  )
+}
+
+-- Stores current cipher
+local function newStateManager()
+  return setmetatable({
+    cipher = ciphers.TLS_NULL_WITH_NULL_NULL,
+    compression = "\x00",
+    seqNum = newSequenceNum()
+  }, {
+    __index = {
+      -- Splits data into records, compresses each one, encrypts and returns them
+      TLSRecord = function(self, contentType, data)
+        local plaintextRecords = splitData(contentType, TLS_VERSION, data)
+        local compressedRecords = {}
+        for k, record in pairs(plaintextRecords) do
+          compressedRecords[k] = createTLSCompressed(record, self.compression)
+          plaintextRecords[k] = nil
+        end
+        local encryptedRecords = {}
+        for k, record in pairs(compressedRecords) do
+          encryptedRecords[k] = createTLSCiphertext(record, self.seqNum, self.cipher)
+          compressedRecords[k] = nil
+        end
+        return encryptedRecords
+      end
+    }
+  })
 end
