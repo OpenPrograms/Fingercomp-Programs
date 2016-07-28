@@ -551,10 +551,6 @@ end
 
 -- Only supports block ciphers
 local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, macKey, ivLen, cipherBlockLength, macBlockLength)
-  local iv = ivLen
-  if type(ivLen) == "number" then
-    iv = getRandom(ivLen)
-  end
   return setmetatable({}, {
     __index = {
       cipherEncrypt = cipherEncrypt,
@@ -562,7 +558,7 @@ local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, mac
       mac = mac,
       cipherKey = cipherKey,
       macKey = macKey,
-      iv = iv,
+      ivLength = ivLength,
       cipherBlockLength = cipherBlockLength,
       macBlockLength = macBlockLength
     },
@@ -575,7 +571,7 @@ local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, mac
         mac = mac,
         cipherKey = cipherKey,
         macKey = macKey,
-        iv = iv,
+        ivLength = ivLength,
         cipherBlockLength = cipherBlockLength,
         macBlockLength = macBlockLength
       })
@@ -586,8 +582,9 @@ local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, mac
         mac = mac,
         cipherKey = cipherKey,
         macKey = macKey,
-        iv = iv,
-        cipherBlockLength = cipherBlockLength
+        ivLength = ivLength,
+        cipherBlockLength = cipherBlockLength,
+        macBlockLength = macBlockLength
       })
     end
   })
@@ -597,11 +594,12 @@ end
 local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
   local contentType, version, length, data = tlsCompressed.contentType, tlsCompressed.version, tlsCompressed.length, tlsCompressed.data
   seqNum.write = seqNum.write + 1
+  local iv = getRandom(cipherMac.ivLength)
   local mac = cipherMac.mac(cipherMac.macKey, number2bytes(seqNum.write) .. uint8:pack(contentType) .. uint16:pack(version) .. data)
   local cipherData = data .. mac
   local padding = (#cipheredData + 1) % cipherMac.cipherBlockLength
   cipherData = cipherData .. uint8:pack(padding):rep(padding + 1)
-  local encryptedData = cipherMac.cipherEncrypt(cipherData, cipherMac.cipherKey, cipherMac.iv)
+  local encryptedData = iv .. cipherMac.cipherEncrypt(cipherData, cipherMac.cipherKey, iv)
   return setmetatable({}, {
     __index = {
       packet = function(self)
@@ -636,8 +634,10 @@ end
 
 -- Only supports block ciphers
 local function readTLSCiphertext(record, seqNum, cipherMac, compression)
-  local contentType, version, length, encryptedData = record.contentType, record.version, record.length, record.fragment
-  local cipherData = cipherMac.cipherDecrypt(encryptedData, cipherMac.cipherKey, cipherMac.iv)
+  local contentType, version, length, encryptedDataWithIV = record.contentType, record.version, record.length, record.fragment
+  local iv = encryptedDataWithIV:sub(1, cipherMac.ivLength)
+  local encryptedData = encryptedDataWithIV:sub(cipherMac.ivLength + 1, -1)
+  local cipherData = cipherMac.cipherDecrypt(encryptedData, cipherMac.cipherKey, iv)
   local padding = cipherData:sub(-1, -1)
   local dataWithMac = cipherData:sub(1, -uint8:unpack(padding) - 1)
   local compressedData = dataWithMac:sub(1, -cipherMac.macBlockLength - 1)
