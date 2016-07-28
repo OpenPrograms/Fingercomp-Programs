@@ -1,4 +1,9 @@
+local component = require("component")
+
 local derdecode = require("der-decoder")
+
+local data = component.data
+local inet = component.internet
 
 local VERSION = 0x0303
 
@@ -187,6 +192,10 @@ local function bytes2number(bytes)
     result = (result << 8) | bytes:sub(i, i):byte()
   end
   return result
+end
+
+local function getRandom(len)
+  return data.random(len)
 end
 
 local function packageClientHello(ciphersA, compressionA, extensionsA)
@@ -705,6 +714,7 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
     dataWithMac = cipherData:sub(1, -uint8:unpack(padding) - 1)
   end
   local compressedData = dataWithMac:sub(1, -cipherMac.macBlockLength - 1)
+  assert(#cipherData <= 2^14 + 1024, Alert(true, ALERTS.record_overflow))
   local recordMac = dataWithMac:sub(-cipherMac.macBlockLength, -1)
   seqNum.read = seqNum.read + 1
   local mac = cipherMac.mac(cipherMac.macKey, number2bytes(seqNum.read) .. uint8:pack(contentType) .. uint16:pack(version) .. data)
@@ -722,15 +732,25 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   else
     error(("unknown compression type: %x"):format(compression:byte()))
   end
+  assert(#data <= 2^14 - 1, Alert(true, ALERTS.record_overflow))
   return createTLSPlaintext(contentType, version, length, data)
 end
 
-function Alert(fatal, code)
+function Alert(fatal, code, description)
   assert(ALERTS[code], "unknown alert")
-  return {
+  return setmetatable({
     fatal = fatal,
-    code = code
-  }
+    code = code,
+    description = description
+  }, {
+    __index = {
+      __name = "Alert"
+    }
+  })
+end
+
+local function createAlert(alert)
+  return uint8:pack(alert.fatal and 2 or 1) .. uint8:pack(alert.code)
 end
 
 -- Splits the data so that each part's length isn't more than 16383 bytes
@@ -792,4 +812,91 @@ local function newStateManager()
       end
     }
   })
+end
+
+-- Makes sure the connection is always properly closed.
+-- Also begins a handshake.
+local function wrapSocket(sock)
+  local connected, reason = false, nil
+  for i = 1, 100, 1 do
+    connected, reason = sock.finishConnect()
+    if connected then
+      break
+    end
+    os.sleep(.05)
+  end
+  if not connected then
+    error("Could not connect to the server: " .. (reason and tostring(reason) or "unknown reason"))
+  end
+  local stateMgr = newStateManager()
+  local close
+  local isClosed = false
+  local function writeRaw(data)
+    if isClosed then
+      return nil, "socket is closed"
+    end
+    local result = {pcall(sock.write, data)}
+    if not result[1] then
+      close(Alert(true, ALERTS.internal_error))
+      error("socket.write error: " .. table.concat(table.pack(table.unpack(result, 2)), ", "))
+    end
+    return table.unpack(result, 2)
+  end
+  local function write(contentType, data)
+    if isClosed then
+      return nil, "socket is closed"
+    end
+    local recordResult = {pcall(stateMgr.TLSRecord, stateMgr, contentType, data)}
+    if not recordResult[1] then
+      close(Alert(true, ALERTS.internal_error))
+      error("an error occured while trying to create records: " .. table.concat(table.pack(table.unpack(recordResult, 2)), ", "))
+    end
+    for _, record in ipairs(records) do
+      writeRaw(record.packet())
+    end
+  end
+  local function readRaw(n)
+    if isClosed then
+      return nil, "socket is closed"
+    end
+    local data = {pcall(sock.read, n)}
+    return table.unpack(data, 2)
+  end
+  local function read()
+    if isClosed then
+      return nil, "socket is closed"
+    end
+    local data = readRaw()
+    if data and data ~= "" then
+      local records = parseTLSRecords(data)
+      local decryptedRecords = {}
+      for k, record in pairs(records) do
+        local result = {pcall(readTLSCiphertext, record, stateMgr.seqNum, stateMgr.cipher, stateMgr.compression)}
+        if not result[1] then
+          if result[2].__name == "Alert" then
+            if result[2].fatal then
+              close(result[2])
+              error("Fatal alert: [" .. ALERTS[result[2].code] .. "] " .. (result[2].description or "no description"))
+            else
+              write(TLS_CONTENT_TYPES.Alert, createAlert(result[2]))
+              return nil, "Alert: [" .. ALERTS[result[2].code] .. "] " .. (result[2].description or "no description")
+            end
+          end
+        end
+        decryptedRecords[k] = result[2]
+        records[k] = nil
+      end
+      return decryptedRecords
+    end
+  end
+  local function close(alert)
+    alert = alert or Alert(true, ALERTS.close_notify)
+    write(TLS_CONTENT_TYPES.Alert, createAlert(alert))
+    socket.close()
+    isClosed = true
+  end
+end
+
+local function newTLSSocket(url)
+  local socket = wrapSocket(inet.connect(url))
 end
