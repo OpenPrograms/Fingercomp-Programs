@@ -50,6 +50,8 @@ local HANDSHAKE_TYPES = enum({
   Finished = 0x14
 })
 
+local hsDecoders = {}
+
 local TLS_VERSION = 0x0303
 
 -- types
@@ -206,23 +208,9 @@ local function packageClientHello(ciphersA, compressionA, extensionsA)
   return uint8:pack(HANDSHAKE_CODE) .. uint16:pack(TLS_VERSION) .. uint16:pack(#packet) .. packet, random
 end
 
-local function parseServerHello(packet)
-  -- [HANDSHAKE CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Version: 2] [Random: 32 = [ [GMT Unix time: 4] [RANDOM: 28] ] ] [Session ID: [Length: 1] ] [Cipher: 2] [Compression: 1] [Extensions: [Length: 2] = [ [Type: 2] [Data: [Length: 2] ] ] ] ] ] ] ]
-  packet = {packet}
+hsDecoders[HANDSHAKE_TYPES.ServerHello] = function(data)
+  -- [Version: 2] [Random: 32 = [ [GMT Unix time: 4] [RANDOM: 28] ] ] [Session ID: [Length: 1] ] [Cipher: 2] [Compression: 1] [Extensions: [Length: 2] = [ [Type: 2] [Data: [Length: 2] ] ] ]
   local result = {}
-  result.tlsCode = uint8:unpack(read(packet, 1)) -- tls packet code (handshake expected)
-  if result.tlsCode ~= HANDSHAKE_CODE then
-    error("bad packet: wrong tls packet code")
-  end
-  result.tlsVersion = uint16:unpack(read(packet, 2))
-  local len = uint16:unpack(read(packet, 2))
-  local data = {read(packet, len)}
-  result.handshakeMsg = uint8:unpack(read(data, 1))
-  if result.handshakeMsg ~= HANDSHAKE_TYPES.ServerHello then
-    error("bad packet: wrong handshake message type")
-  end
-  len = uint24:unpack(read(data, 3))
-  data = {read(data, len)}
   result.tlsVersion = read(data, 2) -- version
   result.random = {}
   result.random.time = uint32:unpack(read(data, 4)) -- GMT Unix time
@@ -244,23 +232,8 @@ local function parseServerHello(packet)
   return result
 end
 
-local function parseServerCertificate(packet)
-  -- [HANDSHAKE CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] = [ [Certificates: [Length: 3] = [ [Certificate 1: [Length: 3] ] [Certificate 2: [Length: 3] ] … ] ] ] ] ] ]
-  packet = {packet}
-  local result = {}
-  result.tlsCode = uint8:unpack(read(packet, 1)) -- tls packet code (handshake expected)
-  if result.tlsCode ~= HANDSHAKE_CODE then
-    error("bad packet: wrong tls packet code")
-  end
-  result.tlsVersion = uint16:unpack(read(packet, 2))
-  local len = uint16:unpack(read(packet, 2))
-  local data = {read(packet, len)}
-  result.handshakeMsg = uint8:unpack(read(data, 1))
-  if result.handshakeMsg ~= HANDSHAKE_TYPES.ServerCertificate then
-    error("bad packet: wrong handshake message type")
-  end
-  len = uint24:unpack(read(data, 3))
-  data = {read(data, len)}
+hsDecoders[HANDSHAKE_TYPES.ServerCertificate] = function(data)
+  -- [Certificates: [Length: 3] = [ [Certificate 1: [Length: 3] ] [Certificate 2: [Length: 3] ] … ] ]
   len = uint24:unpack(read(data, 3))
   result.certificates = {}
   while #data[0] ~= 0 do
@@ -355,25 +328,13 @@ local function parseServerCertificate(packet)
     cert.signatureValue = certd[3]
     result.certificates[#result.certificates + 1] = cert
   end
+  return result
 end
 
-local function parseServerHelloDone(packet)
-  -- [HANDSHAKE CODE: 1] [TLS version: 2] [Body: [Length: 2] = [ [Handshake message type: 1] [Handshake message: [Length: 3] ] ] ]
-  packet = {packet}
-  local result = {}
-  result.tlsCode = uint8:unpack(read(packet, 1)) -- tls packet code (handshake expected)
-  if result.tlsCode ~= HANDSHAKE_CODE then
-    error("bad packet: wrong tls packet code")
-  end
-  result.tlsVersion = uint16:unpack(read(packet, 2))
-  local len = uint16:unpack(read(packet, 2))
-  local data = {read(packet, len)}
-  result.handshakeMsg = uint8:unpack(read(data, 1))
-  if result.handshakeMsg ~= HANDSHAKE_TYPES.ServerHelloDone then
-    error("bad packet: wrong handshake message type")
-  end
+local function parseServerHelloDone(data)
+  -- [Empty]
   -- The body is empty, len is always 0
-  return result
+  return {}
 end
 
 local function packetClientKeyExchange(packet, publicKey)
@@ -461,8 +422,8 @@ local function newSequenceNum()
 end
 
 local function createTLSPlaintext(contentType, data)
-  assert(type(data) == "string", "data of string type expected")
-  assert(type(contentType) == "number", "contentType of number type expected")
+  assert(type(data) == "string", "`data` argument of string type expected")
+  assert(type(contentType) == "number", "`contentType` argument of number type expected")
   assert(TLS_CONTENT_TYPES[contentType], "unknown content type")
   assert(contentType == 0x17 or #data ~= 0, "length of non-application data must not be 0")
   local version = TLS_VERSION
@@ -471,11 +432,11 @@ local function createTLSPlaintext(contentType, data)
   return setmetatable({}, {
     __index = {
       packet = function(self)
-        return uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. self.data
+        return uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. data
       end,
       contentType = contentType,
       version = version,
-      length = length
+      length = length,
       data = data
     },
     __newindex = function(self, k, v)
@@ -490,7 +451,7 @@ local function createTLSPlaintext(contentType, data)
       })
     end,
     __ipairs = function(self)
-      return pairs({
+      return ipairs({
         contentType = contentType,
         version = version,
         length = length,
@@ -503,7 +464,7 @@ end
 local function readRecord(s)
   local result = {}
   result.contentType = uint8:unpack(read(s, 1))
-  assert(TLS_CONTENT_TYPES[result.contentType], "record of unknown content type: " .. result.contentType)
+  assert(TLS_CONTENT_TYPES[result.contentType], "unknown record content type: " .. result.contentType)
   result.length = uint16:unpack(read(s, 2))
   result.fragment = read(s, result.length)
   return result
@@ -511,7 +472,7 @@ end
 
 -- Parses TLS records, and concatenates records of the same content type
 local function parseTLSRecords(packets)
-  assert(type(packets) == "string", "packets of string type expected")
+  assert(type(packets) == "string", "`packets` argument of string type expected")
   local result = {}
   local data = {[0] = packets}
   local prevRecord
@@ -529,4 +490,141 @@ local function parseTLSRecords(packets)
   end
   result[#result+1] = prevRecord
   return result
+end
+
+local function parseHandshakeMessages(record)
+  assert(type(record) == "table", "`record` argument of table type expected")
+  assert(record.contentType == TLS_CONTENT_TYPES.Handshake, "handshake record expected")
+  local data = {[0] = record.data}
+  local result = {}
+  while #data[0] > 0 do
+    local handshakeType = uint8:unpack(read(data, 1))
+    if not HANDSHAKE_TYPES[handshakeType] then
+      error("unknown handshake message type: " .. handshakeType)
+    end
+    local len = uint24:unpack(read(data, 3))
+    local hsData = read(data, len)
+    result[#result+1] = hsDecoders[handshakeType](hsData)
+  end
+end
+
+local function createTLSCompressed(tlsPlaintext, compression)
+  local contentType, version, length, data = tlsPlaintext.contentType, tlsPlaintext.version, tlsPlaintext.length, tlsPlaintext.data
+  if compression == "\x00" then -- No compression
+    -- do nothing
+  else
+    error("unknown compression algorithm")
+  end
+  length = #data
+  -- Prevent modification of struct to prevent screwups
+  return setmetatable({}, {
+    __index = {
+      packet = function(self)
+        return uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. data
+      end,
+      contentType = contentType,
+      version = version,
+      length = length,
+      data = data
+    },
+    __newindex = function(self, k, v)
+      error("the struct is read-only")
+    end,
+    __pairs = function(self)
+      return pairs({
+        contentType = contentType,
+        version = version,
+        length = length,
+        data = data
+      })
+    end,
+    __ipairs = function(self)
+      return ipairs({
+        contentType = contentType,
+        version = version,
+        length = length,
+        data = data
+      })
+    end
+  })
+end
+
+-- Only supports block ciphers
+local function createCipherMac(cipher, mac, cipherKey, macKey, ivLen, cipherBlockLength)
+  cipher, mac, cipherKey, macKey, ivLen, cipherBlockLength = copy(cipher), copy(mac), copy(cipherKey), copy(macKey), copy(ivLen), copy(cipherBlockLength)
+  local iv = getRandom(ivLen)
+  return setmetatable({}, {
+    __index = {
+      cipher = cipher,
+      mac = mac,
+      cipherKey = cipherKey,
+      macKey = macKey,
+      iv = iv,
+      cipherBlockLength = cipherBlockLength
+    },
+    __newindex = function(self, k, v)
+      error("the struct is read-only")
+    end,
+    __pairs = function(self)
+      return pairs({
+        cipher = cipher,
+        mac = mac,
+        cipherKey = cipherKey,
+        macKey = macKey,
+        iv = iv,
+        cipherBlockLength = cipherBlockLength
+      })
+    end,
+    __ipairs = function(self)
+      return ipairs({
+        cipher = cipher,
+        mac = mac,
+        cipherKey = cipherKey,
+        macKey = macKey,
+        iv = iv,
+        cipherBlockLength = cipherBlockLength
+      })
+    end
+  })
+end
+
+-- Only supports block ciphers
+local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
+  local contentType, version, length, data = tlsCompressed.contentType, tlsCompressed.version, tlsCompressed.length, tlsCompressed.data
+  seqNum.write = seqNum.write + 1
+  local mac = cipherMac.mac(cipherMac.macKey, number2bytes(seqNum.write) .. uint8:pack(contentType) .. uint16:pack(version) .. data)
+  local cipherData = data .. mac
+  local padding = (#cipheredData + 1) % cipherMac.cipherBlockLength
+  cipherData = cipherData .. uint8:pack(padding):rep(padding + 1)
+  local encryptedData = cipherMac.cipher(cipherData, cipherMac.cipherKey, cipherMac.iv)
+  return setmetatable({}, {
+    __index = {
+      packet = function(self)
+        return uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. encryptedData
+      end,
+      contentType = contentType,
+      version = version,
+      length = length,
+      data = encryptedData
+    },
+    __newindex = function(self, k, v)
+      error("the struct is read-only")
+    end,
+    __pairs = function(self)
+      return pairs({
+        contentType = contentType,
+        version = version,
+        length = length,
+        data = encryptedData
+      })
+    end,
+    __ipairs = function(self)
+      return ipairs({
+        contentType = contentType,
+        version = version,
+        length = length,
+        data = encryptedData
+      })
+    end
+  })
 end
