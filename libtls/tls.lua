@@ -513,7 +513,7 @@ local function createTLSCompressed(tlsPlaintext, compression)
   if compression == "\x00" then -- No compression
     -- do nothing
   else
-    error("unknown compression algorithm")
+    error(("unknown compression algorithm: %x"):format(compression:byte()))
   end
   length = #data
   -- Prevent modification of struct to prevent screwups
@@ -550,17 +550,21 @@ local function createTLSCompressed(tlsPlaintext, compression)
 end
 
 -- Only supports block ciphers
-local function createCipherMac(cipher, mac, cipherKey, macKey, ivLen, cipherBlockLength)
-  cipher, mac, cipherKey, macKey, ivLen, cipherBlockLength = copy(cipher), copy(mac), copy(cipherKey), copy(macKey), copy(ivLen), copy(cipherBlockLength)
-  local iv = getRandom(ivLen)
+local function createCipherMac(cipherEncrypt, cipherDecrypt, mac, cipherKey, macKey, ivLen, cipherBlockLength, macBlockLength)
+  local iv = ivLen
+  if type(ivLen) == "number" then
+    iv = getRandom(ivLen)
+  end
   return setmetatable({}, {
     __index = {
-      cipher = cipher,
+      cipherEncrypt = cipherEncrypt,
+      cipherDecrypt = cipherDecrypt,
       mac = mac,
       cipherKey = cipherKey,
       macKey = macKey,
       iv = iv,
-      cipherBlockLength = cipherBlockLength
+      cipherBlockLength = cipherBlockLength,
+      macBlockLength = macBlockLength
     },
     __newindex = function(self, k, v)
       error("the struct is read-only")
@@ -572,7 +576,8 @@ local function createCipherMac(cipher, mac, cipherKey, macKey, ivLen, cipherBloc
         cipherKey = cipherKey,
         macKey = macKey,
         iv = iv,
-        cipherBlockLength = cipherBlockLength
+        cipherBlockLength = cipherBlockLength,
+        macBlockLength = macBlockLength
       })
     end,
     __ipairs = function(self)
@@ -596,7 +601,7 @@ local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
   local cipherData = data .. mac
   local padding = (#cipheredData + 1) % cipherMac.cipherBlockLength
   cipherData = cipherData .. uint8:pack(padding):rep(padding + 1)
-  local encryptedData = cipherMac.cipher(cipherData, cipherMac.cipherKey, cipherMac.iv)
+  local encryptedData = cipherMac.cipherEncrypt(cipherData, cipherMac.cipherKey, cipherMac.iv)
   return setmetatable({}, {
     __index = {
       packet = function(self)
@@ -627,4 +632,29 @@ local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
       })
     end
   })
+end
+
+-- Only supports block ciphers
+local function readTLSCiphertext(record, seqNum, cipherMac, compression)
+  local contentType, version, length, encryptedData = record.contentType, record.version, record.length, record.fragment
+  local cipherData = cipherMac.cipherDecrypt(encryptedData, cipherMac.cipherKey, cipherMac.iv)
+  local padding = cipherData:sub(-1, -1)
+  local dataWithMac = cipherData:sub(1, -uint8:unpack(padding) - 1)
+  local compressedData = dataWithMac:sub(1, -cipherMac.macBlockLength - 1)
+  local recordMac = dataWithMac:sub(-cipherMac.macBlockLength, -1)
+  seqNum.read = seqNum.read + 1
+  local mac = cipherMac.mac(cipherMac.macKey, number2bytes(seqNum.read) .. uint8:pack(contentType) .. uint16:pack(version) .. data)
+  if mac ~= recordMac then
+    error("the given MAC and the computed MAC don't match!")
+  end
+  if dataWithMac:sub(-uint8:unpack(padding) - 1, -2) ~= padding:rep(uint8:unpack(padding)) then
+    error("bad padding!")
+  end
+  local data
+  if compression == "\x00" then
+    data = compressedData
+  else
+    error(("unknown compression type: %x"):format(compression:byte()))
+  end
+  return createTLSPlaintext(contentType, version, length, data)
 end
