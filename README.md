@@ -19,3 +19,5 @@ This is a place where brilliant ideas become the programs.
   * A MoonScript port of a parser of semantic version strings originally written in Python.
 * `libaevent`
   * An advanced event library.
+* `libmetanum`
+  * Enables one to have *very* big numbers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported.
