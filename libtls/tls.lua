@@ -1173,7 +1173,7 @@ local function wrapSocket(sock)
   -- [ChangeCipherSpec]
   -- Updates the state
   write(TLS_CONTENT_TYPES.ChangeCipherSpec, packetChangeCipherSpec())
-  stateMgr.cipher = nextCipher(keys.clientWriteKey, keys.clientWriteMACKey)
+  stateMgr.cipher = nextCipher(keys.clientWriteKey, keys.clientWriteMACKey, keys.serverWriteKey, keys.serverWriteMACKey)
   stateMgr.compression = compression
 
   -- Client Finished
