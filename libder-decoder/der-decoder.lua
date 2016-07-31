@@ -1,6 +1,8 @@
 -- An implementation of DER decoder.
 -- It only implements the basic types.
 
+local metanum = require("metanum")
+
 local function read(s, len)
   local result = s[0]:sub(1, len)
   s[0] = s[0]:sub(len + 1, -1)
@@ -210,11 +212,11 @@ decoders[0x03] = function(s, id, len) -- BIT STRING
     len = getNextEOC(s, len)
     local rShift = read(s, 1):byte()
     local data = read(s, len - 1)
-    local result = 0
+    local result = metanum(0)
     for i = 1, #data, 1 do
-      result = (result << 8) | data:sub(i, i):byte()
+      result = (result * 2^8) + data:sub(i, i):byte()
     end
-    result = result >> rShift
+    result = math.floor(result / 2^rShift)
     return result
   end
 end
@@ -250,9 +252,9 @@ decoders[0x04] = function(s, id, len) -- OCTET STRING
     -- return data
   else -- primitive
     len = getNextEOC(s, len)
-    local result = 0
+    local result = metanum(0)
     for i = 1, len, 1 do
-      result = (result << 8) | read(s, 1):byte()
+      result = (result * 2^8) + read(s, 1):byte()
     end
     return result
   end
@@ -349,7 +351,7 @@ decoders[0x06] = function(s, id, len) -- OBJECT IDENTIFIER
 end
 
 decoders[0x0D] = function(s, id, len) -- RELATIVE OBJECT IDENTIFIER
-  assert(id.pc == 0, "RELATIVE OBJECT IDENTIFIER shall be primitive")
+  assert(id.pc == 0, "RELATIVE OBJECT IDENTIFIER shall be primitive, but it isn't")
   return decoders[0x06](s, id, len)
 end
 
