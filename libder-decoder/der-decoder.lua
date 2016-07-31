@@ -375,6 +375,11 @@ decoders[0x17] = function(s, id, len) -- UTCTime
   if not year then
     error("Corrupt data: time pattern not matched")
   end
+  if year >= 50 then
+    year = 1900 + year
+  else
+    year = 2000 + year
+  end
   return {
     year = tonumber(year),
     month = tonumber(month),
