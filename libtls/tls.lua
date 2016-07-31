@@ -1,7 +1,8 @@
 local component = require("component")
 
-local derdecode = require("der-decoder")
 local crypt = require("crypt")
+local derdecode = require("der-decoder")
+local metanum = require("metanum")
 
 local advcipher = component.advanced_cipher
 local data = component.data
@@ -138,9 +139,10 @@ local x509oid = {
   ['85.29.24'] = 'id-ce-invalidityDate';
 
   ['42.840.113549.1.1'] = 'pkcs-1',
+  ['42.840.113549.1.1.1'] = 'RSAEncryption'
   ['42.840.113549.1.1.14'] = 'sha224WithRSAEncryption',
   ['42.840.113549.1.1.11'] = 'sha256WithRSAEncryption',
-  ['42.840.113549.1.1.12'] = 'sha384WithRsaEncryption',
+  ['42.840.113549.1.1.12'] = 'sha384WithRSAEncryption',
   ['42.840.113549.1.1.13'] = 'sha512WithRSAEncryption'
 }
 
@@ -201,6 +203,51 @@ local function getRandom(len)
   return data.random(len)
 end
 
+local function str10to16(numarg)
+  -- x₁₀ → x₂
+  local n = numarg:floor()
+  local bin = {}
+  local meta1 = metanum(1)
+  while n ~= meta1 do
+    table.insert(bin, 1, tonumber(n.mant:sub(-1, -1)) % 2)
+    n = (n / 2):floor()
+  end
+  for i = 1, #bin % 4, 1 do
+    table.insert(bin, 1, 0)
+  end
+
+  -- x₂ → x₁₆
+  local binhex = {
+    ["0000"] = "0",
+    ["0001"] = "1",
+    ["0010"] = "2",
+    ["0011"] = "3",
+    ["0100"] = "4",
+    ["0101"] = "5",
+    ["0110"] = "6",
+    ["0111"] = "7",
+    ["1000"] = "8",
+    ["1001"] = "9",
+    ["1010"] = "A",
+    ["1011"] = "B",
+    ["1100"] = "C",
+    ["1101"] = "D",
+    ["1110"] = "E",
+    ["1111"] = "F"
+  }
+  local result = {}
+  for i = 1, #bin, 4 do
+    result[#result+1] = binhex[table.concat(bin, "", i+3, i)]
+  end
+  return table.concat(result)
+end
+
+local function strhex2bytes(num)
+  return num:gsub("%x%x", function(n)
+    return string.char(tonumber(n, 16))
+  end)
+end
+
 hsDecoders[HANDSHAKE_TYPES.ServerHello] = function(data)
   -- [Version: 2] [Random: 32 = [ [GMT Unix time: 4] [RANDOM: 28] ] ] [Session ID: [Length: 1] ] [Cipher: 2] [Compression: 1] [Extensions: [Length: 2] = [ [Type: 2] [Data: [Length: 2] ] ] ]
   local result = {}
@@ -242,7 +289,7 @@ hsDecoders[HANDSHAKE_TYPES.Certificate] = function(data)
     cert.certificate = {}
     cert.certificate.version = 0
     if type(certd[1][1]) == "table" then
-      cert.certificate.version = certd[1][1][1]
+      cert.certificate.version = certd[1][1][1]:tonumber()
     else
       table.insert(certd[1], 1, {0})
     end
@@ -280,8 +327,11 @@ hsDecoders[HANDSHAKE_TYPES.Certificate] = function(data)
     cert.certificate.subjectPublicKeyInfo.algorithm.algorithm = x509oid[table.concat(certd[1][7][1][1], ".")]
     cert.certificate.subjectPublicKeyInfo.algorithm.parameters = certd[1][7][1][2] or {}
     cert.certificate.subjectPublicKeyInfo.subjectPublicKey = certd[1][7][2]
+    if cert.certificate.subjectPublicKeyInfo.algorithm.algorithm == "RSAEncryption" then
+      cert.certificate.subjectPublicKeyInfo.subjectPublicKeyData = derdecode(strhex2bytes(str10to16(cert.certificate.subjectPublicKeyInfo.subjectPublicKey)))
+    end
     if cert.certificate.version > 0 and type(certd[1][8]) == "number" then
-      cert.certificate.issuerUniqueID = certd[1][8]
+      cert.certificate.issuerUniqueID = certd[1][8]:tonumber()
     else
       table.insert(certd[1], 8, 0)
     end
@@ -939,7 +989,11 @@ end
 local function packetClientKeyExchange(publicKey, rsaCrypt)
   -- [Encrypted PreMasterSecret: 48]
   local preMasterSecret = {[0] = uint16:pack(TLS_VERSION) .. getRandom(46)}
-  local encryptedPreMasterSecret = rsaCrypt(preMasterSecret[0], publicKey)
+  local pubKey = {
+    publicKey[0].mant,
+    publicKey[1].mant
+  }
+  local encryptedPreMasterSecret = rsaCrypt(preMasterSecret[0], pubKey)
   return createHandshakePacket(HANDSHAKE_TYPES.ClientKeyExchange, encryptedPreMasterSecret), {[0] = preMasterSecret}
 end
 
@@ -1155,7 +1209,7 @@ local function wrapSocket(sock)
   end
 
   -- ClientKeyExchange
-  local clientKeyExchange, preMasterSecret = packetClientKeyExchange(serverCertificate[1].certificate.subjectPublicKeyInfo.subjectPublicKey, rsaCrypt)
+  local clientKeyExchange, preMasterSecret = packetClientKeyExchange(serverCertificate[1].certificate.subjectPublicKeyInfo.subjectPublicKeyData, nextCipher.keyExchangeCrypt)
   write(TLS_CONTENT_TYPES.Handshake, clientKeyExchange)
   table.insert(handshakePackets, clientKeyExchange)
 
@@ -1163,12 +1217,12 @@ local function wrapSocket(sock)
 
   -- Master secret generation
   local serverRandom = uint32:pack(serverHello.random.time) .. serverHello.random.random
-  local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, prf)
+  local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, nextCipher.PRF)
 
   local cipherRsaAesSha = "TLS_RSA_WITH_AES_128_CBC_SHA"
 
   -- Key block
-  local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, prf, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
+  local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, nextCipher.PRF, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
 
   -- [ChangeCipherSpec]
   -- Updates the state
@@ -1177,7 +1231,7 @@ local function wrapSocket(sock)
   stateMgr.compression = compression
 
   -- Client Finished
-  local clientFinished = packetClientFinished(handshakePackets, masterSecret, prf, hashHMAC)
+  local clientFinished = packetClientFinished(handshakePackets, masterSecret, nextCipher.PRF, nextCipher.mac)
   write(TLS_CONTENT_TYPES.Handshake, clientFinished)
   table.insert(handshakePackets, clientFinished)
 
@@ -1202,7 +1256,7 @@ local function wrapSocket(sock)
   if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Finished then
     alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
   end
-  local _, expectedServerFinished = packetClientFinished(handshakePackets, masterSecret, prf, hashHMAC)
+  local _, expectedServerFinished = packetClientFinished(handshakePackets, masterSecret, nextCipher.PRF, nextCipher.mac)
   if expectedServerFinished ~= handshakeMessages[1].data then
     alertClose(Alert(true, ALERTS.handshake_failture, "expected server finished isn't equal to the recieved one"))
   end
