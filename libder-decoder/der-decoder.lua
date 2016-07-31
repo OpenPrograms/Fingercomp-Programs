@@ -98,15 +98,15 @@ decoders[0x02] = function(s, id, len) -- INTEGER
   assert(len > 0, "INTEGER must have content of length ≥ 1")
   local firstByte = s[0]:sub(1, 1):byte()
   if len > 1 then
-    local second8Bit = s[0]:sub(1, 1):byte()
+    local second8Bit = s[0]:sub(2, 2):byte() >> 7
     assert(not (firstByte == 0xff and second8Bit == 1 or firstByte == 0x00 and second8Bit == 0), "invalid value: first 9 bits are " .. second8Bit)
   end
-  local result = 0
+  local result = metanum(0)
   if (s[0]:sub(1, 1):byte() >> 7) == 1 then
-    result = -1
+    result = metanum(-1)
   end
   for i = 1, len, 1 do
-    result = (result << 8) | read(s, 1):byte()
+    result = (result * 2^8) + read(s, 1):byte()
   end
   return result
 end
@@ -216,7 +216,7 @@ decoders[0x03] = function(s, id, len) -- BIT STRING
     for i = 1, #data, 1 do
       result = (result * 2^8) + data:sub(i, i):byte()
     end
-    result = math.floor(result / 2^rShift)
+    result = (result / 2^rShift):floor()
     return result
   end
 end
@@ -375,6 +375,7 @@ decoders[0x17] = function(s, id, len) -- UTCTime
   if not year then
     error("Corrupt data: time pattern not matched")
   end
+  year = tonumber(year)
   if year >= 50 then
     year = 1900 + year
   else
@@ -423,7 +424,7 @@ function decode(s, kwargs)
   -- if kwargs.sametag and kwargs.sametag ~= id.tag then
   --   error(("Decoder for type 0x%s required the decoded tag to be the same, but it isn't"):format(kwargs.sametag))
   -- end
-  if id.class == 0x02 and kwargs.context[1] then
+  if id.class == 0x02 and kwargs.context and kwargs.context[1] then
     id.tag = kwargs.context[1]
     table.remove(kwargs.context, 1)
   end
