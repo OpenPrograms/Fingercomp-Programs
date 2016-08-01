@@ -1,6 +1,5 @@
 local component = require("component")
 
-local crypt = require("crypt")
 local derdecode = require("der-decoder")
 local metanum = require("metanum")
 
@@ -40,6 +39,12 @@ local function enum(tbl)
     end
   })
   return tbl
+end
+
+local function callable2func(callable)
+  return function(...)
+    return callable(...)
+  end
 end
 
 local TLS_CONTENT_TYPES = enum({
@@ -139,7 +144,7 @@ local x509oid = {
   ['85.29.24'] = 'id-ce-invalidityDate';
 
   ['42.840.113549.1.1'] = 'pkcs-1',
-  ['42.840.113549.1.1.1'] = 'RSAEncryption'
+  ['42.840.113549.1.1.1'] = 'RSAEncryption',
   ['42.840.113549.1.1.14'] = 'sha224WithRSAEncryption',
   ['42.840.113549.1.1.11'] = 'sha256WithRSAEncryption',
   ['42.840.113549.1.1.12'] = 'sha384WithRSAEncryption',
@@ -574,7 +579,25 @@ local function createTLSCompressed(tlsPlaintext, compression)
 end
 
 -- Only supports block ciphers
-local function createCipherMac(csuite, isBlock, cipherEncrypt, cipherDecrypt, mac, iv, prf, keyExchangeCrypt, keyExchangeDecrypt, ivLen, cipherBlockLength, macBlockLength, keyLength, macKeyLength, clientCipherKey, clientMacKey, serverCipherKey, serverMacKey)
+local function createCipherMac(args)
+  local csuite = args.csuite
+  local isBlock = args.isBlock
+  local cipherEncrypt = args.cipherEncrypt
+  local cipherDecrypt = args.cipherDecrypt
+  local mac = args.mac
+  local iv = args.iv
+  local prf = args.prf
+  local keyExchangeCrypt = args.keyExchangeCrypt
+  local keyExchangeDecrypt = args.keyExchangeDecrypt
+  local ivLen = args.ivLen
+  local cipherBlockLength = args.cipherBlockLength
+  local macBlockLength = args.macBlockLength
+  local keyLength = args.keyLength
+  local macKeyLength = args.macKeyLength
+  local clientCipherKey = args.clientCipherKey
+  local clientMacKey = args.clientMacKey
+  local serverCipherKey = args.serverCipherKey
+  local serverMacKey = args.serverMacKey
   assert(type(csuite) == "string", "bad value for `csuite`: string expected")
   assert(type(isBlock) == "boolean", "bad value for `isBlock`: boolean expected")
   assert(type(cipherEncrypt) == "function", "bad value for `cipherEncrypt`: function expected")
@@ -589,11 +612,11 @@ local function createCipherMac(csuite, isBlock, cipherEncrypt, cipherDecrypt, ma
   assert(type(macBlockLength) == "number", "bad value for `macBlockLength`: number expected")
   assert(type(keyLength) == "number", "bad value for `keyLength`: number expected")
   assert(type(macKeyLength) == "number", "bad value for `macKeyLength`: number expected")
-  assert(({"string", "nil"})[type(clientCipherKey)], "bad value for `clientCipherKey`: string or nil expected")
-  assert(({"string", "nil"})[type(clientMacKey)], "bad value for `clientMacKey`: string or nil expected")
-  assert(({"string", "nil"})[type(serverCipherKey)], "bad value for `serverCipherKey`: string or nil expected")
-  assert(({"string", "nil"})[type(serverMacKey)], "bad value for `serverMacKey`: string or nil expected")
-  if not (clientCipherKey and clientMacKey and serverCipherKey and serverMacKey) then
+  assert(({["string"] = true, ["nil"] = true})[type(clientCipherKey)], "bad value for `clientCipherKey`: string or nil expected")
+  assert(({["string"] = true, ["nil"] = true})[type(clientMacKey)], "bad value for `clientMacKey`: string or nil expected")
+  assert(({["string"] = true, ["nil"] = true})[type(serverCipherKey)], "bad value for `serverCipherKey`: string or nil expected")
+  assert(({["string"] = true, ["nil"] = true})[type(serverMacKey)], "bad value for `serverMacKey`: string or nil expected")
+  if not (clientCipherKey and clientMacKey and serverCipherKey and serverMacKey) and (clientCipherKey or clientMacKey or serverCipherKey or serverMacKey) then
     error("all keys are expected to be provided")
   end
   local setKeys = false
@@ -788,60 +811,62 @@ local function splitData(contentType,  data)
 end
 
 local ciphers = setmetatable({
-  TLS_NULL_WITH_NULL_NULL = createCipherMac(
-    "\x00\x00", -- csuite
-    false -- isBlock
-    function(data, key, iv) -- cipherEncrypt
+  TLS_NULL_WITH_NULL_NULL = createCipherMac {
+    csuite = "\x00\x00",
+    isBlock = false,
+    cipherEncrypt = function(data, key, iv)
       return data
     end,
-    function(data, key, iv) -- cipherDecrypt
+    cipherDecrypt = function(data, key, iv)
       return data
     end,
-    function(secret, data) -- mac
+    mac = function(secret, data)
       return ""
     end,
-    function() -- iv
+    iv = function()
       return ""
     end,
-    function() -- PRF
+    prf = function()
       return ""
     end,
-    function() -- keyExchangeCrypt
+    keyExchangeCrypt = function()
       return ""
     end,
-    function() -- keyExchangeDecrypt
+    keyExchangeDecrypt = function()
       return ""
     end,
-    0, -- ivLen
-    0, -- cipherBlockLength
-    0, -- macBlockLength
-    0, -- keyLength
-    0, -- macKeyLength
-    "", -- cipherKey
-    "" -- macKey
-  ),
-  TLS_RSA_WITH_NULL_MD5 = createCipherMac(
-    "\x00\x01", -- csuite
-    false, -- isBlock
-    function(data) -- cipherEncrypt
+    ivLen = 0,
+    cipherBlockLength = 0,
+    macBlockLength = 0,
+    keyLength = 0,
+    macKeyLength = 0,
+    clientCipherKey = "",
+    clientMacKey = "",
+    serverCipherKey = "",
+    serverMacKey = ""
+  },
+  TLS_RSA_WITH_NULL_MD5 = createCipherMac {
+    csuite = "\x00\x01",
+    isBlock = false,
+    cipherEncrypt = function(data)
       return data
     end,
-    function(data) -- cipherDecrypt
+    cipherDecrypt = function(data)
       return data
     end,
-    data.md5, -- mac
-    function() -- iv
+    mac = callable2func(data.md5),
+    iv = function()
       return ""
     end,
-    PRF(P_hash(data.md5)), -- PRF
-    advcipher.encrypt, -- keyExchangeCrypt
-    advcipher.decrypt, -- keyExchangeDecrypt
-    0, -- ivLen
-    0, -- cipherBlockLength
-    16, -- macBlockLength
-    0, -- keyLength
-    16, -- macKeyLength
-  )
+    prf = PRF(P_hash(data.md5)),
+    keyExchangeCrypt = callable2func(advcipher.encrypt),
+    keyExchangeDecrypt = callable2func(advcipher.decrypt),
+    ivLen = 0,
+    cipherBlockLength = 0,
+    macBlockLength = 16,
+    keyLength = 0,
+    macKeyLength = 16
+  }
 }, {
   __index = function(self, k)
     for i, j in pairs(self) do
@@ -853,51 +878,51 @@ local ciphers = setmetatable({
 })
 
 do
-  local sha256hmac = HMAC(crypt.hash.sha256, 64)
-  local sha256phash = P_hash(sha256hmac)
-  local sha256prf = PRF(sha256phash)
-  ciphers.TLS_RSA_WITH_AES_128_CBC_SHA256 = createCipherMac(
-    "\x00\x3c", -- csuite
-    true, -- isBlock
-    data.encrypt, -- cipherEncrypt
-    data.decrypt, -- cipherDecrypt
-    sha256hmac, -- mac
-    function() -- iv
+  local sha256prf = PRF(P_hash(data.sha256))
+  ciphers.TLS_RSA_WITH_AES_128_CBC_SHA256 = createCipherMac {
+    csuite = "\x00\x3c",
+    isBlock = true,
+    cipherEncrypt = callable2func(data.encrypt),
+    cipherDecrypt = callable2func(data.decrypt),
+    mac = callable2func(data.sha256),
+    iv = function()
       return getRandom(16)
     end,
-    sha256prf, -- PRF
-    advcipher.encrypt, -- keyExchangeCrypt
-    advcipher.decrypt, -- keyExchangeDecrypt
-    16, -- ivLen
-    16, -- cipherBlockLength
-    32, -- macBlockLength
-    16, -- keyLength
-    32 -- macKeyLength
-  )
-  ciphers.TLS_RSA_WITH_NULL_SHA256 = createCipherMac(
-    "\x00\x3b", -- csuite
-    false, -- isBlock
-    function(data) -- cipherEncrypt
+    prf = sha256prf,
+    keyExchangeCrypt = callable2func(advcipher.encrypt),
+    keyExchangeDecrypt = callable2func(advcipher.decrypt),
+    ivLen = 16,
+    cipherBlockLength = 16,
+    macBlockLength = 32,
+    keyLength = 16,
+    macKeyLength = 32
+  }
+  ciphers.TLS_RSA_WITH_NULL_SHA256 = createCipherMac {
+    csuite = "\x00\x3b",
+    isBlock = false,
+    cipherEncrypt = function(data)
       return data
     end,
-    function(data) -- cipherDecrypt
+    cipherDecrypt = function(data)
       return data
     end,
-    sha256hmac, -- mac
-    function() -- iv
+    mac = callable2func(data.sha256),
+    iv = function()
       return ""
     end,
-    sha256prf, -- PRF
-    advcipher.encrypt, -- keyExchangeCrypt
-    advcipher.decrypt, -- keyExchangeDecrypt
-    0, -- ivLen
-    0, -- cipherBlockLength
-    32, -- macBlockLength
-    0, -- keyLength
-    32, -- macKeyLength
-    "", -- cipherKey
-    "", -- macKey
-  )
+    prf = sha256prf,
+    keyExchangeCrypt = callable2func(advcipher.encrypt),
+    keyExchangeDecrypt = callable2func(advcipher.decrypt),
+    ivLen = 0,
+    cipherBlockLength = 0,
+    macBlockLength = 32,
+    keyLength = 0,
+    macKeyLength = 32,
+    clientCipherKey = "",
+    clientMacKey = "",
+    serverCipherKey = "",
+    serverMacKey = ""
+  }
 end
 
 -- Stores current cipher
@@ -1217,12 +1242,12 @@ local function wrapSocket(sock)
 
   -- Master secret generation
   local serverRandom = uint32:pack(serverHello.random.time) .. serverHello.random.random
-  local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, nextCipher.PRF)
+  local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, nextCipher.prf)
 
   local cipherRsaAesSha = "TLS_RSA_WITH_AES_128_CBC_SHA"
 
   -- Key block
-  local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, nextCipher.PRF, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
+  local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, nextCipher.prf, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
 
   -- [ChangeCipherSpec]
   -- Updates the state
@@ -1231,7 +1256,7 @@ local function wrapSocket(sock)
   stateMgr.compression = compression
 
   -- Client Finished
-  local clientFinished = packetClientFinished(handshakePackets, masterSecret, nextCipher.PRF, nextCipher.mac)
+  local clientFinished = packetClientFinished(handshakePackets, masterSecret, nextCipher.prf, nextCipher.mac)
   write(TLS_CONTENT_TYPES.Handshake, clientFinished)
   table.insert(handshakePackets, clientFinished)
 
@@ -1256,7 +1281,7 @@ local function wrapSocket(sock)
   if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Finished then
     alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
   end
-  local _, expectedServerFinished = packetClientFinished(handshakePackets, masterSecret, nextCipher.PRF, nextCipher.mac)
+  local _, expectedServerFinished = nextCipher.prf(masterSecret, "server finished", nextCipher.mac(table.concat(handshakePackets)))
   if expectedServerFinished ~= handshakeMessages[1].data then
     alertClose(Alert(true, ALERTS.handshake_failture, "expected server finished isn't equal to the recieved one"))
   end
