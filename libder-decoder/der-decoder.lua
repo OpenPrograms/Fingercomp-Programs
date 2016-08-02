@@ -1,7 +1,15 @@
 -- An implementation of DER decoder.
 -- It only implements the basic types.
 
-local metanum = require("metanum")
+local comp = require("computer")
+
+-- a lua 5.2 compat hack
+_G.math.log10 = function(n)
+  return math.log(n, 10)
+end
+
+require("bigint")
+local bigint = bigint
 
 local function read(s, len)
   local result = s[0]:sub(1, len)
@@ -101,12 +109,13 @@ decoders[0x02] = function(s, id, len) -- INTEGER
     local second8Bit = s[0]:sub(2, 2):byte() >> 7
     assert(not (firstByte == 0xff and second8Bit == 1 or firstByte == 0x00 and second8Bit == 0), "invalid value: first 9 bits are " .. second8Bit)
   end
-  local result = metanum(0)
+  local result = len < 46.5 and 0 or bigint(0)
   if (s[0]:sub(1, 1):byte() >> 7) == 1 then
-    result = metanum(-1)
+    result = len < 46.5 and -1 or bigint(-1)
   end
   for i = 1, len, 1 do
-    result = (result * 2^8) + read(s, 1):byte()
+    result = (result * 256) + read(s, 1):byte()
+    os.sleep(.05)
   end
   return result
 end
@@ -212,12 +221,22 @@ decoders[0x03] = function(s, id, len) -- BIT STRING
     len = getNextEOC(s, len)
     local rShift = read(s, 1):byte()
     local data = read(s, len - 1)
-    local result = metanum(0)
+    local result = {}
     for i = 1, #data, 1 do
-      result = (result * 2^8) + data:sub(i, i):byte()
+      result[#result+1] = ("%02X"):format(data:sub(i, i):byte())
     end
-    result = (result / 2^rShift):floor()
-    return result
+    for i = 1, rShift, 1 do
+      local bovr = 0
+      for j = #result, 1, -1 do
+        local byte = tonumber(result[j], 16) + bovr
+        result[j] = ("%02X"):format(byte // 2)
+        bovr = (byte % 2) * 100
+      end
+      os.sleep(.05)
+    end
+    return table.concat(result):gsub("%x%x", function(n)
+      return string.char(tonumber(n, 16))
+    end)
   end
 end
 
@@ -252,11 +271,7 @@ decoders[0x04] = function(s, id, len) -- OCTET STRING
     -- return data
   else -- primitive
     len = getNextEOC(s, len)
-    local result = metanum(0)
-    for i = 1, len, 1 do
-      result = (result * 2^8) + read(s, 1):byte()
-    end
-    return result
+    return read(s, len)
   end
 end
 
@@ -355,6 +370,12 @@ decoders[0x0D] = function(s, id, len) -- RELATIVE OBJECT IDENTIFIER
   return decoders[0x06](s, id, len)
 end
 
+decoders[0x0c] = function(s, id, len) -- UTF8String
+  assert(id.pc == 0, "DER requires UTF8String to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
 decoders[0x12] = function(s, id, len) -- NumericString
   assert(id.pc == 0, "DER requires NumericString to be primitive, but it isn't")
   len = getNextEOC(s, len)
@@ -362,7 +383,25 @@ decoders[0x12] = function(s, id, len) -- NumericString
 end
 
 decoders[0x13] = function(s, id, len) -- PrintableString
-  assert(id.pc == 0, "DER requires NumericString to be primitive, but it isn't")
+  assert(id.pc == 0, "DER requires PrintableString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x14] = function(s, id, len) -- T61String
+  assert(id.pc == 0, "DER requires T61String to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x15] = function(s, id, len) -- VideotexString
+  assert(id.pc == 0, "DER requires VideotexString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x16] = function(s, id, len) -- IA5String
+  assert(id.pc == 0, "DER requires IA5String to be primitive, but it isn't")
   len = getNextEOC(s, len)
   return read(s, len)
 end
@@ -412,6 +451,42 @@ decoders[0x18] = function(s, id, len) -- GeneralizedTime
   }
 end
 
+decoders[0x19] = function(s, id, len) -- GraphicString
+  assert(id.pc == 0, "DER requires GraphicString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x1a] = function(s, id, len) -- VisibleString
+  assert(id.pc == 0, "DER requires VisibleString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x1b] = function(s, id, len) -- GeneralString
+  assert(id.pc == 0, "DER requires GeneralString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x1c] = function(s, id, len) -- UniversalString
+  assert(id.pc == 0, "DER requires UniversalString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x1d] = function(s, id, len) -- CHARACTER STRING
+  assert(id.pc == 0, "DER requires CHARACTER STRING to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
+decoders[0x1e] = function(s, id, len) -- BMPString
+  assert(id.pc == 0, "DER requires BMPString to be primitive, but it isn't")
+  len = getNextEOC(s, len)
+  return read(s, len)
+end
+
 function decode(s, kwargs)
   if type(s) == "string" then
     s = {[0]=s}
@@ -430,6 +505,7 @@ function decode(s, kwargs)
   end
   local result = decoders[id.tag](s, id, len, kwargs)
   -- print(tostring(result):gsub(".",function(c)return("%02X"):format(c:byte())end))
+  os.sleep(.05)
   return result
 end
 
