@@ -3,6 +3,7 @@ local comp = require("computer")
 local fs = require("filesystem")
 local uuid = require("uuid")
 
+local bigint = require("bigint")
 local derdecode = require("der-decoder")
 
 local advcipher = component.advanced_cipher
@@ -193,13 +194,31 @@ local function read(ts, len)
 end
 
 local function number2bytes(number)
-  local result = ""
-  for i = 1, math.ceil(math.ceil(math.log(number, 2)) / 8), 1 do
-    local byte = number & 0xff
-    result = result .. string.char(byte)
-    number = number >> 8
+  if type(number) == "number" then
+    local result = ""
+    for i = 1, math.ceil(math.ceil(math.log(number, 2)) / 8), 1 do
+      local byte = number & 0xff
+      result = result .. string.char(byte)
+      number = number >> 8
+    end
+    return result
+  elseif type(number) == "table" then
+    -- less optimized way:
+    -- 1.  convert to hexadecimal array of numbers
+    -- 2.  concat
+    -- 3.  convert to bytestring
+    local hexnum = {}
+    local zero = bigint(0)
+    repeat
+      local mod = number % 16
+      table.insert(hexnum, 1, ("%x"):format(tonumber(tostring(mod))))
+      number = (number - mod) / 16
+    until number == zero
+    hexnum = table.concat(hexnum)
+    return hexnum:gsub("%x%x", function(n)
+      return string.char(tonumber(n, 16))
+    end)
   end
-  return result
 end
 
 local function bytes2number(bytes)
@@ -713,17 +732,17 @@ end
 
 local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
   local contentType, version, length, data = tlsCompressed.contentType, tlsCompressed.version, tlsCompressed.length, tlsCompressed.data
-  local mac = cipherMac.mac(cipherMac.clientMacKey, uint64:pack(seqNum.write) .. uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. data)
+  local mac = uint64:pack(seqNum.write) .. uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. data
+  mac = cipherMac.mac(cipherMac.clientMacKey, mac)
+  print(mac:gsub(".",function(c)return("%02X"):format(c:byte())end))
   seqNum.write = seqNum.write + 1
   local cipherData = data .. mac
   local iv = cipherMac.iv()
   if cipherMac.isBlock then
-    local padding = (#cipherData + 1) % cipherMac.cipherBlockLength
-    cipherData = cipherData .. uint8:pack(padding):rep(padding + 1)
-    print(padding)
-    print(cipherData:sub(-20, -1):gsub(".",function(c)return("%02X"):format(c:byte())end))
+    -- workaround data card's PKCS5 padding
+    local padding = cipherMac.cipherBlockLength - ((#cipherData + 1) % cipherMac.cipherBlockLength)
+    cipherData = cipherData .. string.char(padding)
   end
-  print(cipherMac.clientCipherKey:gsub(".",function(c)return("%02X"):format(c:byte())end))
   local encryptedData = iv .. cipherMac.cipherEncrypt(cipherData, cipherMac.clientCipherKey, iv)
   length = #encryptedData
   return setmetatable({}, {
@@ -1008,7 +1027,7 @@ local function packetClientHello(ciphersA, compressionA, extensionsA)
   local extensions = ""
   do
     local c = extensionsA or {
-      {"\x00\x0d", "\x00\x02\x06\x01"} -- signature_algorithms: SHA512 + RSA
+      {"\x00\x0d", "\x00\x02\x04\x01"} -- signature_algorithms: SHA256 + RSA
     }
     for i, j in pairs(c) do
       c[i] = j[1] .. uint16:pack(#j[2]) .. j[2]
@@ -1032,7 +1051,12 @@ end
 local function packetClientKeyExchange(publicKey, rsaCrypt)
   -- [Encrypted PreMasterSecret: 48]
   local preMasterSecret = {[0] = uint16:pack(TLS_VERSION) .. getRandom(46)}
-  local encryptedPreMasterSecret = data.decode64(rsaCrypt(preMasterSecret[0], publicKey))
+  local eData64, reason = rsaCrypt(preMasterSecret[0], publicKey)
+  if not eData64 then
+    error(Alert(true, ALERTS.internal_error, "could not encrypt PMS with the public key: " .. tostring(reason or "unknown reason")))
+  end
+  local encryptedPreMasterSecret = data.decode64(eData64)
+  --print(encryptedPreMasterSecret:gsub(".",function(c)return("%02X"):format(c:byte())end))
   return createHandshakePacket(HANDSHAKE_TYPES.ClientKeyExchange, uint16:pack(#encryptedPreMasterSecret) .. encryptedPreMasterSecret), preMasterSecret
 end
 
@@ -1182,7 +1206,7 @@ local function wrapSocket(sock)
       return decryptedRecords
     elseif data == "" then
       close(nil, true)
-      error("connection lost")
+      error("timed out")
     end
   end
   function close(alert, noWriteOnClose)
@@ -1303,11 +1327,24 @@ local function wrapSocket(sock)
     alertClose(Alert(true, ALERTS.unsupported_certificate, "unknown public key"))
   end
   os.sleep(.05)
+
   rsaPublicKey = {
-    data.encode64(tostring(rsaPublicKey[1])),
-    data.encode64(tostring(math.floor(tonumber(rsaPublicKey[2]))))
+    data.encode64("\x00" .. number2bytes(rsaPublicKey[1])), -- javaderp workaround
+    data.encode64("\x00" .. number2bytes(math.floor(tonumber(rsaPublicKey[2]))))
   }
-  local clientKeyExchange, preMasterSecret = packetClientKeyExchange(rsaPublicKey, nextCipher.keyExchangeCrypt)
+
+  print(require("serialization").serialize(rsaPublicKey, math.huge))
+
+  print(#data.decode64(rsaPublicKey[1]), #data.decode64(rsaPublicKey[2]))
+
+  local success, clientKeyExchange, preMasterSecret = pcall(packetClientKeyExchange, rsaPublicKey, nextCipher.keyExchangeCrypt)
+  if not success then
+    if type(clientKeyExchange) == "table" and clientKeyExchange.__name == "Alert" then
+      alertClose(clientKeyExchange)
+    else
+      alertClose(Alert(true, ALERTS.internal_error, "could not create client key exchange message: " .. tostring(clientKeyExchange or "unknown reason")))
+    end
+  end
   write(TLS_CONTENT_TYPES.Handshake, clientKeyExchange)
   table.insert(handshakePackets, clientKeyExchange)
 

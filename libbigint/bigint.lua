@@ -498,7 +498,7 @@ bigintmt = {
 local cache = {}
 local ncache = 0
 
-return function bigint(n)
+return function(n)
 	if cache[n] then
 		return cache[n]
 	end
