@@ -449,13 +449,15 @@ local function newSequenceNum()
   }
 end
 
-local function createTLSPlaintext(contentType, data)
+local function createTLSPlaintext(contentType, data, version, length)
   assert(type(data) == "string", "bad value for `data`: string expected")
   assert(type(contentType) == "number", "bad value for `contentType`: number expected")
+  assert(({["number"] = true, ["nil"] = true})[type(version)], "bad value for `version`: number or nil expected")
+  assert(({["number"] = true, ["nil"] = true})[type(length)], "bad value for `length`: number or nil expected")
   assert(TLS_CONTENT_TYPES[contentType], "unknown content type")
   assert(contentType == 0x17 or #data ~= 0, "length of non-application data must not be 0")
-  local version = TLS_VERSION
-  local length = #data
+  local version = version or TLS_VERSION
+  local length = length or #data
   -- Prevent modification of struct to prevent screwups
   return setmetatable({}, {
     __index = {
@@ -520,6 +522,9 @@ local function parseTLSRecords(packets)
     prevRecord = record
   end
   result[#result+1] = prevRecord
+  for k, v in pairs(result) do
+    result[k] = createTLSPlaintext(v.contentType, v.data, v.version, v.length)
+  end
   return result
 end
 
@@ -538,7 +543,8 @@ local function parseHandshakeMessages(record)
     result[#result+1] = {
       handshakeType = handshakeType,
       length = len,
-      data = hsData
+      data = hsData,
+      packet = uint8:pack(handshakeType) .. uint24:pack(len) .. hsData
     }
   end
   return result
@@ -734,7 +740,6 @@ local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
   local contentType, version, length, data = tlsCompressed.contentType, tlsCompressed.version, tlsCompressed.length, tlsCompressed.data
   local mac = uint64:pack(seqNum.write) .. uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(length) .. data
   mac = cipherMac.mac(cipherMac.clientMacKey, mac)
-  print(mac:gsub(".",function(c)return("%02X"):format(c:byte())end))
   seqNum.write = seqNum.write + 1
   local cipherData = data .. mac
   local iv = cipherMac.iv()
@@ -782,14 +787,12 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   assert(length <= 2^14 + 2048, Alert(true, ALERTS.record_overflow))
   local iv = encryptedDataWithIV:sub(1, cipherMac.ivLength)
   local encryptedData = encryptedDataWithIV:sub(cipherMac.ivLength + 1, -1)
-  print(#iv, #encryptedData, #cipherMac.serverCipherKey)
-  print(cipherMac.ivLength, cipherMac.keyLength, #encryptedDataWithIV)
   local cipherData = cipherMac.cipherDecrypt(encryptedData, cipherMac.serverCipherKey, iv)
   local dataWithMac = cipherData
   local padding
   if cipherMac.isBlock then
-    padding = cipherData:sub(-1, -1)
-    dataWithMac = cipherData:sub(1, -uint8:unpack(padding) - 1)
+    padding = uint8:unpack(cipherData:sub(-1, -1))
+    dataWithMac = cipherData:sub(1, -2)
   end
   local compressedData = dataWithMac:sub(1, -cipherMac.macBlockLength - 1)
   assert(#cipherData <= 2^14 + 1024, Alert(true, ALERTS.record_overflow))
@@ -799,13 +802,13 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   else
     recordMac = ""
   end
+  local mac = cipherMac.mac(cipherMac.serverMacKey, uint64:pack(seqNum.read) .. uint8:pack(contentType) .. uint16:pack(version) .. uint16:pack(#compressedData) .. compressedData)
   seqNum.read = seqNum.read + 1
-  local mac = cipherMac.mac(cipherMac.serverMacKey, number2bytes(seqNum.read) .. uint8:pack(contentType) .. uint16:pack(version) .. cipherData)
   if mac ~= recordMac then
     error(Alert(true, ALERTS.bad_record_mac, "the given MAC and the computed MAC don't match!"))
   end
   if cipherMac.isBlock then
-    if dataWithMac:sub(-uint8:unpack(padding) - 1, -2) ~= padding:rep(uint8:unpack(padding)) or #cipherData % cipherMac.cipherBlockLength then
+    if #dataWithMac + padding + 1 ~= #encryptedData or #encryptedData % cipherMac.cipherBlockLength ~= 0 then
       error(Alert(true, ALERTS.bad_record_mac, "bad padding!"))
     end
   end
@@ -1056,7 +1059,6 @@ local function packetClientKeyExchange(publicKey, rsaCrypt)
     error(Alert(true, ALERTS.internal_error, "could not encrypt PMS with the public key: " .. tostring(reason or "unknown reason")))
   end
   local encryptedPreMasterSecret = data.decode64(eData64)
-  --print(encryptedPreMasterSecret:gsub(".",function(c)return("%02X"):format(c:byte())end))
   return createHandshakePacket(HANDSHAKE_TYPES.ClientKeyExchange, uint16:pack(#encryptedPreMasterSecret) .. encryptedPreMasterSecret), preMasterSecret
 end
 
@@ -1099,6 +1101,7 @@ local function wrapSocket(sock)
   local isClosed = false
   local reads = read
   local timeout = 5 -- the timeout will be unset at the end of handshake
+  local readBuffer = ""
   local function setTimeout(to)
     assert(type(to) == "number", "bad value for `to`: number expected")
     assert(to > 0, "timeout must be a positive number")
@@ -1136,8 +1139,8 @@ local function wrapSocket(sock)
     if not ({["number"] = true, ["nil"] = true})[type(n)] then
       return nil, "bad argument #1: number or nil expected"
     end
+    local data = ""
     if not n then
-      local data = ""
       local gotNonNilChunk = false
       local emptyChunksLeft = 5
       local readStartTime = comp.uptime()
@@ -1155,11 +1158,16 @@ local function wrapSocket(sock)
           os.sleep(.05)
         end
       until not chunk and gotNonNilChunk or not gotNonNilChunk and comp.uptime() - readStartTime > timeout
-      return data
+    else
+      data = sock.read(n)
     end
-    return sock.read(n)
+    readBuffer = readBuffer .. data
+    return readBuffer
   end
-  local function read()
+  local function read(n)
+    if type(n) ~= "number" or n <= 0 then
+      n = math.huge
+    end
     if isClosed then
       return nil, "socket is closed"
     end
@@ -1173,9 +1181,19 @@ local function wrapSocket(sock)
           alertClose(Alert(true, ALERTS.internal_error, "could not parse TLS records: " .. tostring(records or "unknown reason")))
         end
       end
+      local storeInBuffer = {}
+      for k, record in ipairs(records) do
+        if n == 0 then
+          storeInBuffer[#storeInBuffer+1] = record.packet()
+          records[k] = nil
+        else
+          n = n - 1
+        end
+      end
+      readBuffer = table.concat(storeInBuffer)
       local decryptedRecords = {}
       for k, record in pairs(records) do
-        local result = {xpcall(readTLSCiphertext, function(m)return m .. "\n" .. debug.traceback() end, record, stateMgr.seqNum, stateMgr.read.cipher, stateMgr.read.compression)}
+        local result = {pcall(readTLSCiphertext, record, stateMgr.seqNum, stateMgr.read.cipher, stateMgr.read.compression)}
         if not result[1] then
           if type(result[2]) == "table" and result[2].__name == "Alert" then
             alertClose(result[2])
@@ -1270,7 +1288,7 @@ local function wrapSocket(sock)
       alertClose(Alert(true, ALERTS.internal_error, tostring(serverHello)))
     end
   end
-  table.insert(handshakePackets, handshakeMessages[1].data)
+  table.insert(handshakePackets, handshakeMessages[1].packet)
   table.remove(handshakeMessages, 1)
 
   local nextCipher = ciphers[serverHello.cipher]
@@ -1287,7 +1305,7 @@ local function wrapSocket(sock)
       alertClose(Alert(true, ALERTS.internal_error, tostring(serverCertificate)))
     end
   end
-  table.insert(handshakePackets, handshakeMessages[1].data)
+  table.insert(handshakePackets, handshakeMessages[1].packet)
   table.remove(handshakeMessages, 1)
   if handshakeMessages[1].handshakeType == HANDSHAKE_TYPES.ServerKeyExchange then
     alertClose(Alert(true, ALERTS.unexpected_message, "the server sent ServerKeyExchange message, which isn't legal with RSA"))
@@ -1296,8 +1314,8 @@ local function wrapSocket(sock)
   if handshakeMessages[1].handshakeType == HANDSHAKE_TYPES.CertificateRequest then
     -- don't parse, as we won't need that data: we aren't gonna send any certificate
     certificateRequested = true
-    table.insert(handshakePackets, handshakeMessages[1].data)
-    table.remove(handshakeMessage, 1)
+    table.insert(handshakePackets, handshakeMessages[1].packet)
+    table.remove(handshakeMessages, 1)
   end
   if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.ServerHelloDone then
     alertClose(Alert(true, ALERTS.unexpected_message, "the server sent unexpected message"))
@@ -1310,6 +1328,8 @@ local function wrapSocket(sock)
       alertClose(Alert(true, ALERTS.internal_error, tostring(serverHelloDone)))
     end
   end
+  table.insert(handshakePackets, handshakeMessages[1].packet)
+  table.remove(handshakeMessages, 1)
 
   -- ClientCertificate
   if certificateRequested then
@@ -1319,23 +1339,17 @@ local function wrapSocket(sock)
   end
 
   -- ClientKeyExchange
-  os.sleep(.05)
   local rsaPublicKey
   if serverCertificate.certificates[1].certificate.subjectPublicKeyInfo.algorithm.algorithm == "RSAEncryption" then
     rsaPublicKey = derdecode(serverCertificate.certificates[1].certificate.subjectPublicKeyInfo.subjectPublicKey)
   else
     alertClose(Alert(true, ALERTS.unsupported_certificate, "unknown public key"))
   end
-  os.sleep(.05)
 
   rsaPublicKey = {
     data.encode64("\x00" .. number2bytes(rsaPublicKey[1])), -- javaderp workaround
     data.encode64("\x00" .. number2bytes(math.floor(tonumber(rsaPublicKey[2]))))
   }
-
-  print(require("serialization").serialize(rsaPublicKey, math.huge))
-
-  print(#data.decode64(rsaPublicKey[1]), #data.decode64(rsaPublicKey[2]))
 
   local success, clientKeyExchange, preMasterSecret = pcall(packetClientKeyExchange, rsaPublicKey, nextCipher.keyExchangeCrypt)
   if not success then
@@ -1355,8 +1369,6 @@ local function wrapSocket(sock)
     file:close()
   end
 
-  os.sleep(.05)
-
   -- CertificateVerify -- omitted
 
   -- Master secret generation
@@ -1370,8 +1382,6 @@ local function wrapSocket(sock)
     file:close()
   end
 
-  os.sleep(.05)
-
   -- Key block
   local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, nextCipher.prf, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
 
@@ -1384,14 +1394,12 @@ local function wrapSocket(sock)
   stateMgr.seqNum.write = 0
 
   -- Client Finished
-  os.sleep(.05)
   local clientFinished = packetClientFinished(handshakePackets, masterSecret, nextCipher.prf, nextCipher.mac)
   write(TLS_CONTENT_TYPES.Handshake, clientFinished)
   table.insert(handshakePackets, clientFinished)
-  os.sleep(.05)
 
   -- [ChangeCipherSpec]
-  local records = read()
+  local records = read(1)
   if records[1].contentType ~= TLS_CONTENT_TYPES.ChangeCipherSpec then
     alertClose(Alert(true, ALERTS.unexpected_message, "ChangeCipherSpec message was expected"))
   end
@@ -1400,10 +1408,11 @@ local function wrapSocket(sock)
   stateMgr.seqNum.read = 0
 
   -- Server Finished
-  if records[2].contentType ~= TLS_CONTENT_TYPES.Handshake then
+  records = read()
+  if records[1].contentType ~= TLS_CONTENT_TYPES.Handshake then
     alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
   end
-  result, handshakeMessages = pcall(parseHandshakeMessages, records[2])
+  result, handshakeMessages = pcall(parseHandshakeMessages, records[1])
   if not result then
     if type(handshakeMessages) == "table" and handshakeMessages.__name == "Alert" then
       alertClose(handshakeMessages)
@@ -1414,7 +1423,7 @@ local function wrapSocket(sock)
   if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Finished then
     alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
   end
-  local _, expectedServerFinished = nextCipher.prf(masterSecret, "server finished", nextCipher.mac(table.concat(handshakePackets)))
+  local expectedServerFinished = nextCipher.prf(masterSecret, "server finished", nextCipher.mac(table.concat(handshakePackets)), 12)
   if expectedServerFinished ~= handshakeMessages[1].data then
     alertClose(Alert(true, ALERTS.handshake_failture, "expected server finished isn't equal to the recieved one"))
   end

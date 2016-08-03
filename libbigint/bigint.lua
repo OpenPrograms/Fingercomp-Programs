@@ -84,6 +84,7 @@ local radix = 2^24 -- maybe up to 2^26 is safe?
 local radix_sqrt = fl(math.sqrt(radix))
 
 local bigintmt -- forward decl
+local bigint
 
 local function alloc()
 	local bi = {}
@@ -498,7 +499,7 @@ bigintmt = {
 local cache = {}
 local ncache = 0
 
-return function(n)
+function bigint(n)
 	if cache[n] then
 		return cache[n]
 	end
@@ -532,3 +533,5 @@ return function(n)
 	ncache = ncache + 1
 	return bi
 end
+
+return bigint
