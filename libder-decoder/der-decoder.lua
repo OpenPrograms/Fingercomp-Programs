@@ -8,8 +8,7 @@ _G.math.log10 = function(n)
   return math.log(n, 10)
 end
 
-require("bigint")
-local bigint = bigint
+local bigint = require("bigint")
 
 local function read(s, len)
   local result = s[0]:sub(1, len)
