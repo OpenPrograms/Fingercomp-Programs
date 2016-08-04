@@ -1543,6 +1543,10 @@ local function wrapSocket(sock)
     alertClose(Alert(true, ALERTS.handshake_failture, "expected server finished isn't equal to the recieved one"))
   end
 
+  for k, v in pairs(handshakeMessages) do
+    handshakeMessages[k] = nil
+  end
+
   -- FINALLY, the handshake is over.
   -- Unset the timeout, and return a table of functions.
   timeout = math.huge
@@ -1586,5 +1590,10 @@ local function newTLSSocket(url, port)
 end
 
 return {
-  tlsSocket = newTLSSocket
+  tlsSocket = newTLSSocket,
+  wrap = function(sock)
+    assert(type(sock) == "table", "bad value for `sock`: table expected")
+    assert(sock.read and sock.write and sock.close and sock.id and sock.finishConnect, "not a socket")
+    return wrapSocket(sock)
+  end
 }
