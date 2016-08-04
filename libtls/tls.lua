@@ -5,6 +5,7 @@ local uuid = require("uuid")
 
 local bigint = require("bigint")
 local derdecode = require("der-decoder")
+local lockbox = require("lockbox")
 
 local advcipher = component.advanced_cipher
 local data = component.data
@@ -247,6 +248,18 @@ local function getRealTime()
   local result = fs.lastModified(tmpname)
   fs.remove(tmpname)
   return result
+end
+
+local function noPadding()
+  return function()
+    return nil
+  end
+end
+
+local function hex(s)
+  return s:gsub(".", function(c)
+    return ("%02x"):format(c:byte())
+  end)
 end
 
 local function Alert(fatal, code, description)
@@ -503,16 +516,34 @@ local function readRecord(s)
   return result
 end
 
--- Parses TLS records, and concatenates records of the same content type
+-- Parses TLS records
 local function parseTLSRecords(packets)
   assert(type(packets) == "string", "bad value for `packets`: string expected")
   local result = {}
   local data = {[0] = packets}
   local prevRecord
   while #data[0] > 0 do
-    local record = readRecord(data)
+    result[#result+1] = readRecord(data)
+  end
+  for k, v in pairs(result) do
+    result[k] = createTLSPlaintext(v.contentType, v.data, v.version, v.length)
+  end
+  return result
+end
+
+local function concatRecords(records)
+  assert(type(records) == "table", "bad value for `records`: table expected")
+  local result = {}
+  local prevRecord
+  for k, orecord in ipairs(records) do
+    local record = {
+      contentType = orecord.contentType,
+      version = orecord.version,
+      length = orecord.length,
+      data = orecord.data
+    }
     if prevRecord then
-      if prevRecord.contentType == record.contentType then
+      if prevRecord.contentType == orecord.contentType then
         record.length = prevRecord.length + record.length
         record.data = prevRecord.data .. record.data
       else
@@ -744,9 +775,11 @@ local function createTLSCiphertext(tlsCompressed, seqNum, cipherMac)
   local cipherData = data .. mac
   local iv = cipherMac.iv()
   if cipherMac.isBlock then
-    -- workaround data card's PKCS5 padding
-    local padding = cipherMac.cipherBlockLength - ((#cipherData + 1) % cipherMac.cipherBlockLength)
-    cipherData = cipherData .. string.char(padding)
+    local padding = (#cipherData + 1) % cipherMac.cipherBlockLength
+    if padding ~= 0 then
+      padding = cipherMac.cipherBlockLength - padding
+    end
+    cipherData = cipherData .. string.char(padding):rep(padding + 1)
   end
   local encryptedData = iv .. cipherMac.cipherEncrypt(cipherData, cipherMac.clientCipherKey, iv)
   length = #encryptedData
@@ -784,18 +817,19 @@ end
 
 local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   local contentType, version, length, encryptedDataWithIV = record.contentType, record.version, record.length, record.data
-  assert(length <= 2^14 + 2048, Alert(true, ALERTS.record_overflow))
   local iv = encryptedDataWithIV:sub(1, cipherMac.ivLength)
   local encryptedData = encryptedDataWithIV:sub(cipherMac.ivLength + 1, -1)
-  local cipherData = cipherMac.cipherDecrypt(encryptedData, cipherMac.serverCipherKey, iv)
+  local cipherData, reason = cipherMac.cipherDecrypt(encryptedData, cipherMac.serverCipherKey, iv)
+  if not cipherData then
+    error(Alert(true, ALERTS.decrypt_error, "could not decrypt TLS record: " .. tostring(reason or "unknown reason")))
+  end
   local dataWithMac = cipherData
   local padding
   if cipherMac.isBlock then
     padding = uint8:unpack(cipherData:sub(-1, -1))
-    dataWithMac = cipherData:sub(1, -2)
+    dataWithMac = cipherData:sub(1, -padding - 2)
   end
   local compressedData = dataWithMac:sub(1, -cipherMac.macBlockLength - 1)
-  assert(#cipherData <= 2^14 + 1024, Alert(true, ALERTS.record_overflow))
   local recordMac
   if cipherMac.macBlockLength ~= 0 then
     recordMac = dataWithMac:sub(-cipherMac.macBlockLength, -1)
@@ -808,7 +842,7 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
     error(Alert(true, ALERTS.bad_record_mac, "the given MAC and the computed MAC don't match!"))
   end
   if cipherMac.isBlock then
-    if #dataWithMac + padding + 1 ~= #encryptedData or #encryptedData % cipherMac.cipherBlockLength ~= 0 then
+    if uint8:pack(padding):rep(padding + 1) ~= cipherData:sub(-padding - 1, -1) or #encryptedData % cipherMac.cipherBlockLength ~= 0 then
       error(Alert(true, ALERTS.bad_record_mac, "bad padding!"))
     end
   end
@@ -818,7 +852,6 @@ local function readTLSCiphertext(record, seqNum, cipherMac, compression)
   else
     error(Alert(true, ALERTS.decompression_failture, ("unknown compression type: %x"):format(compression:byte())))
   end
-  assert(#data <= 2^14 - 1, Alert(true, ALERTS.record_overflow))
   return createTLSPlaintext(contentType, data)
 end
 
@@ -871,30 +904,6 @@ local ciphers = setmetatable({
     clientMacKey = "",
     serverCipherKey = "",
     serverMacKey = ""
-  },
-  TLS_RSA_WITH_NULL_MD5 = createCipherMac {
-    csuite = "\x00\x01",
-    isBlock = false,
-    cipherEncrypt = function(data)
-      return data
-    end,
-    cipherDecrypt = function(data)
-      return data
-    end,
-    mac = callable2func(data.md5),
-    iv = function()
-      return ""
-    end,
-    prf = PRF(P_hash(function(key, data)
-      return data.md5(data, key)
-    end)),
-    keyExchangeCrypt = callable2func(advcipher.encrypt),
-    keyExchangeDecrypt = callable2func(advcipher.decrypt),
-    ivLength = 0,
-    cipherBlockLength = 0,
-    macBlockLength = 16,
-    keyLength = 0,
-    macKeyLength = 16
   }
 }, {
   __index = function(self, k)
@@ -907,20 +916,93 @@ local ciphers = setmetatable({
 })
 
 do
-  local sha256hmac = function(key, hashData)
+  local lockbox = require("lockbox")
+  lockbox.ALLOW_INSECURE = true
+
+  local stream = require("lockbox.util.stream")
+  local array = require("lockbox.util.array")
+  local md5digest = require("lockbox.digest.md5")
+  local hmac = require("lockbox.mac.hmac")()
+  local md5 = function(key, data)
+    return tobytestr(
+      hmac().setBlockSize(16)
+            .setDigest(md5digest)
+            .setKey(stream.fromString(key))
+            .init()
+            .update(string.fromString(data))
+            .finish()
+            .asBytes())
+  end
+  ciphers.TLS_RSA_WITH_NULL_MD5 = createCipherMac {
+    csuite = "\x00\x01",
+    isBlock = false,
+    cipherEncrypt = function(data)
+      return data
+    end,
+    cipherDecrypt = function(data)
+      return data
+    end,
+    mac = md5,
+    iv = function()
+      return ""
+    end,
+    prf = PRF(P_hash(md5)),
+    keyExchangeCrypt = callable2func(advcipher.encrypt),
+    keyExchangeDecrypt = callable2func(advcipher.decrypt),
+    ivLength = 0,
+    cipherBlockLength = 0,
+    macBlockLength = 16,
+    keyLength = 0,
+    macKeyLength = 16
+  }
+end
+do
+  local stream = require("lockbox.util.stream")
+  local array = require("lockbox.util.array")
+  local cbcmode = require("lockbox.cipher.mode.cbc")
+  local aes128 = require("lockbox.cipher.aes128")
+
+  local sha256 = function(key, hashData)
     if hashData then
       return data.sha256(hashData, key)
     else
       return data.sha256(key)
     end
   end
-  local sha256prf = PRF(P_hash(sha256hmac))
+  local sha256prf = PRF(P_hash(sha256))
+
+  local aes128encrypt = function(data, key, iv)
+    local cipher = cbcmode.Cipher()
+                          .setKey(array.fromString(key))
+                          .setBlockCipher(aes128)
+                          .setPadding(noPadding)
+    return array.toString(
+      cipher.init()
+            .update(stream.fromString(iv))
+            .update(stream.fromString(data))
+            .finish()
+            .asBytes())
+  end
+
+  local aes128decrypt = function(data, key, iv)
+    local decipher = cbcmode.Decipher()
+                            .setKey(array.fromString(key))
+                            .setBlockCipher(aes128)
+                            .setPadding(noPadding)
+    return array.toString(
+      decipher.init()
+              .update(stream.fromString(iv))
+              .update(stream.fromString(data))
+              .finish()
+              .asBytes())
+  end
+
   ciphers.TLS_RSA_WITH_AES_128_CBC_SHA256 = createCipherMac {
     csuite = "\x00\x3c",
     isBlock = true,
-    cipherEncrypt = callable2func(data.encrypt),
-    cipherDecrypt = callable2func(data.decrypt),
-    mac = sha256hmac,
+    cipherEncrypt = aes128encrypt,
+    cipherDecrypt = aes128decrypt,
+    mac = sha256,
     iv = function()
       return getRandom(16)
     end,
@@ -942,7 +1024,7 @@ do
     cipherDecrypt = function(data)
       return data
     end,
-    mac = sha256hmac,
+    mac = sha256,
     iv = function()
       return ""
     end,
@@ -1099,6 +1181,7 @@ local function wrapSocket(sock)
   local stateMgr = newStateManager()
   local close, alertClose
   local isClosed = false
+  local closedByServer = false
   local reads = read
   local timeout = 5 -- the timeout will be unset at the end of handshake
   local readBuffer = ""
@@ -1109,7 +1192,11 @@ local function wrapSocket(sock)
   end
   local function writeRaw(data)
     if isClosed then
-      return nil, "socket is closed"
+      if closedByServer then
+        return nil, "closed by the server"
+      else
+        return nil, "socket is closed"
+      end
     end
     local result = {pcall(sock.write, data)}
     if not result[1] then
@@ -1120,7 +1207,11 @@ local function wrapSocket(sock)
   end
   local function write(contentType, data, noWriteOnClose)
     if isClosed then
-      return nil, "socket is closed"
+      if closedByServer then
+        return nil, "closed by the server"
+      else
+        return nil, "socket is closed"
+      end
     end
     local recordResult = {xpcall(stateMgr.TLSRecord, function(m)return m .. debug.traceback()end, stateMgr, contentType, data)}
     if not recordResult[1] then
@@ -1134,32 +1225,46 @@ local function wrapSocket(sock)
   end
   local function readRaw(n)
     if isClosed then
-      return nil, "socket is closed"
+      if closedByServer then
+        return nil, "closed by the server"
+      else
+        return nil, "socket is closed"
+      end
     end
     if not ({["number"] = true, ["nil"] = true})[type(n)] then
       return nil, "bad argument #1: number or nil expected"
     end
     local data = ""
+    local noDataToReceive = true
     if not n then
       local gotNonNilChunk = false
-      local emptyChunksLeft = 5
       local readStartTime = comp.uptime()
       repeat
-        local chunk = sock.read(64)
+        local chunk = sock.read(8196)
         if chunk == "" then
-          if emptyChunksLeft == 0 then
-            break
+          if sock.finishConnect() then -- the connection is still alive
+            if gotNonNilChunk then
+              noDataToReceive = false
+              gotNonNilChunk = false
+              readStartTime = comp.uptime()
+            end
           end
-          emptyChunksLeft = emptyChunksLeft - 1
+          os.sleep(.05)
         elseif chunk then
           data = data .. chunk
           gotNonNilChunk = true
+          noDataToReceive = false
+          os.sleep(.05)
         else
           os.sleep(.05)
         end
       until not chunk and gotNonNilChunk or not gotNonNilChunk and comp.uptime() - readStartTime > timeout
     else
+      gotNonNilChunk = true
       data = sock.read(n)
+    end
+    if noDataToReceive then
+      return readBuffer, "recieved nothing"
     end
     readBuffer = readBuffer .. data
     return readBuffer
@@ -1169,9 +1274,13 @@ local function wrapSocket(sock)
       n = math.huge
     end
     if isClosed then
-      return nil, "socket is closed"
+      if closedByServer then
+        return nil, "closed by the server"
+      else
+        return nil, "socket is closed"
+      end
     end
-    local data = readRaw()
+    local data, reason = readRaw()
     if data and data ~= "" then
       local success, records = pcall(parseTLSRecords, data)
       if not success then
@@ -1202,8 +1311,12 @@ local function wrapSocket(sock)
           end
         end
         decryptedRecords[k] = result[2]
-        if result[2].contentType == TLS_CONTENT_TYPES.Alert then
-          local alertData = {[0] = result[2].data}
+        records[k] = nil
+      end
+      local resultRecords = concatRecords(decryptedRecords)
+      for k, record in ipairs(resultRecords) do
+        if record.contentType == TLS_CONTENT_TYPES.Alert then
+          local alertData = {[0] = record.data}
           local fatal, code = reads(alertData, 1):byte(), reads(alertData, 1):byte()
           if not fatal or fatal == "" or not code or code == "" then
             close(Alert(true, ALERTS.decode_error))
@@ -1215,14 +1328,17 @@ local function wrapSocket(sock)
             if code ~= ALERTS.close_notify then
               error("Fatal alert sent by the server: " .. ALERTS[alert.code])
             else
-              return nil, "closed by the server"
+              close()
+              closedByServer = true
             end
           end
         end
-        records[k] = nil
       end
-      return decryptedRecords
+      return resultRecords
     elseif data == "" then
+      if reason == "recieved nothing" then
+        return nil, "timed out"
+      end
       close(nil, true)
       error("timed out")
     end
@@ -1437,7 +1553,10 @@ local function wrapSocket(sock)
       return write(TLS_CONTENT_TYPES.ApplicationData, data)
     end,
     read = function()
-      local packets = read()
+      local packets, reason = read()
+      if not packets then
+        return packets, reason
+      end
       local data = ""
       for _, packet in ipairs(packets) do
         data = data .. packet.data
@@ -1445,7 +1564,7 @@ local function wrapSocket(sock)
       return data
     end,
     close = function()
-      close()
+      return close()
     end,
     id = function()
       return sock.id()
