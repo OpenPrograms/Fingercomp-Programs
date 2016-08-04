@@ -114,7 +114,6 @@ decoders[0x02] = function(s, id, len) -- INTEGER
   end
   for i = 1, len, 1 do
     result = (result * 256) + read(s, 1):byte()
-    os.sleep(.05)
   end
   return result
 end
@@ -231,7 +230,6 @@ decoders[0x03] = function(s, id, len) -- BIT STRING
         result[j] = ("%02X"):format(byte // 2)
         bovr = (byte % 2) * 100
       end
-      os.sleep(.05)
     end
     return table.concat(result):gsub("%x%x", function(n)
       return string.char(tonumber(n, 16))
@@ -504,7 +502,6 @@ function decode(s, kwargs)
   end
   local result = decoders[id.tag](s, id, len, kwargs)
   -- print(tostring(result):gsub(".",function(c)return("%02X"):format(c:byte())end))
-  os.sleep(.05)
   return result
 end
 
