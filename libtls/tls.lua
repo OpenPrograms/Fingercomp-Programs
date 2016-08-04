@@ -1240,7 +1240,7 @@ local function wrapSocket(sock)
       local gotNonNilChunk = false
       local readStartTime = comp.uptime()
       repeat
-        local chunk = sock.read(8196)
+        local chunk = sock.read(1024)
         if chunk == "" then
           if sock.finishConnect() then -- the connection is still alive
             if gotNonNilChunk then
@@ -1249,15 +1249,12 @@ local function wrapSocket(sock)
               readStartTime = comp.uptime()
             end
           end
-          os.sleep(.05)
         elseif chunk then
           data = data .. chunk
           gotNonNilChunk = true
           noDataToReceive = false
-          os.sleep(.05)
-        else
-          os.sleep(.05)
         end
+        os.sleep(.05)
       until not chunk and gotNonNilChunk or not gotNonNilChunk and comp.uptime() - readStartTime > timeout
     else
       gotNonNilChunk = true
@@ -1312,6 +1309,7 @@ local function wrapSocket(sock)
         end
         decryptedRecords[k] = result[2]
         records[k] = nil
+        os.sleep(.05)
       end
       local resultRecords = concatRecords(decryptedRecords)
       for k, record in ipairs(resultRecords) do
@@ -1333,6 +1331,7 @@ local function wrapSocket(sock)
             end
           end
         end
+        os.sleep(.05)
       end
       return resultRecords
     elseif data == "" then
@@ -1568,6 +1567,9 @@ local function wrapSocket(sock)
     end,
     id = function()
       return sock.id()
+    end,
+    isClosed = function()
+      return isClosed and sock.finishConnect()
     end,
     setTimeout = setTimeout
   }
