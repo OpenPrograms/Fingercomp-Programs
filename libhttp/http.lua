@@ -30,7 +30,7 @@ end
 local function trainCase(str)
   local parts = {}
   for part in str:gmatch("[^-]+") do
-    parts[#parts+1] = part:sub(1, 1):upper() .. part:sub(2, -1)
+    parts[#parts+1] = part:sub(1, 1):upper() .. part:sub(2, -1):lower()
   end
   return table.concat(parts, "-")
 end
@@ -171,7 +171,8 @@ local function newHTTPRequest(url, kwargs, ...)
     assert(k:sub(1, 1) ~= "-" and k:sub(-1, -1) ~= "-", "bad header name")
     headers[trainCase(k)] = v:gsub("[^ \t" .. visibleChars .. "\x80-\xff]", "")
   end
-  method = method and method:gsub("[^a-zA-Z]", "") or "GET"
+  method = method and method:gsub("[^a-zA-Z]", "")
+  if body and not method then method = "POST" end
   if method == "" then method = "GET" end
   -- convert query to string
   local queryStr = {}
@@ -321,7 +322,7 @@ local function newHTTPRequest(url, kwargs, ...)
       return read(body, n)
     end,
     response = function()
-      return status.status, status.reason, headers
+      return tonumber(status.status) or status.status, status.reason, headers
     end
   }
 end
