@@ -1605,7 +1605,7 @@ local function wrapSocket(sock, extensions)
       return sock.id()
     end,
     isClosed = function()
-      return (isClosed and sock.finishConnect()) and true or false
+      return (isClosed and not sock.finishConnect()) and true or false
     end,
     setTimeout = setTimeout
   }
