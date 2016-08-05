@@ -1112,11 +1112,15 @@ local function packetClientHello(ciphersA, compressionA, extensionsA)
   -- 4. Extensions
   local extensions = ""
   do
-    local c = extensionsA or {
-      {"\x00\x0d", "\x00\x02\x04\x01"} -- signature_algorithms: SHA256 + RSA
-    }
-    for i, j in pairs(c) do
-      c[i] = j[1] .. uint16:pack(#j[2]) .. j[2]
+    local c = extensionsA or {}
+    c["\x00\x0d"] = "\x00\x02\x04\x01" -- signature_algorithms: SHA256 + RSA
+    local i = 1
+    for k, v in pairs(c) do
+      if type(v) == "table" then
+        v = table.concat(v)
+      end
+      c[i] = k .. uint16:pack(#v) .. v
+      i = i + 1
     end
     extensions = uint16:pack(#table.concat(c)) .. table.concat(c)
   end
@@ -1167,7 +1171,7 @@ end
 
 -- Makes sure the connection is always properly closed.
 -- Also begins a handshake.
-local function wrapSocket(sock)
+local function wrapSocket(sock, extensions)
   local connected, reason = false, nil
   for i = 1, 100, 1 do
     connected, reason = sock.finishConnect()
@@ -1184,7 +1188,7 @@ local function wrapSocket(sock)
   local isClosed = false
   local closedByServer = false
   local reads = read
-  local timeout = 5 -- the timeout will be unset at the end of handshake
+  local timeout = 10 -- the timeout will be unset at the end of handshake
   local readBuffer = ""
   local function setTimeout(to)
     assert(type(to) == "number", "bad value for `to`: number expected")
@@ -1237,8 +1241,8 @@ local function wrapSocket(sock)
     end
     local data = ""
     local noDataToReceive = true
+    local gotNonNilChunk = false
     if not n then
-      local gotNonNilChunk = false
       local readStartTime = comp.uptime()
       repeat
         local chunk = sock.read(1024)
@@ -1246,8 +1250,7 @@ local function wrapSocket(sock)
           if sock.finishConnect() then -- the connection is still alive
             if gotNonNilChunk then
               noDataToReceive = false
-              gotNonNilChunk = false
-              readStartTime = comp.uptime()
+              break
             end
           end
         elseif chunk then
@@ -1261,7 +1264,7 @@ local function wrapSocket(sock)
       gotNonNilChunk = true
       data = sock.read(n)
     end
-    if noDataToReceive then
+    if noDataToReceive or not gotNonNilChunk then
       return readBuffer, "recieved nothing"
     end
     readBuffer = readBuffer .. data
@@ -1278,69 +1281,88 @@ local function wrapSocket(sock)
         return nil, "socket is closed"
       end
     end
-    local data, reason = readRaw()
-    if data and data ~= "" then
-      local success, records = pcall(parseTLSRecords, data)
-      if not success then
-        if type(records) == "table" and records.__name == "Alert" then
-          alertClose(records)
-        else
-          alertClose(Alert(true, ALERTS.internal_error, "could not parse TLS records: " .. tostring(records or "unknown reason")))
-        end
-      end
-      local storeInBuffer = {}
-      for k, record in ipairs(records) do
-        if n == 0 then
-          storeInBuffer[#storeInBuffer+1] = record.packet()
-          records[k] = nil
-        else
-          n = n - 1
-        end
-      end
-      readBuffer = table.concat(storeInBuffer)
-      local decryptedRecords = {}
-      for k, record in pairs(records) do
-        local result = {pcall(readTLSCiphertext, record, stateMgr.seqNum, stateMgr.read.cipher, stateMgr.read.compression)}
-        if not result[1] then
-          if type(result[2]) == "table" and result[2].__name == "Alert" then
-            alertClose(result[2])
+    local success, records
+    if #readBuffer >= n * 5 then
+      do
+        local r
+        success, r = pcall(parseTLSRecords, readBuffer)
+        if not success then
+          if type(r) == "table" and r.__name == "Alert" then
+            alertClose(r)
           else
-            alertClose(Alert(true, ALERTS.internal_error, "could not decrypt TLS record: " .. tostring(result[2] or "unknown reason")))
+            alertClose(Alert(true, ALERTS.internal_error, "could not parse TLS records: " .. tostring(records or "unknown reason")))
           end
         end
-        decryptedRecords[k] = result[2]
+        if #readBuffer >= n * 5 and type(r) == "table" and #r >= n then
+          records = r
+        end
+      end
+    end
+    if not records then
+      local data, reason = readRaw()
+      if data and data ~= "" then
+        success, records = pcall(parseTLSRecords, data)
+        if not success then
+          if type(records) == "table" and records.__name == "Alert" then
+            alertClose(records)
+          else
+            alertClose(Alert(true, ALERTS.internal_error, "could not parse TLS records: " .. tostring(records or "unknown reason")))
+          end
+        end
+      elseif data == "" then
+        if reason == "recieved nothing" then
+          return nil, "timed out"
+        end
+        close(nil, true)
+        error("timed out")
+      end
+    end
+    local storeInBuffer = {}
+    for k, record in ipairs(records) do
+      if n == 0 then
+        storeInBuffer[#storeInBuffer+1] = record.packet()
         records[k] = nil
-        os.sleep(.05)
+      else
+        n = n - 1
       end
-      local resultRecords = concatRecords(decryptedRecords)
-      for k, record in ipairs(resultRecords) do
-        if record.contentType == TLS_CONTENT_TYPES.Alert then
-          local alertData = {[0] = record.data}
-          local fatal, code = reads(alertData, 1):byte(), reads(alertData, 1):byte()
-          if not fatal or fatal == "" or not code or code == "" then
-            close(Alert(true, ALERTS.decode_error))
-            error("Could not decode the alert")
-          end
-          if fatal then
-            local alert = Alert(fatal, code)
-            close(nil, true)
-            if code ~= ALERTS.close_notify then
-              error("Fatal alert sent by the server: " .. ALERTS[alert.code])
-            else
-              close()
-              closedByServer = true
-            end
+    end
+    readBuffer = table.concat(storeInBuffer)
+    local decryptedRecords = {}
+    for k, record in pairs(records) do
+      local result = {pcall(readTLSCiphertext, record, stateMgr.seqNum, stateMgr.read.cipher, stateMgr.read.compression)}
+      if not result[1] then
+        if type(result[2]) == "table" and result[2].__name == "Alert" then
+          alertClose(result[2])
+        else
+          alertClose(Alert(true, ALERTS.internal_error, "could not decrypt TLS record: " .. tostring(result[2] or "unknown reason")))
+        end
+      end
+      decryptedRecords[k] = result[2]
+      records[k] = nil
+      os.sleep(.05)
+    end
+    local resultRecords = concatRecords(decryptedRecords)
+    for k, record in ipairs(resultRecords) do
+      if record.contentType == TLS_CONTENT_TYPES.Alert then
+        local alertData = {[0] = record.data}
+        local fatal, code = reads(alertData, 1):byte(), reads(alertData, 1):byte()
+        if not fatal or fatal == "" or not code or code == "" then
+          close(Alert(true, ALERTS.decode_error))
+          error("Could not decode the alert")
+        end
+        if fatal then
+          local alert = Alert(fatal, code)
+          close(nil, true)
+          if code ~= ALERTS.close_notify then
+            error("Fatal alert sent by the server: " .. ALERTS[alert.code])
+          else
+            close()
+            closedByServer = true
           end
         end
-        os.sleep(.05)
       end
+      os.sleep(.05)
       return resultRecords
-    elseif data == "" then
-      if reason == "recieved nothing" then
-        return nil, "timed out"
-      end
-      close(nil, true)
-      error("timed out")
     end
   end
   function close(alert, noWriteOnClose)
@@ -1363,7 +1385,7 @@ local function wrapSocket(sock)
   for _, v in pairs(ciphers) do
     table.insert(cipherSuites, v.csuite)
   end
-  local packet, clientRandom = packetClientHello(cipherSuites)
+  local packet, clientRandom = packetClientHello(cipherSuites, nil, nil, extensions)
   write(TLS_CONTENT_TYPES.Handshake, packet)
   table.insert(handshakePackets, packet)
 
@@ -1409,6 +1431,9 @@ local function wrapSocket(sock)
 
   local nextCipher = ciphers[serverHello.cipher]
   local nextCompression = serverHello.compression
+  if not nextCipher then
+    alertClose(Alert(true, ALERTS.handshake_failture, "server requested to use unsupported cipher suite"))
+  end
 
   if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Certificate then
     alertClose(Alert(true, ALERTS.unexpected_message, "unexpected handshake message was sent by the server"))
@@ -1515,7 +1540,10 @@ local function wrapSocket(sock)
   table.insert(handshakePackets, clientFinished)
 
   -- [ChangeCipherSpec]
-  local records = read(1)
+  local records, reason = read(1)
+  if not records then
+    alertClose(Alert(true, ALERTS.internal_error, "could not read the data: " .. tostring(reason or "unknown reason")))
+  end
   if records[1].contentType ~= TLS_CONTENT_TYPES.ChangeCipherSpec then
     alertClose(Alert(true, ALERTS.unexpected_message, "ChangeCipherSpec message was expected"))
   end
@@ -1524,7 +1552,10 @@ local function wrapSocket(sock)
   stateMgr.seqNum.read = 0
 
   -- Server Finished
-  records = read()
+  local records, reason = read(1)
+  if not records then
+    alertClose(Alert(true, ALERTS.handshake_failture, "could not read the data: " .. tostring(reason or "unknown reason")))
+  end
   if records[1].contentType ~= TLS_CONTENT_TYPES.Handshake then
     alertClose(Alert(true, ALERTS.unexpected_message, "Server Finished message was expected"))
   end
@@ -1556,8 +1587,8 @@ local function wrapSocket(sock)
     write = function(data)
       return write(TLS_CONTENT_TYPES.ApplicationData, data)
     end,
-    read = function()
-      local packets, reason = read()
+    read = function(n)
+      local packets, reason = read(n)
       if not packets then
         return packets, reason
       end
@@ -1580,21 +1611,21 @@ local function wrapSocket(sock)
   }
 end
 
-local function newTLSSocket(url, port)
+local function newTLSSocket(url, port, ext)
   local socket
-  if port then
-    socket = wrapSocket(inet.connect(url, port))
+  if type(port) == "number" then
+    socket = wrapSocket(inet.connect(url, port), ext)
   else
-    socket = wrapSocket(inet.connect(url))
+    socket = wrapSocket(inet.connect(url), port)
   end
   return socket
 end
 
 return {
   tlsSocket = newTLSSocket,
-  wrap = function(sock)
+  wrap = function(sock, ext)
     assert(type(sock) == "table", "bad value for `sock`: table expected")
     assert(sock.read and sock.write and sock.close and sock.id and sock.finishConnect, "not a socket")
-    return wrapSocket(sock)
+    return wrapSocket(sock, ext)
   end
 }
