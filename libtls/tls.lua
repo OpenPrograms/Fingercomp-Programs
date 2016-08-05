@@ -393,11 +393,10 @@ hsDecoders[HANDSHAKE_TYPES.Certificate] = function(data)
           table.insert(v, 2, false)
         end
         if not x509oid[table.concat(v[1], ".")] then
-          local pfunc = print
           if v[2] then
             error(Alert(v[2], ALERTS.certificate_unknown, "Unknown extension: " .. table.concat(v[1], ".") .. "\nPlease leave an issue at https://github.com/OpenPrograms/Fingercomp-Programs/issues"))
-          else
-            print("Unknown extension: " .. table.concat(v[1], ".") .. "\nPlease leave an issue at https://github.com/OpenPrograms/Fingercomp-Programs/issues")
+          -- else
+          --   print("Unknown extension: " .. table.concat(v[1], ".") .. "\nPlease leave an issue at https://github.com/OpenPrograms/Fingercomp-Programs/issues")
           end
         end
         local ext = {
@@ -1622,6 +1621,9 @@ local function wrapSocket(sock, extensions)
     end,
     isClosed = function()
       return (isClosed and not sock.finishConnect()) and true or false
+    end,
+    finishConnect = function()
+      return sock.finishConnect()
     end,
     setTimeout = setTimeout
   }
