@@ -51,6 +51,22 @@ local function callable2func(callable)
   end
 end
 
+local function check(value, arg, ...)
+  local types = {...}
+  if type(arg) == "number" then
+    arg = "#" .. arg
+  else
+    arg = "`" .. arg .. "`"
+  end
+  for _, t in pairs(types) do
+    ttype = type(value)
+    if ttype == t or ttype == "table" and t.__name == t then
+      return true
+    end
+  end
+  error("bad value for " .. arg .. ": " .. table.concat(types, " or ") .. ", got " .. tostring(ttype == "table" and t.__name or ttype))
+end
+
 local TLS_CONTENT_TYPES = enum({
   ChangeCipherSpec = 0x14,
   Alert = 0x15,
@@ -464,10 +480,10 @@ local function newSequenceNum()
 end
 
 local function createTLSPlaintext(contentType, data, version, length)
-  assert(type(data) == "string", "bad value for `data`: string expected")
-  assert(type(contentType) == "number", "bad value for `contentType`: number expected")
-  assert(({["number"] = true, ["nil"] = true})[type(version)], "bad value for `version`: number or nil expected")
-  assert(({["number"] = true, ["nil"] = true})[type(length)], "bad value for `length`: number or nil expected")
+  check(data, "data", "string")
+  check(contentType, "contentType", "number")
+  check(version, "version", "number", "nil")
+  check(length, "length", "number", "nil")
   assert(TLS_CONTENT_TYPES[contentType], "unknown content type")
   assert(contentType == 0x17 or #data ~= 0, "length of non-application data must not be 0")
   local version = version or TLS_VERSION
@@ -519,7 +535,7 @@ end
 
 -- Parses TLS records
 local function parseTLSRecords(packets)
-  assert(type(packets) == "string", "bad value for `packets`: string expected")
+  check(packets, "packets", "string")
   local result = {}
   local data = {[0] = packets}
   local prevRecord
@@ -533,7 +549,7 @@ local function parseTLSRecords(packets)
 end
 
 local function concatRecords(records)
-  assert(type(records) == "table", "bad value for `records`: table expected")
+  check(records, "records", "table")
   local result = {}
   local prevRecord
   for k, orecord in ipairs(records) do
@@ -561,7 +577,7 @@ local function concatRecords(records)
 end
 
 local function parseHandshakeMessages(record)
-  assert(type(record) == "table", "bad value for `record`: table expected")
+  check(record, "record", "table")
   assert(record.contentType == TLS_CONTENT_TYPES.Handshake, "handshake record expected")
   local data = {[0] = record.data}
   local result = {}
@@ -643,24 +659,24 @@ local function createCipherMac(args)
   local clientMacKey = args.clientMacKey
   local serverCipherKey = args.serverCipherKey
   local serverMacKey = args.serverMacKey
-  assert(type(csuite) == "string", "bad value for `csuite`: string expected")
-  assert(type(isBlock) == "boolean", "bad value for `isBlock`: boolean expected")
-  assert(type(cipherEncrypt) == "function", "bad value for `cipherEncrypt`: function expected")
-  assert(type(cipherDecrypt) == "function", "bad value for `cipherDecrypt`: function expected")
-  assert(type(mac) == "function", "bad value for `mac`: function expected")
-  assert(type(iv) == "function", "bad value for `iv`: function expected")
-  assert(type(prf) == "function", "bad value for `prf`: function expected")
-  assert(type(keyExchangeCrypt) == "function", "bad value for `keyExchangeCrypt`: function expected")
-  assert(type(keyExchangeDecrypt) == "function", "bad value for `keyExchangeDecrypt`: function expected")
-  assert(type(ivLength) == "number", "bad value for `ivLength`: number expected")
-  assert(type(cipherBlockLength) == "number", "bad value for `cipherBlockLength`: number expected")
-  assert(type(macBlockLength) == "number", "bad value for `macBlockLength`: number expected")
-  assert(type(keyLength) == "number", "bad value for `keyLength`: number expected")
-  assert(type(macKeyLength) == "number", "bad value for `macKeyLength`: number expected")
-  assert(({["string"] = true, ["nil"] = true})[type(clientCipherKey)], "bad value for `clientCipherKey`: string or nil expected")
-  assert(({["string"] = true, ["nil"] = true})[type(clientMacKey)], "bad value for `clientMacKey`: string or nil expected")
-  assert(({["string"] = true, ["nil"] = true})[type(serverCipherKey)], "bad value for `serverCipherKey`: string or nil expected")
-  assert(({["string"] = true, ["nil"] = true})[type(serverMacKey)], "bad value for `serverMacKey`: string or nil expected")
+  check(csuite,             "csuite",             "string")
+  check(isBlock,            "isBlock",            "boolean")
+  check(cipherEncrypt,      "cipherEncrypt",      "function")
+  check(cipherDecrypt,      "cipherDecrypt",      "function")
+  check(mac,                "mac",                "function")
+  check(iv,                 "iv",                 "function")
+  check(prf,                "prf",                "function")
+  check(keyExchangeCrypt,   "keyExchangeCrypt",   "function")
+  check(keyExchangeDecrypt, "keyExchangeDecrypt", "function")
+  check(ivLength,           "ivLength",           "number")
+  check(cipherBlockLength,  "cipherBlockLength",  "number")
+  check(macBlockLength,     "macBlockLength",     "number")
+  check(keyLength,          "keyLength",          "number")
+  check(macKeyLength,       "macKeyLength",       "number")
+  check(clientCipherKey,    "clientCipherKey",    "string", "nil")
+  check(clientMacKey,       "clientMacKey",       "string", "nil")
+  check(serverCipherKey,    "serverCipherKey",    "string", "nil")
+  check(serverMacKey,       "serverMacKey",       "string", "nil")
   if not (clientCipherKey and clientMacKey and serverCipherKey and serverMacKey) and (clientCipherKey or clientMacKey or serverCipherKey or serverMacKey) then
     error("all keys are expected to be provided")
   end
@@ -747,10 +763,10 @@ local function createCipherMac(args)
     end,
     __call = function(self, clCipherKey, clMacKey, srvCipherKey, srvMacKey)
       if not setKeys then
-        assert(type(clCipherKey) == "string", "bad value for `clCipherKey`: string expected")
-        assert(type(clMacKey) == "string", "bad value for `clMacKey`: string expected")
-        assert(type(srvCipherKey) == "string", "bad value for `srvCipherKey`: string expected")
-        assert(type(srvMacKey) == "string", "bad value for `srvMacKey`: string expected")
+        check(clCipherKey, "clCipherKey", string)
+        check(clMacKey, "clMacKey", string)
+        check(srvCipherKey, "srvCipherKey", string)
+        check(srvMacKey, "srvMacKey", string)
         local params = {}
         for k, v in pairs(self) do
           if k ~= "new" then
@@ -1191,7 +1207,7 @@ local function wrapSocket(sock, extensions)
   local timeout = 10 -- the timeout will be unset at the end of handshake
   local readBuffer = ""
   local function setTimeout(to)
-    assert(type(to) == "number", "bad value for `to`: number expected")
+    check(to, "to", number)
     assert(to > 0, "timeout must be a positive number")
     timeout = to
   end
@@ -1624,7 +1640,7 @@ end
 return {
   tlsSocket = newTLSSocket,
   wrap = function(sock, ext)
-    assert(type(sock) == "table", "bad value for `sock`: table expected")
+    check(sock, "sock", table)
     assert(sock.read and sock.write and sock.close and sock.id and sock.finishConnect, "not a socket")
     return wrapSocket(sock, ext)
   end
