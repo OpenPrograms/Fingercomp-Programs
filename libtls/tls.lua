@@ -763,10 +763,10 @@ local function createCipherMac(args)
     end,
     __call = function(self, clCipherKey, clMacKey, srvCipherKey, srvMacKey)
       if not setKeys then
-        check(clCipherKey, "clCipherKey", string)
-        check(clMacKey, "clMacKey", string)
-        check(srvCipherKey, "srvCipherKey", string)
-        check(srvMacKey, "srvMacKey", string)
+        check(clCipherKey, "clCipherKey", "string")
+        check(clMacKey, "clMacKey", "string")
+        check(srvCipherKey, "srvCipherKey", "string")
+        check(srvMacKey, "srvMacKey", "string")
         local params = {}
         for k, v in pairs(self) do
           if k ~= "new" then
@@ -1207,7 +1207,7 @@ local function wrapSocket(sock, extensions)
   local timeout = 10 -- the timeout will be unset at the end of handshake
   local readBuffer = ""
   local function setTimeout(to)
-    check(to, "to", number)
+    check(to, "to", "number")
     assert(to > 0, "timeout must be a positive number")
     timeout = to
   end
@@ -1640,7 +1640,7 @@ end
 return {
   tlsSocket = newTLSSocket,
   wrap = function(sock, ext)
-    check(sock, "sock", table)
+    check(sock, "sock", "table")
     assert(sock.read and sock.write and sock.close and sock.id and sock.finishConnect, "not a socket")
     return wrapSocket(sock, ext)
   end
