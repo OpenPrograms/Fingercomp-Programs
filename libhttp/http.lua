@@ -276,3 +276,5 @@ local function newHTTPRequest(url, kwargs, ...)
     end
   }
 end
+
+return newHTTPRequest
