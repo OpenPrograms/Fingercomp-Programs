@@ -19,5 +19,13 @@ This is a place where brilliant ideas become the programs.
   * A MoonScript port of a parser of semantic version strings originally written in Python.
 * `libaevent`
   * An advanced event library.
-* `libmetanum`
-  * Enables one to have *very* big numbers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported.
+* `libbigint`
+  * Enables one to have *very* big integers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported.
+* `libder-decoder`
+  * Decodes the data encoded using Distinguished Encoding Rules, a subset of ASN.1. For example, x.509 certificates.
+* `lua-lockbox`
+  * The most awesome pure Lua cryptography toolkit that I've ever found.
+* `libtls`
+  * An (uncomplete, though) implementation of TLS 1.2.
+* `libhttp`
+  * A HTTP/HTTPS 1.1 library that allows to specify a request method (`GET`, `POST`, `DELETE`, `PATCH`, etc.)
