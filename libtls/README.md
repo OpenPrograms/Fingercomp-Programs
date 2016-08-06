@@ -74,6 +74,18 @@ Either way, you get a table of functions.
 * `socket.finishConnect(): boolean[, string]` — directly calls raw socket's method with the same name.
 * `socket.setTimeout(n: number)` — sets the read timeout, in seconds.
 
+### Extensions
+
+The `extensions` argument is a table of extensions that looks like this:
+
+```lua
+{
+  ["\x00\x10"] = "\x09\x08http/1.1"
+}
+```
+
+The key is an extension type, and the extension data is the value. The length of value is calculated automatically.
+
 ## Some random questions
 
 ### WHY IS THIS THING SO SLOOOOOOOOW?
