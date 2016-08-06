@@ -149,14 +149,20 @@ local function newHTTPRequest(url, kwargs, ...)
   end
   -- escape the fragment string
   fragment = encode(fragment)
+  -- Train-Case the header names, and strip some characters
+  for k, v in pairs(headers) do
+    k = k:gsub("[^" .. tokenChars .. "]", "")
+    assert(k:sub(1, 1) ~= "-" and k:sub(-1, -1) ~= "-", "bad header name")
+    headers[trainCase(k)] = v:gsub("[^ \t" .. visibleChars .. "\x80-\xff]", "")
+  end
   -- set headers
   headers = headers or {}
-  headers["Content-Type"] = "text/html; encoding=utf-8"
+  headers["Content-Type"] = headers["Content-Type"] or "text/html; encoding=utf-8"
   headers["Accept"] = "*/*"
   if not isIP then
     headers["Host"] = domain
   end
-  headers["User-Agent"] = "OpenComputers"
+  headers["User-Agent"] = headers["User-Agent"] or "OpenComputers"
   if closeConnection then
     headers["Connection"] = "close"
   else
@@ -164,12 +170,6 @@ local function newHTTPRequest(url, kwargs, ...)
   end
   if body then
     headers["Content-Length"] = tostring(#body)
-  end
-  -- Train-Case the header names, and strip some characters
-  for k, v in pairs(headers) do
-    k = k:gsub("[^" .. tokenChars .. "]", "")
-    assert(k:sub(1, 1) ~= "-" and k:sub(-1, -1) ~= "-", "bad header name")
-    headers[trainCase(k)] = v:gsub("[^ \t" .. visibleChars .. "\x80-\xff]", "")
   end
   method = method and method:gsub("[^a-zA-Z]", "")
   if body and not method then method = "POST" end
