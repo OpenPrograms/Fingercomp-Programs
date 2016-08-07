@@ -86,6 +86,11 @@ The `extensions` argument is a table of extensions that looks like this:
 
 The key is an extension type, and the extension data is the value. The length of value is calculated automatically.
 
+## Hardware dependencies
+* Advanced cipher block (Computronics), it provides RSA encryption.
+* Second-tier data card, sha256 and md5 HMAC algorithms, and secure random generator.
+* Internet card, I guess I don't need to explain why this is needed.
+
 ## Some random questions
 
 ### WHY IS THIS THING SO SLOOOOOOOOW?
