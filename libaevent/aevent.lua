@@ -84,15 +84,35 @@ return setmetatable({
         return inst
       end
     })
+  end,
+
+  stdEvent = function (self, name)
+    local event = require("event")
+    table.insert(self.stdEvents, name)
+    event.listen(name, self.eventListener)
   end
 }, {
-  __call = function (cls)
+  __call = function (cls, incStdEvt)
     local self = setmetatable({}, {__index = cls})
 
     self.keys = {}
     self.priorities = {}
     self.maxPriority = 0
 
+    -- Create a new listener for each engine
+    self.eventListener = function(evt, ...)
+      local e = self:event(evt)
+      self:push(e(table.pack(...)))
+    end
+
     return self
+  end,
+  __gc = function (self)
+    if #self.stdEvents > 0 then
+      local event = require("event")
+      for name in self.stdEvents do
+        event.ignore(name, self.eventListener)
+      end
+    end
   end
 })
