@@ -7,6 +7,8 @@ local bigint = require("bigint")
 local derdecode = require("der-decoder")
 local lockbox = require("lockbox")
 
+local base64 = require("lockbox.util.base64")
+
 local advcipher = component.advanced_cipher
 local data = component.data
 local inet = component.internet
@@ -940,14 +942,21 @@ do
   local md5digest = require("lockbox.digest.md5")
   local hmac = require("lockbox.mac.hmac")()
   local md5 = function(key, data)
-    return tobytestr(
-      hmac().setBlockSize(16)
-            .setDigest(md5digest)
-            .setKey(stream.fromString(key))
-            .init()
-            .update(string.fromString(data))
-            .finish()
-            .asBytes())
+    if data then
+      return array.toString(
+        hmac().setBlockSize(64)
+              .setDigest(md5digest)
+              .setKey(array.fromString(key))
+              .init()
+              .update(stream.fromString(data))
+              .finish()
+              .asBytes())
+    else
+      return array.toString(
+        md5digest().update(stream.fromString(key))
+                   .finish()
+                   .asBytes())
+    end
   end
   ciphers.TLS_RSA_WITH_NULL_MD5 = createCipherMac {
     csuite = "\x00\x01",
@@ -977,12 +986,24 @@ do
   local array = require("lockbox.util.array")
   local cbcmode = require("lockbox.cipher.mode.cbc")
   local aes128 = require("lockbox.cipher.aes128")
+  local sha256digest = require("lockbox.digest.sha2_256")
+  local hmac = require("lockbox.mac.hmac")
 
   local sha256 = function(key, hashData)
     if hashData then
-      return data.sha256(hashData, key)
+      return array.toString(
+        hmac().setBlockSize(64)
+              .setDigest(sha256digest)
+              .setKey(array.fromString(key))
+              .init()
+              .update(stream.fromString(hashData))
+              .finish()
+              .asBytes())
     else
-      return data.sha256(key)
+      return array.toString(
+        sha256digest().update(stream.fromString(key))
+                      .finish()
+                      .asBytes())
     end
   end
   local sha256prf = PRF(P_hash(sha256))
@@ -1160,7 +1181,7 @@ local function packetClientKeyExchange(publicKey, rsaCrypt)
   if not eData64 then
     error(Alert(true, ALERTS.internal_error, "could not encrypt PMS with the public key: " .. tostring(reason or "unknown reason")))
   end
-  local encryptedPreMasterSecret = data.decode64(eData64)
+  local encryptedPreMasterSecret = base64.toString(eData64)
   return createHandshakePacket(HANDSHAKE_TYPES.ClientKeyExchange, uint16:pack(#encryptedPreMasterSecret) .. encryptedPreMasterSecret), preMasterSecret
 end
 
@@ -1503,8 +1524,8 @@ local function wrapSocket(sock, extensions)
   end
 
   rsaPublicKey = {
-    data.encode64("\x00" .. number2bytes(rsaPublicKey[1])), -- javaderp workaround
-    data.encode64("\x00" .. number2bytes(math.floor(tonumber(rsaPublicKey[2]))))
+    base64.fromString("\x00" .. number2bytes(rsaPublicKey[1])), -- javaderp workaround
+    base64.fromString("\x00" .. number2bytes(math.floor(tonumber(rsaPublicKey[2]))))
   }
 
   local success, clientKeyExchange, preMasterSecret = pcall(packetClientKeyExchange, rsaPublicKey, nextCipher.keyExchangeCrypt)
@@ -1518,12 +1539,14 @@ local function wrapSocket(sock, extensions)
   write(TLS_CONTENT_TYPES.Handshake, clientKeyExchange)
   table.insert(handshakePackets, clientKeyExchange)
 
+  --[=[
   do
     -- debug
     local file = io.open("/tlsdebug.log", "a")
     file:write(("PMS_CLIENT_RANDOM %s %s\n"):format(clientRandom:gsub(".",function(c)return("%02x"):format(c:byte())end), preMasterSecret[0]:gsub(".", function(c)return("%02x"):format(c:byte())end)))
     file:close()
   end
+  ]=]
 
   -- CertificateVerify -- omitted
 
@@ -1531,12 +1554,14 @@ local function wrapSocket(sock, extensions)
   local serverRandom = uint32:pack(serverHello.random.time) .. serverHello.random.random
   local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, nextCipher.prf)
 
+  --[=[
   do
     -- debug
     local file = io.open("/tlsdebug.log", "a")
     file:write(("CLIENT_RANDOM %s %s\n"):format(clientRandom:gsub(".",function(c)return("%02x"):format(c:byte())end), masterSecret:gsub(".", function(c)return("%02x"):format(c:byte())end)))
     file:close()
   end
+  ]=]
 
   -- Key block
   local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, nextCipher.prf, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
