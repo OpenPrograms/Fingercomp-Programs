@@ -20,4 +20,31 @@ if e.ror and not e.rrotate then
 	e.rrotate = e.ror
 end
 
+-- fix of OpenComputers' broken bit32 library
+if _VERSION:find("5.3") and _OSVERSION then
+  e.rrotate = function(x, disp)
+    if disp == 0 then
+      return x
+    elseif disp < 0 then
+      return e.lrotate(x, -disp)
+    else
+      disp = e.band(disp, 31)
+      x = e.band(x, 0xffffffff)
+      return e.band(e.bor(e.rshift(x, disp), e.lshift(x, (32 - disp))), 0xffffffff)
+    end
+  end
+
+  e.lrotate = function(x, disp)
+    if disp == 0 then
+      return x
+    elseif disp < 0 then
+      return e.rrotate(x, -disp)
+    else
+      disp = e.band(disp, 31)
+      x = e.band(x, 0xffffffff)
+      return e.band(e.bor(e.lshift(x, disp), r.shift(x, (32 - disp))), 0xffffffff)
+    end
+  end
+end
+
 return e
