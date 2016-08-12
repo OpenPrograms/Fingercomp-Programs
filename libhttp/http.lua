@@ -323,6 +323,9 @@ local function newHTTPRequest(url, kwargs, ...)
     end,
     response = function()
       return tonumber(status.status) or status.status, status.reason, headers
+    end,
+    write = function(data)
+      return sock.write(data)
     end
   }
 end
