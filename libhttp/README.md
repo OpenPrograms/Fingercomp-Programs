@@ -26,6 +26,7 @@ The function returns a table of functions:
 * `response.finishConnect(): boolean[, string]` — returns whether the connection is established.
 * `response.read([n: number]): string or nil` — reads a certain amount of data from the buffer.
 * `response.response(): number, string, table` — returns a status code, status text, and headers.
+* `response.write(data: string)` — writes a data string to the socket stream.
 
 All headers returned by `response.response()` are Train-Cased, so that you don't need to worry about that.
 
