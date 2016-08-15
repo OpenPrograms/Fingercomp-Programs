@@ -149,6 +149,7 @@ local function newHTTPRequest(url, kwargs, ...)
   end
   -- escape the fragment string
   fragment = encode(fragment)
+  headers = headers or {}
   -- Train-Case the header names, and strip some characters
   for k, v in pairs(headers) do
     k = k:gsub("[^" .. tokenChars .. "]", "")
@@ -156,7 +157,6 @@ local function newHTTPRequest(url, kwargs, ...)
     headers[trainCase(k)] = v:gsub("[^ \t" .. visibleChars .. "\x80-\xff]", "")
   end
   -- set headers
-  headers = headers or {}
   headers["Content-Type"] = headers["Content-Type"] or "text/html; encoding=utf-8"
   headers["Accept"] = "*/*"
   if not isIP then
