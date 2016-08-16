@@ -51,7 +51,7 @@ local function read2crlf(pstr)
 end
 
 local function newHTTPRequest(kwargs, ...)
-  checkArg(1, url, "string")
+  checkArg(1, kwargs, "string", "table")
   if type(kwargs) ~= "table" then
     local args = {...}
     kwargs = {
@@ -144,6 +144,9 @@ local function newHTTPRequest(kwargs, ...)
   end
   -- escape characters in the path
   path = encode(path, {"/"})
+  path = path:gsub("[^" .. unreservedChars .. "!$&'()*+,;=:@]", function(c)
+    return "%" .. ("%02X"):format(c:byte())
+  end)
   -- split the query string
   local query = {}
   for part in queryStr:gmatch("[^&]+") do
@@ -178,8 +181,8 @@ local function newHTTPRequest(kwargs, ...)
     headers["Content-Length"] = tostring(#body)
   end
   method = method and method:gsub("[^a-zA-Z]", "")
-  if body and not method then method = "POST" end
-  if method == "" then method = "GET" end
+  if body and (not method or method) == "" then method = "POST" end
+  if not body and (not method or method == "") then method = "GET" end
   -- convert query to string
   local queryStr = {}
   for k, v in pairs(query) do
