@@ -13,7 +13,11 @@ local openos = _OSVERSION == "OpenOS 1.6" and "1.6" or (_OSVERSION == "OpenOS 1.
 local lua = math.tointeger and "5.3" or (io.stderr:write("Warning: Lua version is not 5.3! This may cause issues with the program.\n") and "5.2" or "5.2")
 local guid
 if openos == "1.6" then
-  guid = require("guid")
+  local success
+  success, guid = pcall(require, "uuid")
+  if not success then
+    guid = require("guid")
+  end
 else
   guid = {
     toHex = function(n)
