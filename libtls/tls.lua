@@ -1,7 +1,6 @@
 local component = require("component")
 local comp = require("computer")
 local fs = require("filesystem")
-local uuid = require("uuid")
 
 local bigint = require("bigint")
 local derdecode = require("der-decoder")
@@ -14,6 +13,16 @@ local data = component.data
 local inet = component.internet
 
 local VERSION = 0x0303
+
+local uuid
+
+do
+  local success
+  success, uuid = pcall(require, "uuid")
+  if not success then
+    uuid = require("guid")
+  end
+end
 
 local function copy(tbl)
   if type(tbl) ~= "table" then return tbl end
