@@ -69,6 +69,17 @@ local function check(value, arg, ...)
   error("bad value for " .. arg .. ": " .. table.concat(types, " or ") .. ", got " .. tostring(ttype == "table" and t.__name or ttype))
 end
 
+local lastProfileTime
+local function profile(msg)
+  if not lastProfileTime then
+    lastProfileTime = comp.uptime()
+  else
+    local delta = comp.uptime() - lastProfileTime
+    print("PROFILER: '" .. msg .. "' took " .. delta .. "s!")
+    lastProfileTime = comp.uptime()
+  end
+end
+
 local TLS_CONTENT_TYPES = enum({
   ChangeCipherSpec = 0x14,
   Alert = 0x15,
@@ -943,19 +954,9 @@ do
   local hmac = require("lockbox.mac.hmac")()
   local md5 = function(key, data)
     if data then
-      return array.toString(
-        hmac().setBlockSize(64)
-              .setDigest(md5digest)
-              .setKey(array.fromString(key))
-              .init()
-              .update(stream.fromString(data))
-              .finish()
-              .asBytes())
+      return data.md5(data, key)
     else
-      return array.toString(
-        md5digest().update(stream.fromString(key))
-                   .finish()
-                   .asBytes())
+      return data.md5(key)
     end
   end
   ciphers.TLS_RSA_WITH_NULL_MD5 = createCipherMac {
@@ -986,24 +987,12 @@ do
   local array = require("lockbox.util.array")
   local cbcmode = require("lockbox.cipher.mode.cbc")
   local aes128 = require("lockbox.cipher.aes128")
-  local sha256digest = require("lockbox.digest.sha2_256")
-  local hmac = require("lockbox.mac.hmac")
 
   local sha256 = function(key, hashData)
     if hashData then
-      return array.toString(
-        hmac().setBlockSize(64)
-              .setDigest(sha256digest)
-              .setKey(array.fromString(key))
-              .init()
-              .update(stream.fromString(hashData))
-              .finish()
-              .asBytes())
+      return data.sha256(hashData, key)
     else
-      return array.toString(
-        sha256digest().update(stream.fromString(key))
-                      .finish()
-                      .asBytes())
+      return data.sha256(key)
     end
   end
   local sha256prf = PRF(P_hash(sha256))
@@ -1426,7 +1415,9 @@ local function wrapSocket(sock, extensions)
   table.insert(handshakePackets, packet)
 
   -- ServerHello, Certificate, ServerKeyExchange*, CertificateRequest, ServerHelloDone
+  -- profile("read1")
   local record, reason = read()
+  -- profile("read2")
   if not record then
     close()
     error("Record is nil: " .. tostring(reason or "unknown reason"))
@@ -1474,7 +1465,9 @@ local function wrapSocket(sock, extensions)
   if handshakeMessages[1].handshakeType ~= HANDSHAKE_TYPES.Certificate then
     alertClose(Alert(true, ALERTS.unexpected_message, "unexpected handshake message was sent by the server"))
   end
+  -- profile("beforecert")
   local result, serverCertificate = pcall(hsDecoders[handshakeMessages[1].handshakeType], handshakeMessages[1].data)
+  -- profile("aftercert")
   if not result then
     if type(serverCertificate) == "table" and serverCertificate.__name == "Alert" then
       alertClose(serverCertificate)
@@ -1508,12 +1501,15 @@ local function wrapSocket(sock, extensions)
   table.insert(handshakePackets, handshakeMessages[1].packet)
   table.remove(handshakeMessages, 1)
 
+  -- profile("2client")
+
   -- ClientCertificate
   if certificateRequested then
     local clientCertificate = packetClientCertificate({})
     write(TLS_CONTENT_TYPES.Handshake, clientCertificate)
     table.insert(handshakePackets, clientCertificate)
   end
+  -- profile("ccertdone")
 
   -- ClientKeyExchange
   local rsaPublicKey
@@ -1522,13 +1518,17 @@ local function wrapSocket(sock, extensions)
   else
     alertClose(Alert(true, ALERTS.unsupported_certificate, "unknown public key"))
   end
+  -- profile("genkeys")
 
   rsaPublicKey = {
     base64.fromString("\x00" .. number2bytes(rsaPublicKey[1])), -- javaderp workaround
     base64.fromString("\x00" .. number2bytes(math.floor(tonumber(rsaPublicKey[2]))))
   }
 
+  -- profile("encodekeys")
+
   local success, clientKeyExchange, preMasterSecret = pcall(packetClientKeyExchange, rsaPublicKey, nextCipher.keyExchangeCrypt)
+  -- profile("encrypt")
   if not success then
     if type(clientKeyExchange) == "table" and clientKeyExchange.__name == "Alert" then
       alertClose(clientKeyExchange)
@@ -1538,6 +1538,8 @@ local function wrapSocket(sock, extensions)
   end
   write(TLS_CONTENT_TYPES.Handshake, clientKeyExchange)
   table.insert(handshakePackets, clientKeyExchange)
+
+  -- profile("done")
 
   --[=[
   do
@@ -1552,7 +1554,9 @@ local function wrapSocket(sock, extensions)
 
   -- Master secret generation
   local serverRandom = uint32:pack(serverHello.random.time) .. serverHello.random.random
+  -- profile("premaster")
   local masterSecret = generateMasterSecret(preMasterSecret, clientRandom, serverRandom, nextCipher.prf)
+  -- profile("master")
 
   --[=[
   do
@@ -1565,6 +1569,7 @@ local function wrapSocket(sock, extensions)
 
   -- Key block
   local keys = generateKeyBlock(masterSecret, clientRandom, serverRandom, nextCipher.prf, nextCipher.macKeyLength, nextCipher.keyLength, nextCipher.ivLength)
+  -- profile("keys")
 
   -- [ChangeCipherSpec]
   -- Updates the state
@@ -1579,7 +1584,10 @@ local function wrapSocket(sock, extensions)
   write(TLS_CONTENT_TYPES.Handshake, clientFinished)
   table.insert(handshakePackets, clientFinished)
 
+  -- profile("cfinished")
+
   -- [ChangeCipherSpec]
+  -- profile("wait")
   local records, reason = read(1)
   if not records then
     alertClose(Alert(true, ALERTS.internal_error, "could not read the data: " .. tostring(reason or "unknown reason")))
@@ -1592,6 +1600,7 @@ local function wrapSocket(sock, extensions)
   stateMgr.seqNum.read = 0
 
   -- Server Finished
+  -- profile("wait")
   local records, reason = read(1)
   if not records then
     alertClose(Alert(true, ALERTS.handshake_failture, "could not read the data: " .. tostring(reason or "unknown reason")))
@@ -1614,6 +1623,8 @@ local function wrapSocket(sock, extensions)
   if expectedServerFinished ~= handshakeMessages[1].data then
     alertClose(Alert(true, ALERTS.handshake_failture, "expected server finished isn't equal to the recieved one"))
   end
+
+  -- profile("done")
 
   for k, v in pairs(handshakeMessages) do
     handshakeMessages[k] = nil
