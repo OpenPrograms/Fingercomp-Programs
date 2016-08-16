@@ -50,12 +50,18 @@ local function read2crlf(pstr)
   return data
 end
 
-local function newHTTPRequest(url, kwargs, ...)
+local function newHTTPRequest(kwargs, ...)
   checkArg(1, url, "string")
   if type(kwargs) ~= "table" then
     local args = {...}
-    kwargs = {body = kwargs, headers = args[1], ...}
+    kwargs = {
+      url = kwargs,
+      body = args[1],
+      headers = args[2],
+      method = args[3]
+    }
   end
+  local url = kwargs.url
   if not url:match("^https?://") then
     url = "http://" .. url
   end
