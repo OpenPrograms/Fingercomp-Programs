@@ -143,7 +143,6 @@ local function newHTTPRequest(kwargs, ...)
     path, fragment = path:match("^(.-)#(.-)$")
   end
   -- escape characters in the path
-  path = encode(path, {"/"})
   path = path:gsub("[^A-Za-z0-9~._!$&'()*+,;=:@/-]", function(c)
     return "%" .. ("%02X"):format(c:byte())
   end)
