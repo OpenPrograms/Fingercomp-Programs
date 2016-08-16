@@ -144,7 +144,7 @@ local function newHTTPRequest(kwargs, ...)
   end
   -- escape characters in the path
   path = encode(path, {"/"})
-  path = path:gsub("[^" .. unreservedChars .. "!$&'()*+,;=:@]", function(c)
+  path = path:gsub("[^A-Za-z0-9~._!$&'()*+,;=:@/-]", function(c)
     return "%" .. ("%02X"):format(c:byte())
   end)
   -- split the query string
