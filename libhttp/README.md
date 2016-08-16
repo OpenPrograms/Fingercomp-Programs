@@ -6,12 +6,13 @@ This is a library (obviously) that returns a HTTP request function. It tries to 
 ## Usage
 
 * `http(url: string[, body: string[, headers: table[, method: string]]])` — starts a new request.
-* `http(url: string[, kwargs: table])` — does pretty much the same, but accepts a table of arguments.
+* `http(kwargs: table)` — does pretty much the same, but accepts a table of arguments.
 
-All options of kwargs are optional. Here's the example of a full kwargs table:
+All options of kwargs, except `url`, are optional. Here's the example of a full kwargs table:
 
 ```lua
 {
+  url = "https://example.com/",
   body = "Hi there\n",
   headers = {
     ["Content-Type"] = "application/json",
