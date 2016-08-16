@@ -277,6 +277,9 @@ local function newHTTPRequest(url, kwargs, ...)
     if not status and line:sub(-1, -1) == "[%s\t]" then
       -- ignore
     end
+    if #response[0] then
+      return nil, "bad response"
+    end
   end
   local headers = {}
   while true do
