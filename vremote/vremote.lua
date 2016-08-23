@@ -94,7 +94,7 @@ local function generatePalette(palette)
     result[i + 16] = (r << 16) | (g << 8) | b
   end
 
-  return enum(result)
+  return result
 end
 
 -- what
@@ -122,8 +122,9 @@ local function index2color(palette, i)
 end
 
 local function color2index(palette, color)
-  if palette[color] then
-    return palette[color]
+  local _, pos = isin(palette, color)
+  if pos then
+    return pos
   end
   local r, g, b = (color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff
   local idxR = math.floor(r * 5 / 255 + .5)
@@ -183,6 +184,7 @@ local uint32 = ">I4"
 local uint64 = ">I4"
 
 local str = ">s3"
+local ustr = ">s1"
 
 local function packBoolean(bool)
   if bool then
@@ -194,23 +196,6 @@ end
 
 
 -- PROTOCOL --------------------------------------------------------------------
-
-local createRecord
-do
-  local function createPacket(self)
-    return uint8:pack(self.opcode) .. str:pack(self.data)
-  end
-  function createRecord(opcode, data)
-    return setmetatable({
-      opcode = opcode,
-      data = data
-    }, {
-      __index = {
-        packet = createPacket
-      }
-    })
-  end
-end
 
 -- Encoders & decoders
 local codecs = {}
@@ -255,19 +240,25 @@ codecs[opcodes.AuthServer] = codec(
 
 codecs[opcodes.InitialData] = codec(
   function(connectionMode, ...)
-    if connectionMode == 01 then
+    if connectionMode == 00 or connectionMode == 01 then
       local palette, fg, bg, resolution, screenState, preciseMode, shownChars = ...
       local result = ""
       for i = 0, 15, 1 do
         result = result .. uint24:pack(palette[i])
       end
-      result = result .. uint24:pack(color2index(palette, fg))
-      result = result .. uint24:pack(color2index(palette, bg))
+      result = result .. uint8:pack(fg)
+      result = result .. uint8:pack(bg)
       result = result .. uint8:pack(resolution.w)
       result = result .. uint8:pack(resolution.h)
       result = result .. packBoolean(screenState)
       result = result .. packBoolean(preciseMode)
-      result = result .. table.concat(shownChars)  -- list[w × h] = chars...
+      for i = 1, #shownChars, 1 do
+        for j = 1, #shownChars[i], 1 do
+          result = result .. ustr:pack(shownChars[i][j][1]) ..
+                   uint8:pack(shownChars[i][j][2]) ..
+                   uint8:pack(shownChars[i][j][3])
+        end
+      end
       return s(result)
     elseif connectionMode == 02 then
       return s("") -- no data
@@ -282,8 +273,8 @@ codecs[opcodes.InitialData] = codec(
       result.palette[i] = stream:unpack(uint24)
     end
     result.palette = generatePalette(result.palette)
-    result.fg = index2color(result.palette, stream:unpack(uint8))
-    result.bg = index2color(result.palette, stream:unpack(uint8))
+    result.fg = stream:unpack(uint8)
+    result.bg = stream:unpack(uint8)
     result.resolution = {}
     result.resolution.w = stream:unpack(uint8)
     result.resolution.h = stream:unpack(uint8)
@@ -296,30 +287,34 @@ codecs[opcodes.InitialData] = codec(
     for i = 1, result.w * result.h, 1 do
       local x = i % w
       local y = i // w
-      result.chars[y][x] = stream:read(1)
+      result.chars[y][x] = {
+        stream:unpack(ustr),
+        stream:unpack(uint8),
+        stream:unpack(uint8)
+      }
     end
     return result
   end
 )
 
 codecs[opcodes.SetBG] = codec(
-  function(palette, color)
-    return s(uint8:pack(color2index(palette, color)))
+  function(color)
+    return s(uint8:pack(color))
   end,
   function(stream)
     return {
-      color = index2color(stream:unpack(uint8))
+      color = stream:unpack(uint8)
     }
   end
 )
 
 codecs[opcodes.SetFG] = codec(
-  function(palette, color)
-    return s(uint8:pack(color2index(palette, color)))
+  function(color)
+    return s(uint8:pack(color))
   end,
   function(stream)
     return {
-      color = index2color(stream:unpack(uint8))
+      color = stream:unpack(uint8)
     }
   end
 )
@@ -517,3 +512,348 @@ codecs[opcodes.Pong] = codec(
     }
   end
 )
+
+
+-- Packets
+local createRecord
+do
+  local function createPacket(self)
+    return uint8:pack(self.opcode) .. str:pack(self.data)
+  end
+  function createRecord(opcode, data)
+    return setmetatable({
+      opcode = opcode,
+      data = data
+    }, {
+      __index = {
+        packet = createPacket
+      }
+    })
+  end
+end
+
+local function parseRecord(stream)
+  local opcode = stream:unpack(uint8)
+  local length = stream:unpack(uint24)
+  local data = stream:read(length)
+  if #data ~= length then
+    error("corrupt packet: incorrect length")
+  end
+  if not opcodes[opcode] then
+    error("corrupt packet: unknown opcode")
+  end
+  return createRecord(opcode, data)
+end
+
+local function readRecords(stream)
+  local result = {}
+  while #stream > 0 do
+    local record = parseRecord(stream)
+    result[#result + 1] = record
+  end
+  return result
+end
+
+
+-- VIRTUAL COMPONENTS ----------------------------------------------------------
+
+local function registerVirtualComponents()
+  local gpuAddr = vcomponent.uuid()
+  local screenAddr = vcomponent.uuid()
+  local kbdAddr = vcomponent.uuid()
+
+  local params = {
+    palette = {},
+    fg = 0,
+    bg = 0,
+    resolution = {
+      w = 160,
+      h = 50
+    },
+    screenState = true,
+    preciseMode = false,
+    chars = {}
+  }
+
+  -- Initialize and generate the palette
+  for i = 0, 15, 1 do
+    local shade = 0xff * (i + 1) / 17
+    params.palette[i] = (shade << 16) | (shade << 8) | shade
+  end
+  params.palette = generatePalette(palette)
+  for i = 0, 255, 1 do
+    if palette[i] == 0xffffff then
+      params.fg = i
+    end
+    if palette[i] == 0x000000 then
+      params.bg = i
+    end
+  end
+
+  -- Initialize the screen to black characters
+  for i = 1, params.resolution.h, 1 do
+    params.chars[i] = {}
+    for j = 1, params.resolution.w, 1 do
+      params.chars[i][j] = {" ", params.fg, params.bg}
+    end
+  end
+
+  -- GPU proxy
+  local gpu = {}
+  gpu.bind = function()
+    return false
+  end
+  gpu.getScreen = function()
+    return screenAddr
+  end
+  gpu.getBackground = function()
+    return index2color(params.bg), params.bg < 16
+  end,
+  gpu.setBackground = function(color, palIdx)
+    checkArg(1, color, "number")
+    checkArg(2, palIdx, "boolean", "nil")
+    local shouldSend = false
+    if palIdx then
+      if color < 0 or color > 15 then
+        error("invalid palette index")
+      end
+      if params.bg ~= color then
+        params.bg = color
+        shouldSend = true
+      end
+    else
+      local color = color2index(params.palette, color)
+      if color ~= params.bg then
+        params.bg = color
+        shouldSend = true
+      end
+    end
+    if shouldSend then
+      -- TODO: send packet
+    end
+    return true
+  end
+  gpu.getForeground = function()
+    return index2color(params.fg), params.fg < 16
+  end
+  gpu.setForeground = function(color, palIdx)
+    checkArg(1, color, "number")
+    checkArg(2, palIdx, "boolean", "nil")
+    local shouldSend = false
+    if palIdx then
+      if color < 0 or color > 15 then
+        error("invalid palette index")
+      end
+      if params.fg ~= color then
+        params.fg = color
+        shouldSend = true
+      end
+    else
+      local color = color2index(params.palette, color)
+      if params.fg ~= coloe then
+        params.fg = color
+        shouldSend = true
+      end
+    end
+    if shouldSend then
+      -- TODO: send packet
+    end
+    return true
+  end
+  gpu.getPaletteColor = function(index)
+    checkArg(1, index, "number")
+    if index < 0 or index > 15 then
+      error("invalid palette index")
+    end
+    return params.palette[index]
+  end
+  gpu.setPaletteColor = function(index, color)
+    checkArg(1, index, "number")
+    checkArg(2, color, "number")
+    if index < 0 or index > 15 then
+      error("invalid palette index")
+    end
+    if params.palette[index] ~= color then
+      params.palette[index] = color
+      -- TODO: send packet
+    end
+    return true
+  end
+  gpu.maxDepth = function()
+    return 8
+  end
+  gpu.getDepth = function()
+    return 8
+  end
+  gpu.setDepth = function()
+    return false
+  end
+  gpu.maxResolution = function()
+    return 160, 50
+  end
+  gpu.setResolution = function(w, h)
+    checkArg(1, w, "number")
+    checkArg(2, h, "number")
+    if h < 1 or w < 1 or h > 50 or w > 160 then
+      error("unsupported resolution")
+    end
+    if params.resolution.w ~= w or params.resolution.h ~= h then
+      params.resolution.w, params.resolution.h = w, h
+      -- TODO: send packet
+    end
+    return true
+  end
+  gpu.getResolution = function()
+    return params.resolution.w, params.resolution.h
+  end
+  gpu.get = function(x, y)
+    checkArg(x, "number")
+    checkArg(y, "number")
+    if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
+      error("index out of bounds")
+    end
+    local result = table.unpack(params.chars[y][x])
+    result[4] = result[2] < 16 and result[2] or nil
+    result[5] = result[3] < 16 and result[3] or nil
+    result[2] = index2color(params.palette, result[2])
+    result[3] = index2color(params.palette, result[3])
+    return table.unpack(result)
+  end
+  gpu.set = function(x, y, chars, vertical)
+    checkArg(x, "number")
+    checkArg(y, "number")
+    checkArg(chars, "string")
+    checkArg(vertical, "boolean", "nil")
+    -- it makes no sense to send characters that are out of screen's bounds
+    if vertical then
+      chars = unicode.sub(chars, 1, params.resolution.h - y + 1)
+    else
+      chars = unicode.sub(chars, 1, params.resolution.w - x + 1)
+    end
+    -- Handle wide characters
+    local nChars = ""
+    for i = 1, unicode.len(chars), 1 do
+      local c = unicode.sub(chars, i, i)
+      nChars = nChars .. c
+      if unicode.isWide(c) then
+        nChars = nChars .. " "
+      end
+    end
+    -- Recheck again
+    if vertical then
+      chars = unicode.sub(chars, 1, params.resolution.h - y + 1)
+    else
+      chars = unicode.sub(chars, 1, params.resolution.w - x + 1)
+    end
+    -- check if we really need to update something
+    -- (we could also update only the chars that needs to be updated...
+    -- but, y'know, it's overkill IMO)
+    local needsUpdate = false
+    for i = 0, unicode.len(chars) - 1, 1 do
+      local ix, iy = x, y
+      if vertical then
+        iy = iy + i
+      else
+        ix = ix + i
+      end
+      if unicode.sub(chars, i, i) ~= params.chars[iy][ix][1] or
+          params.chars[iy][ix][2] ~= params.fg or
+          params.chars[iy][ix][3] ~= params.bg then
+        needsUpdate = true
+        break
+      end
+    end
+    if needsUpdate then
+      for i = 0, unicode.len(chars) - 1, 1 do
+        local c = unicode.sub(chars, i, i)
+        local ix, iy = x, y
+        if vertical then
+          iy = iy + i
+        else
+          ix = ix + i
+        end
+        params.chars[iy][ix][1] = c
+        params.chars[iy][ix][2] = params.fg
+        params.chars[iy][ix][3] = params.bg
+      end
+      -- TODO: send packet
+    end
+    return true
+  end
+  gpu.copy = function(x, y, w, h, tx, ty)
+    checkArg(1, x, "number")
+    checkArg(2, y, "number")
+    checkArg(3, w, "number")
+    checkArg(4, h, "number")
+    checkArg(5, tx, "number")
+    checkArg(6, ty, "number")
+    if x < 1 or y < 1 or x > params.resolution.w or y > params.resolution.h then
+      error("index out of bounds")
+    end
+    w = math.max(w, 0)
+    h = math.max(h, 0)
+    if w == 0 or h == 0 then
+      -- pass
+      return true
+    end
+    if w > params.resolution.w - x + 1 then
+      w = params.resolution.w - x + 1
+    end
+    if h > params.resolution.h - y + 1 then
+      h = params.resolution.h - y + 1
+    end
+    if (tx > params.resolution.w - x or x + w + tx - 1 < 1) and
+        (ty > params.resolution.h - y or y + h + ty - 1 < 1) then
+      -- pass
+      return true
+    end
+    -- region that's copied
+    local region = {}
+    for j = y, y + h - 1, 1 do
+      for i = x, x + w - 1, 1 do
+        -- copy cells
+        region[j][i] = {
+          params.chars[j][i][1],
+          params.chars[j][i][2],
+          params.chars[j][i][3]
+        }
+      end
+    end
+    for j = y, y + h - 1, 1 do
+      for i = x, x + w - 1, 1 do
+        local ix = i + tx
+        local iy = j + ty
+        params.chars[iy][ix] = region[j][i]
+      end
+    end
+    -- TODO: send packet
+  end
+  gpu.fill = function(x, y, w, h, char)
+    checkArg(1, x, "number")
+    checkArg(2, y, "number")
+    checkArg(3, w, "number")
+    checkArg(4, h, "number")
+    checkArg(5, char, "string")
+    if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
+      error("index out of bounds")
+    end
+    w = math.max(w, 0)
+    h = math.max(h, 0)
+    char = unicode.sub(char, 1, 1)
+    checkArg(5, char, "string")
+    local shouldSend = false
+    for j = y, y + h - 1, 1, do
+      for i = x, x + w - 1, 1 do
+        if params.chars[j][i][1] ~= char then
+          shouldSend = true
+          params.chars[j][i][1] = char
+          params.chars[j][i][2] = params.fg
+          params.chars[j][i][3] = params.bg
+        end
+      end
+    end
+    if shouldSend then
+      -- TODO: send packet
+    end
+  end
+end
