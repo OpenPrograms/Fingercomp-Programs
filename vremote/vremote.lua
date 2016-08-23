@@ -254,9 +254,9 @@ codecs[opcodes.InitialData] = codec(
       result = result .. packBoolean(preciseMode)
       for i = 1, #shownChars, 1 do
         for j = 1, #shownChars[i], 1 do
-          result = result .. ustr:pack(shownChars[i][j][1]) ..
-                   uint8:pack(shownChars[i][j][2]) ..
-                   uint8:pack(shownChars[i][j][3])
+          result = result .. ustr:pack(shownChars[3 * (j * resolution.w + i)]) ..
+                   uint8:pack(shownChars[3 * (j * resolution.w + i) + 1]) ..
+                   uint8:pack(shownChars[3 * (j * resolution.w + i) + 2])
         end
       end
       return s(result)
@@ -285,13 +285,11 @@ codecs[opcodes.InitialData] = codec(
       result.chars[i] = {}
     end
     for i = 1, result.w * result.h, 1 do
-      local x = i % w
-      local y = i // w
-      result.chars[y][x] = {
-        stream:unpack(ustr),
-        stream:unpack(uint8),
-        stream:unpack(uint8)
-      }
+      local x = i % resolution.w
+      local y = i // resolution.w
+      result.chars[3 * (y * result.resolution.w + x)] = stream:unpack(ustr)
+      result.chars[3 * (y * result.resolution.w + x) + 1] = stream:unpack(uint8)
+      result.chars[3 * (y * result.resolution.w + x) + 2] = stream:unpack(uint8)
     end
     return result
   end
@@ -575,6 +573,14 @@ local function registerVirtualComponents()
     chars = {}
   }
 
+  local function char(x, y, i, val)
+    i = i or 0
+    if not val then
+      return params.chars[3 * (y * params.resolution.w + x) + i]
+    end
+    params.chars[3 * (y + params.resolution.w + x) + i] = val
+  end
+
   -- Initialize and generate the palette
   for i = 0, 15, 1 do
     local shade = 0xff * (i + 1) / 17
@@ -590,12 +596,11 @@ local function registerVirtualComponents()
     end
   end
 
-  -- Initialize the screen to black characters
-  for i = 1, params.resolution.h, 1 do
-    params.chars[i] = {}
-    for j = 1, params.resolution.w, 1 do
-      params.chars[i][j] = {" ", params.fg, params.bg}
-    end
+  -- Initialize the screen to blank characters
+  for i = 0, params.resolution.w * params.resolution.h * 3 - 1, 3 do
+    params.chars[i+0] = " "
+    params.chars[i+1] = params.fg
+    params.chars[i+2] = params.bg
   end
 
   -- GPU proxy
@@ -712,7 +717,9 @@ local function registerVirtualComponents()
     if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
       error("index out of bounds")
     end
-    local result = table.unpack(params.chars[y][x])
+    local result = {
+      char(x, y), char(x, y, 1), char(x, y, 2)
+    }
     result[4] = result[2] < 16 and result[2] or nil
     result[5] = result[3] < 16 and result[3] or nil
     result[2] = index2color(params.palette, result[2])
@@ -756,9 +763,9 @@ local function registerVirtualComponents()
       else
         ix = ix + i
       end
-      if unicode.sub(chars, i, i) ~= params.chars[iy][ix][1] or
-          params.chars[iy][ix][2] ~= params.fg or
-          params.chars[iy][ix][3] ~= params.bg then
+      if unicode.sub(chars, i, i) ~= char(ix, ij) or
+          char(ix, ij, 1) ~= params.fg or
+          char(ix, ij, 2) ~= params.bg then
         needsUpdate = true
         break
       end
@@ -772,9 +779,9 @@ local function registerVirtualComponents()
         else
           ix = ix + i
         end
-        params.chars[iy][ix][1] = c
-        params.chars[iy][ix][2] = params.fg
-        params.chars[iy][ix][3] = params.bg
+        char(ix, ij, 0, c)
+        char(ix, iy, 1, params.fg)
+        char(ix, ij, 2, params.bg)
       end
       -- TODO: send packet
     end
@@ -812,18 +819,18 @@ local function registerVirtualComponents()
     for j = y, y + h - 1, 1 do
       for i = x, x + w - 1, 1 do
         -- copy cells
-        region[j][i] = {
-          params.chars[j][i][1],
-          params.chars[j][i][2],
-          params.chars[j][i][3]
-        }
+        region[3 * (j * params.resolution.w + i)] = char(i, j)
+        region[3 * (j * params.resolution.w + i) + 1] = char(i, j, 1)
+        region[3 * (j * params.resolution.w + i) + 2] = char(i, j, 2)
       end
     end
     for j = y, y + h - 1, 1 do
       for i = x, x + w - 1, 1 do
         local ix = i + tx
         local iy = j + ty
-        params.chars[iy][ix] = region[j][i]
+        char(ix, ij, 0, region[3 * (j * params.resolution.w + i)])
+        char(ix, ij, 1, region[3 + (j + params.resolution.w + i) + 1])
+        char(ix, ij, 2, region[3 + (j + params.resolution.w + i) + 2])
       end
     end
     -- TODO: send packet
@@ -844,11 +851,11 @@ local function registerVirtualComponents()
     local shouldSend = false
     for j = y, y + h - 1, 1, do
       for i = x, x + w - 1, 1 do
-        if params.chars[j][i][1] ~= char then
+        if char(i, j) ~= char then
           shouldSend = true
-          params.chars[j][i][1] = char
-          params.chars[j][i][2] = params.fg
-          params.chars[j][i][3] = params.bg
+          char(i, j, 0, char)
+          char(i, j, 1, params.fg)
+          char(i, j, 2, params.bg)
         end
       end
     end
@@ -856,4 +863,7 @@ local function registerVirtualComponents()
       -- TODO: send packet
     end
   end
+
+  -- Screen proxy
+  local screen = {}
 end
