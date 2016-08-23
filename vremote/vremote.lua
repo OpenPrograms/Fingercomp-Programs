@@ -1,4 +1,7 @@
 local com = require("component")
+local computer = require("computer")
+local shell = require("shell")
+local term = require("term")
 local unicode = require("unicode")
 
 local inet = com.internet
@@ -9,6 +12,9 @@ local vcomponent = require("vcomponent")
 -- When true, the program will be wrapped in pcall
 -- to avoid double-registering components.
 local safeMode = false
+local oPull = computer.pullSignal
+local addresses
+local gSocket
 
 -- UTILITIES -------------------------------------------------------------------
 
@@ -150,6 +156,10 @@ local function color2index(palette, color)
     return minDIdx
   end
 end
+
+-- Fwd declaration
+-- reverts all tweaks
+local revert
 
 
 -- Opcodes (message types)
@@ -547,7 +557,8 @@ local function parseRecord(stream)
   return createRecord(opcode, data)
 end
 
-local function readRecords(stream)
+local function readRecords(data)
+  local stream = s(data)
   local result = {}
   while #stream > 0 do
     local record = parseRecord(stream)
@@ -918,6 +929,7 @@ local function registerVirtualComponents(write)
   end
 
   -- Register vcomponents, turn safe mode on
+  addresses = {gpuAddr, screenAddr, kbdAddr}
   safeMode = true
   vcomponent.register(gpuAddr, "gpu", gpu)
   vcomponent.register(screenAddr, "screen", screen)
@@ -925,3 +937,238 @@ local function registerVirtualComponents(write)
 
   return params, gpuAddr, screenAddr, kbdAddr
 end
+
+local function connect(address, user, password, connectionMode, tls)
+  local socket, reason
+  if tls then
+    local err, traceback
+    local success
+    success, socket, reason = xpcall(tls.tlsSocket, function(m)
+        err = m
+        traceback = debug.traceback()
+        return {error=true}
+      end, address)
+    if not success then
+      if type(socket) == "table" and socket.error then
+        io.stderr:write("Caught TLS library error: " .. tostring(err) .. "\n" .. traceback .. "\n")
+        return false
+      else
+        io.stderr:write("Could not open TLS socket: " .. tostring(socket or "unknown reason") .. "\n")
+        return false
+      end
+    end
+    if not socket then
+      io.stderr:write("Could not open TLS socket: " .. tostring(reason or "unknown reason") .. "\n")
+      return false
+    end
+    socket.setTimeout(5)
+  else
+    socket, reason = inet.connect(address)
+    if not socket then
+      io.stderr:write("Could not open socket: " .. tostring(reason or "unknown reason") ,, "\n")
+      return false
+    end
+    for i = 1, 100, 1 do
+      local s, rsn = socket.finishConnect()
+      if not s then
+        if rsn then
+          io.stderr:write("Could not connect to server: " .. tostring(rsn) .. "\n")
+          return false
+        end
+        os.sleep(.05)
+      else
+        break
+      end
+    end
+    local success = socket.finishConnect()
+    if not success then
+      io.stderr:write("Coud not connect to server: timed out\n")
+      return false
+    end
+  end
+
+  local timeout = 5
+
+  local function read()
+    if tls then
+      return socket.read()
+    end
+    local response
+    local gotNonNilChunk = false
+    local readStartTime = comp.uptime()
+    repeat
+      local chunk = sock.read(1024)
+      if chunk == "" then
+        if sock.finishConnect() then -- the connection is still alive
+          if gotNonNilChunk then
+            break
+          end
+        end
+      elseif chunk then
+        response = (response or "") .. chunk
+        gotNonNilChunk = true
+      end
+      os.sleep(.05)
+    until not chunk and gotNonNilChunk or not gotNonNilChunk and comp.uptime() - readStartTime > timeout
+    return response
+  end
+
+  local function write(data)
+    if tls then
+      socket.write(data)
+    end
+    repeat
+      local n = socket.write(data)
+      if not n n n ~= #data then
+        os.sleep(.05)
+      end
+    until n and n == #data
+  end
+
+  -- Authentication
+  write(createRecord(opcodes.AuthClient, codecs[opcodes.AuthClient].encode(user, passwd, connectionMode, 30)):packet())
+
+  local records = readRecords(read())
+  if #records == 0 then
+    io.stderr:write("No data recieved\n")
+    return false
+  end
+  for k, v in pairs(records) do
+    v.data = codecs[v.opcode].decode(v.data)
+  end
+
+  if records[1].opcode ~= opcodes.AuthServer then
+    io.stderr:write("Unexpected message sent by server!\n")
+    return false
+  end
+
+  print(records[1].data.displayMessage)
+  if records[1].data.authResult == 02 then
+    io.stderr:write("Server doesn't support this connection mode!\n")
+    return false
+  end
+  if records[1].data.authResult == 01 then
+    io.stderr:write("Wrong credentials!\n")
+    return false
+  end
+
+  local params, gAddr, sAddr, kAddr = registerVirtualComponents(write)
+
+  local initData = codecs[opcodes.InitialData].encode(connectionMode, params.palette, params.fg, params.bg, params.resolution, params.screenState, params.preciseMode, params.chars)
+  write(createRecord(opcodes.InitialData, initData):packet())
+
+  -- Here, we're connected and initialized.
+  -- Register the custom event listener
+  oPull = computer.pullSignal
+  computer.pullSignal = function(to)
+    local toSocket = to
+    if to >= .05 then
+      toSocket = to - .05
+    end
+    if to == math.huge then
+      toSocket = 5
+    end
+    timeout = toSocket
+    if tls then
+      socket.setTimeout(timeout)
+    end
+    local success, data = pcall(read)
+    if success and data then
+      local records = readRecords(data)
+      if #records > 0 then
+        for k, v in ipairs(records) do
+          local data = codecs[v.opcode].decode(v.data)
+          if v.opcode == opcodes.EventTouch then
+            computer.pushSignal("touch", gAddr, data.x, data.y, data.button, user)
+          elseif v.opcode == opcodes.EventDrag then
+            computer.pushSignal("drag", gAddr, data.x, data.y, data.button, user)
+          elseif v.opcode == opcodes.EventDrop then
+            computer.pushSignal("drop", gAddr, data.x, data.y, data.button, user)
+          elseif v.opcode == opcodes.EventKeyDown then
+            computer.pushSignal("key_down", kAddr, data.char, data.code, user)
+          elseif v.opcode == opcodes.EventKeyUp then
+            computer.pushSignal("key_up", kAddr, data.char, data.code, user)
+          elseif v.opcode == opcodes.EventClipboard then
+            computer.pushSignal("clipboard", kAddr, data.data, user)
+          elseif v.opcode == opcodes.Ping then
+            local pong = codecs[opcodes.Pong].encode(data.ping)
+            write(createRecord(opcodes.Pong, pong):packet())
+          end
+        end
+      end
+    end
+    return oPull(to)
+  end
+  gSocket = socket
+end
+
+local function revert()
+  computer.pullSignal = oPull
+  for _, addr in pairs(addresses) do
+    vcomponent.unregister(addr)
+  end
+  if gSocket then
+    gSocket:close()
+  end
+end
+
+local function wrap(func, ...)
+  local err, stacktrace
+  local data = {xpcall(func, function(m)
+      if not safeMode then
+        error(m)
+      end
+      err = m
+      stacktrace = debug.traceback()
+    end), ...}
+  if data[1] then
+    return table.unpack(data, 2)
+  end
+  io.stderr:write("ERROR CAUGHT: Safe move active\n" .. tostring(err) .. "\n" .. tostring(stacktrace) .. "\n")
+  io.stderr:write("Reverting... ")
+  revert()
+  io.stderr:write("done\n")
+  os.exit(-1)
+end
+
+-- MAIN LOGIC ------------------------------------------------------------------
+-- vremote [--passwd=<passwd>] <server> <user>
+local args, opts = shell.parse(...)
+
+if not args[1] then
+  print("Usage: vremote [-s] [--passwd=<passwd>] <server> <user>")
+  print("  <server>    Server to connect to")
+  print("  <user>      Username")
+  print("  [--passwd]  (Optional) password to use. If not specified, will be prompted")
+  print("  [-s]        Use secure TLS connection: you need to install libtls\n" ..
+        "              in order to be able to use it")
+
+local server, user = args[1], args[2]
+local mode = 00
+if opts.mode == "gpu+kbd" or opts.mode == "kbd+gpu" then
+  mode = 00
+elseif opts.mode == "gpu" then
+  mode = 01
+elseif opts.mode == "kbd" then
+  mode = 02
+elseif opts.mode then
+  io.stderr:write("Unknown mode: " .. tostring(opts.mode) .. "\n")
+  return 1
+end
+
+local passwd = ""
+if type(opts.passwd) == "string" then
+  passwd = opts.passwd
+else
+  io.write("Password: ")
+  passwd = term.read{pwchar="*"}:gsub("\n$", "")
+end
+
+local tls = false
+if opts.s or opts.secure then
+  tls = true
+end
+
+wrap(connect, server, user, passwd, mode, tls)
+revert()
+return 0
