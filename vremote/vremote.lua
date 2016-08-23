@@ -866,4 +866,47 @@ local function registerVirtualComponents()
 
   -- Screen proxy
   local screen = {}
+  screen.isOn = function()
+    return params.screenState
+  end
+  screen.turnOn = function()
+    local shouldSend = params.screenState ~= true
+    params.screenState = true
+    if shouldSend then
+      -- TODO: send packet
+    end
+    return shouldSend
+  end
+  screen.turnOff = function()
+    local shouldSend = params.screenState ~= false
+    params.screenState = false
+    if shouldSend then
+      -- TODO: send packet
+    end
+    return shouldSend
+  end
+  screen.getAspectRatio = function()
+    return 1, 1
+  end
+  screen.getKeyboards = function()
+    return {kbdAddr}
+  end
+  screen.setPrecise = function(precise)
+    checkArg(1, precise, "boolean")
+    local shouldSend = params.screenState ~= precise
+    params.screenState = precise
+    if shouldSend then
+      -- TODO: send packet
+    end
+    return true
+  end
+  screen.isPrecise = function()
+    return params.screenState
+  end
+  screen.setTouchModeInverted = function()
+    return false
+  end
+  screen.isTouchModeInverted = function()
+    return false
+  end
 end
