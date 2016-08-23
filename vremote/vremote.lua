@@ -6,6 +6,10 @@ local inet = com.internet
 local vcomponent = require("vcomponent")
 
 
+-- When true, the program will be wrapped in pcall
+-- to avoid double-registering components.
+local safeMode = false
+
 -- UTILITIES -------------------------------------------------------------------
 
 local function copy(tbl)
@@ -555,7 +559,7 @@ end
 
 -- VIRTUAL COMPONENTS ----------------------------------------------------------
 
-local function registerVirtualComponents()
+local function registerVirtualComponents(write)
   local gpuAddr = vcomponent.uuid()
   local screenAddr = vcomponent.uuid()
   local kbdAddr = vcomponent.uuid()
@@ -627,14 +631,16 @@ local function registerVirtualComponents()
         shouldSend = true
       end
     else
-      local color = color2index(params.palette, color)
+      color = color2index(params.palette, color)
       if color ~= params.bg then
         params.bg = color
         shouldSend = true
       end
     end
     if shouldSend then
-      -- TODO: send packet
+      local data = codecs[opcodes.SetBG].encode(color)
+      local record = createRecord(opcodes.SetBG, data)
+      write(createRecord(opcodes.SetBG, codecs[opcodes.SetBG].encode(color)):packet())
     end
     return true
   end
@@ -661,7 +667,7 @@ local function registerVirtualComponents()
       end
     end
     if shouldSend then
-      -- TODO: send packet
+      write(createRecord(opcodes.SetFG, codecs[opcodes.SetFG].encode(color)):packet())
     end
     return true
   end
@@ -675,12 +681,13 @@ local function registerVirtualComponents()
   gpu.setPaletteColor = function(index, color)
     checkArg(1, index, "number")
     checkArg(2, color, "number")
+    color = color & 0xffffff
     if index < 0 or index > 15 then
       error("invalid palette index")
     end
     if params.palette[index] ~= color then
       params.palette[index] = color
-      -- TODO: send packet
+      write(createRecord(opcodes.SetPalette, codecs[opcodes.SetPalette].encode(index, color)):packet())
     end
     return true
   end
@@ -704,7 +711,7 @@ local function registerVirtualComponents()
     end
     if params.resolution.w ~= w or params.resolution.h ~= h then
       params.resolution.w, params.resolution.h = w, h
-      -- TODO: send packet
+      write(createRecord(opcodes.SetResolution, codecs[opcodes.SetResolution].encode(w, h)):packet())
     end
     return true
   end
@@ -783,7 +790,7 @@ local function registerVirtualComponents()
         char(ix, iy, 1, params.fg)
         char(ix, ij, 2, params.bg)
       end
-      -- TODO: send packet
+      write(createRecord(opcodes.SetChars, codecs[opcodes.SetChars].encode(x, y, chars, vertical)):packet())
     end
     return true
   end
@@ -833,7 +840,7 @@ local function registerVirtualComponents()
         char(ix, ij, 2, region[3 + (j + params.resolution.w + i) + 2])
       end
     end
-    -- TODO: send packet
+    write(createRecord(opcodes.Copy, codecs[opcodes.Copy].encode(x, y, w, h, tx, ty)):packet())
   end
   gpu.fill = function(x, y, w, h, char)
     checkArg(1, x, "number")
@@ -860,7 +867,7 @@ local function registerVirtualComponents()
       end
     end
     if shouldSend then
-      -- TODO: send packet
+      write(createRecord(opcodes.Fill, codecs[opcodes.Fill].encode(x, y, w, h, char)):packet())
     end
   end
 
@@ -873,7 +880,7 @@ local function registerVirtualComponents()
     local shouldSend = params.screenState ~= true
     params.screenState = true
     if shouldSend then
-      -- TODO: send packet
+      write(createRecord(opcodes.TurnOnOff, codecs[opcodes.TurnOnOff].encode(true)):packet())
     end
     return shouldSend
   end
@@ -881,7 +888,7 @@ local function registerVirtualComponents()
     local shouldSend = params.screenState ~= false
     params.screenState = false
     if shouldSend then
-      -- TODO: send packet
+      write(createRecord(opcodes.TurnOnOff, codecs[opcodes.TurnOnOff].encode(false)):packet())
     end
     return shouldSend
   end
@@ -896,7 +903,7 @@ local function registerVirtualComponents()
     local shouldSend = params.screenState ~= precise
     params.screenState = precise
     if shouldSend then
-      -- TODO: send packet
+      write(createRecord(opcodes.SetPrecise, codecs[opcodes.SetPrecise].encode(precise)):packet())
     end
     return true
   end
@@ -909,4 +916,12 @@ local function registerVirtualComponents()
   screen.isTouchModeInverted = function()
     return false
   end
+
+  -- Register vcomponents, turn safe mode on
+  safeMode = true
+  vcomponent.register(gpuAddr, "gpu", gpu)
+  vcomponent.register(screenAddr, "screen", screen)
+  vcomponent.register(kbdAddr, "keyboard", {})
+
+  return params, gpuAddr, screenAddr, kbdAddr
 end
