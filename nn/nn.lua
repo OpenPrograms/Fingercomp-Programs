@@ -22,17 +22,25 @@ codes = {
 }
 
 local function s(...)
-  m.send(_G.nnaddress, _G.port, "nanomachines", ...)
+  if _G.nnaddress then
+    m.send(_G.nnaddress, _G.port, "nanomachines", ...)
+  else
+    m.broadcast(_G.port, "nanomachines", ...)
+  end
 end
 
 local function g(...)
   s(...)
-  return {event.pull(6, "modem_message", _G.nnaddress)}
+  if _G.nnaddress then
+    return {event.pull(6, "modem_message", _G.nnaddress)}
+  else
+    return {event.pull(6, "modem_message")}
+  end
 end
 
 local function init(rqpt, prpt)
-  _G.port = rqpt or _G.port
   prpt = prpt or _G.port
+  _G.port = rqpt or _G.port
   m.broadcast(prpt, "nanomachines", "setResponsePort", _G.port)
   event.pull(6, "modem_message")
   m.close(prpt)
@@ -41,7 +49,7 @@ local function init(rqpt, prpt)
   _G.max = resp[8]
   if not _G.max then
     io.stderr:write("Failed to init.\n")
-    io.write("Are you sure you're near enough to modem and you have nanomachines?\n")
+    io.write("Are you sure you're near enough to modem and have nanomachines?\n")
     _G.max = 15
     return codes.initfail
   end
