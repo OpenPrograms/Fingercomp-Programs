@@ -266,6 +266,7 @@ codecs[opcodes.InitialData] = codec(
       result = result .. uint8:pack(resolution.h)
       result = result .. packBoolean(screenState)
       result = result .. packBoolean(preciseMode)
+      result = result .. uint24:pack(resolution.w * resolution.h)
       for i = 1, #shownChars, 1 do
         for j = 1, #shownChars[i], 1 do
           result = result .. ustr:pack(shownChars[3 * (j * resolution.w + i)]) ..
@@ -295,9 +296,7 @@ codecs[opcodes.InitialData] = codec(
     result.screenState = stream:unpackBoolean()
     result.preciseMode = stream:unpackBoolean()
     result.chars = {}
-    for i = 1, result.h, 1 do
-      result.chars[i] = {}
-    end
+    stream:read(3)  -- read vector length, and ignore it
     for i = 1, result.w * result.h, 1 do
       local x = i % resolution.w
       local y = i // resolution.w
