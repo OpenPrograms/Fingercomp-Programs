@@ -198,7 +198,6 @@ local uint32 = ">I4"
 local uint64 = ">I4"
 
 local str = ">s3"
-local ustr = ">s1"
 
 local function packBoolean(bool)
   if bool then
@@ -269,7 +268,7 @@ codecs[opcodes.InitialData] = codec(
       result = result .. uint24:pack(resolution.w * resolution.h)
       for i = 1, #shownChars, 1 do
         for j = 1, #shownChars[i], 1 do
-          result = result .. ustr:pack(shownChars[3 * (j * resolution.w + i)]) ..
+          result = result .. uint32:pack(utf8.codepoint(shownChars[3 * (j * resolution.w + i))]) ..
                    uint8:pack(shownChars[3 * (j * resolution.w + i) + 1]) ..
                    uint8:pack(shownChars[3 * (j * resolution.w + i) + 2])
         end
@@ -300,7 +299,7 @@ codecs[opcodes.InitialData] = codec(
     for i = 1, result.w * result.h, 1 do
       local x = i % resolution.w
       local y = i // resolution.w
-      result.chars[3 * (y * result.resolution.w + x)] = stream:unpack(ustr)
+      result.chars[3 * (y * result.resolution.w + x)] = utf8.char(stream:unpack(uint32))
       result.chars[3 * (y * result.resolution.w + x) + 1] = stream:unpack(uint8)
       result.chars[3 * (y * result.resolution.w + x) + 2] = stream:unpack(uint8)
     end
@@ -404,7 +403,7 @@ codecs[opcodes.Copy] = codec(
 
 codecs[opcodes.Fill] = codec(
   function(x, y, w, h, char)
-    return s(uint8:pack(x) .. uint8:pack(y) .. uint8:pack(w) .. uint8:pack(h) .. char:sub(1, 1))
+    return s(uint8:pack(x) .. uint8:pack(y) .. uint8:pack(w) .. uint8:pack(h) .. uint32:pack(utf8.codepoint(unicode.sub(char, 1, 1))))
   end,
   function(stream)
     return {
@@ -412,7 +411,7 @@ codecs[opcodes.Fill] = codec(
       y = stream:unpack(uint8),
       w = stream:unpack(uint8),
       h = stream:unpack(uint8),
-      char = stream:read(1)
+      char = utf8.char(stream:unpack(uint32))
     }
   end
 )
@@ -466,13 +465,14 @@ codecs[opcodes.EventDrop] = codecs[opcodes.EventTouch]
 
 codecs[opcodes.EventScroll] = codec(
   function(x, y, direction)
-    return s(uint8:pack(x) .. uint8:pack(y) .. uint8:pack(direction))
+    return s(uint8:pack(x) .. uint8:pack(y) .. uint8:pack(direction) .. uint8:pack(delta))
   end,
   function(stream)
     return {
       x = stream:unpack(uint8),
       y = stream:unpack(uint8),
-      direction = stream:unpack(uint8)
+      direction = stream:unpack(uint8),
+      delta = stream:unpack(uint8)
     }
   end
 )
