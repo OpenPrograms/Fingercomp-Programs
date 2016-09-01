@@ -267,8 +267,8 @@ codecs[opcodes.InitialData] = codec(
       result = result .. packBoolean(screenState)
       result = result .. packBoolean(preciseMode)
       result = result .. uint24:pack(resolution.w * resolution.h)
-      for i = 1, #shownChars, 1 do
-        for j = 1, #shownChars[i], 1 do
+      for j = 0, resolution.h - 1, 1 do
+        for i = 0, resolution.w - 1, 1 do
           result = result .. uint32:pack(utf8.codepoint(shownChars[3 * (j *
                    resolution.w + i)])) .. uint8:pack(shownChars[3 * (j *
                    resolution.w + i) + 1]) .. uint8:pack(shownChars[3 * (j *
@@ -578,8 +578,8 @@ local function registerVirtualComponents(write)
 
   local params = {
     palette = {},
-    fg = 0,
-    bg = 0,
+    fg = 255,
+    bg = 16,
     resolution = {
       w = 160,
       h = 50
@@ -598,18 +598,10 @@ local function registerVirtualComponents(write)
   end
 
   -- Initialize and generate the palette
+  params.palette = generatePalette(palette)
   for i = 0, 15, 1 do
     local shade = 0xff * (i + 1) / 17
     params.palette[i] = (shade << 16) | (shade << 8) | shade
-  end
-  params.palette = generatePalette(palette)
-  for i = 0, 255, 1 do
-    if palette[i] == 0xffffff then
-      params.fg = i
-    end
-    if palette[i] == 0x000000 then
-      params.bg = i
-    end
   end
 
   -- Initialize the screen to blank characters
@@ -932,9 +924,9 @@ local function registerVirtualComponents(write)
   -- Register vcomponents, turn safe mode on
   addresses = {gpuAddr, screenAddr, kbdAddr}
   safeMode = true
-  vcomponent.register(gpuAddr, "gpu", gpu)
-  vcomponent.register(screenAddr, "screen", screen)
-  vcomponent.register(kbdAddr, "keyboard", {})
+  print(vcomponent.register(gpuAddr, "gpu", gpu))
+  print(vcomponent.register(screenAddr, "screen", screen))
+  print(vcomponent.register(kbdAddr, "keyboard", {}))
 
   return params, gpuAddr, screenAddr, kbdAddr
 end
@@ -1031,7 +1023,12 @@ local function connect(address, user, password, connectionMode, tls)
   -- Authentication
   write(createRecord(opcodes.AuthClient, codecs[opcodes.AuthClient].encode(user, password, connectionMode, 30)):packet())
 
-  local records = readRecords(read())
+  local readData = read()
+  if not readData then
+    io.stderr:write("No data received\n")
+    return false
+  end
+  local records = readRecords(readData)
   if #records == 0 then
     io.stderr:write("No data recieved\n")
     return false
@@ -1178,5 +1175,4 @@ if opts.s or opts.secure then
 end
 
 wrap(connect, server, user, passwd, mode, tls)
-revert()
 return 0
