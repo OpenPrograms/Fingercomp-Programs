@@ -1,4 +1,5 @@
 local com = require("component")
+local comp = require("computer")
 local computer = require("computer")
 local shell = require("shell")
 local term = require("term")
@@ -13,7 +14,7 @@ local vcomponent = require("vcomponent")
 -- to avoid double-registering components.
 local safeMode = false
 local oPull = computer.pullSignal
-local addresses
+local addresses = {}
 local gSocket
 
 -- UTILITIES -------------------------------------------------------------------
@@ -65,7 +66,7 @@ end
 
 local function unpack(stream, format)
   local result, len = format:unpack(stream[0])
-  stream:read(len)
+  stream:read(len - 1)
   return result
 end
 
@@ -268,9 +269,10 @@ codecs[opcodes.InitialData] = codec(
       result = result .. uint24:pack(resolution.w * resolution.h)
       for i = 1, #shownChars, 1 do
         for j = 1, #shownChars[i], 1 do
-          result = result .. uint32:pack(utf8.codepoint(shownChars[3 * (j * resolution.w + i))]) ..
-                   uint8:pack(shownChars[3 * (j * resolution.w + i) + 1]) ..
-                   uint8:pack(shownChars[3 * (j * resolution.w + i) + 2])
+          result = result .. uint32:pack(utf8.codepoint(shownChars[3 * (j *
+                   resolution.w + i)])) .. uint8:pack(shownChars[3 * (j *
+                   resolution.w + i) + 1]) .. uint8:pack(shownChars[3 * (j *
+                   resolution.w + i) + 2])
         end
       end
       return s(result)
@@ -534,7 +536,7 @@ do
   function createRecord(opcode, data)
     return setmetatable({
       opcode = opcode,
-      data = data
+      data = data[0]
     }, {
       __index = {
         packet = createPacket
@@ -553,13 +555,13 @@ local function parseRecord(stream)
   if not opcodes[opcode] then
     error("corrupt packet: unknown opcode")
   end
-  return createRecord(opcode, data)
+  return createRecord(opcode, s(data))
 end
 
 local function readRecords(data)
   local stream = s(data)
   local result = {}
-  while #stream > 0 do
+  while #stream[0] > 0 do
     local record = parseRecord(stream)
     result[#result + 1] = record
   end
@@ -627,7 +629,7 @@ local function registerVirtualComponents(write)
   end
   gpu.getBackground = function()
     return index2color(params.bg), params.bg < 16
-  end,
+  end
   gpu.setBackground = function(color, palIdx)
     checkArg(1, color, "number")
     checkArg(2, palIdx, "boolean", "nil")
@@ -866,7 +868,7 @@ local function registerVirtualComponents(write)
     char = unicode.sub(char, 1, 1)
     checkArg(5, char, "string")
     local shouldSend = false
-    for j = y, y + h - 1, 1, do
+    for j = y, y + h - 1, 1 do
       for i = x, x + w - 1, 1 do
         if char(i, j) ~= char then
           shouldSend = true
@@ -964,7 +966,7 @@ local function connect(address, user, password, connectionMode, tls)
   else
     socket, reason = inet.connect(address)
     if not socket then
-      io.stderr:write("Could not open socket: " .. tostring(reason or "unknown reason") ,, "\n")
+      io.stderr:write("Could not open socket: " .. tostring(reason or "unknown reason") .. "\n")
       return false
     end
     for i = 1, 100, 1 do
@@ -986,7 +988,7 @@ local function connect(address, user, password, connectionMode, tls)
     end
   end
 
-  local timeout = 5
+  local timeout = 8
 
   local function read()
     if tls then
@@ -996,12 +998,14 @@ local function connect(address, user, password, connectionMode, tls)
     local gotNonNilChunk = false
     local readStartTime = comp.uptime()
     repeat
-      local chunk = sock.read(1024)
+      local chunk = socket.read(100)
       if chunk == "" then
-        if sock.finishConnect() then -- the connection is still alive
+        if socket.finishConnect() then -- the connection is still alive
           if gotNonNilChunk then
             break
           end
+        else
+          break
         end
       elseif chunk then
         response = (response or "") .. chunk
@@ -1018,14 +1022,14 @@ local function connect(address, user, password, connectionMode, tls)
     end
     repeat
       local n = socket.write(data)
-      if not n n n ~= #data then
+      if n ~= #data then
         os.sleep(.05)
       end
     until n and n == #data
   end
 
   -- Authentication
-  write(createRecord(opcodes.AuthClient, codecs[opcodes.AuthClient].encode(user, passwd, connectionMode, 30)):packet())
+  write(createRecord(opcodes.AuthClient, codecs[opcodes.AuthClient].encode(user, password, connectionMode, 30)):packet())
 
   local records = readRecords(read())
   if #records == 0 then
@@ -1033,7 +1037,7 @@ local function connect(address, user, password, connectionMode, tls)
     return false
   end
   for k, v in pairs(records) do
-    v.data = codecs[v.opcode].decode(v.data)
+    v.data = codecs[v.opcode].decode(s(v.data))
   end
 
   if records[1].opcode ~= opcodes.AuthServer then
@@ -1112,22 +1116,21 @@ local function revert()
 end
 
 local function wrap(func, ...)
-  local err, stacktrace
   local data = {xpcall(func, function(m)
-      if not safeMode then
-        error(m)
-      end
-      err = m
-      stacktrace = debug.traceback()
-    end), ...}
+      return tostring(m) .. "\n" .. tostring(debug.traceback())
+    end, ...)}
   if data[1] then
     return table.unpack(data, 2)
   end
-  io.stderr:write("ERROR CAUGHT: Safe move active\n" .. tostring(err) .. "\n" .. tostring(stacktrace) .. "\n")
-  io.stderr:write("Reverting... ")
-  revert()
-  io.stderr:write("done\n")
-  os.exit(-1)
+  table.unpack(data)
+  if safeMode then
+    io.stderr:write("ERROR CAUGHT: Safe move active\n" .. data[2] .. "\n")
+    io.stderr:write("Reverting... ")
+    revert()
+    io.stderr:write("done\n")
+    os.exit(-1)
+  end
+  error(data[2])
 end
 
 -- MAIN LOGIC ------------------------------------------------------------------
@@ -1141,6 +1144,8 @@ if not args[1] then
   print("  [--passwd]  (Optional) password to use. If not specified, will be prompted")
   print("  [-s]        Use secure TLS connection: you need to install libtls\n" ..
         "              in order to be able to use it")
+  return 1
+end
 
 local server, user = args[1], args[2]
 local mode = 00
@@ -1160,7 +1165,11 @@ if type(opts.passwd) == "string" then
   passwd = opts.passwd
 else
   io.write("Password: ")
-  passwd = term.read{pwchar="*"}:gsub("\n$", "")
+  passwd = term.read{pwchar="*"}
+  if not passwd then
+    return 0
+  end
+  passwd = passwd:gsub("\n$", "")
 end
 
 local tls = false
