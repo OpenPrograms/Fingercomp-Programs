@@ -1,6 +1,7 @@
 local com = require("component")
 local comp = require("computer")
 local computer = require("computer")
+local event = require("event")
 local shell = require("shell")
 local term = require("term")
 local unicode = require("unicode")
@@ -16,6 +17,8 @@ local safeMode = false
 local oPull = computer.pullSignal
 local addresses = {}
 local gSocket
+
+local revert -- fwdecl
 
 -- UTILITIES -------------------------------------------------------------------
 
@@ -924,9 +927,9 @@ local function registerVirtualComponents(write)
   -- Register vcomponents, turn safe mode on
   addresses = {gpuAddr, screenAddr, kbdAddr}
   safeMode = true
-  print(vcomponent.register(gpuAddr, "gpu", gpu))
-  print(vcomponent.register(screenAddr, "screen", screen))
-  print(vcomponent.register(kbdAddr, "keyboard", {}))
+  print(vcomponent.register(gpuAddr, "g-pu", gpu))
+  print(vcomponent.register(screenAddr, "scr-een", screen))
+  print(vcomponent.register(kbdAddr, "keyb-oard", {}))
 
   return params, gpuAddr, screenAddr, kbdAddr
 end
@@ -968,7 +971,11 @@ local function connect(address, user, password, connectionMode, tls)
           io.stderr:write("Could not connect to server: " .. tostring(rsn) .. "\n")
           return false
         end
-        os.sleep(.05)
+        if oPull then
+          oPull(.05)
+        else
+          os.sleep(.05)
+        end
       else
         break
       end
@@ -982,7 +989,7 @@ local function connect(address, user, password, connectionMode, tls)
 
   local timeout = 8
 
-  local function read()
+  local function read(noSleep)
     if tls then
       return socket.read()
     end
@@ -996,6 +1003,9 @@ local function connect(address, user, password, connectionMode, tls)
           if gotNonNilChunk then
             break
           end
+          if noSleep then
+            break
+          end
         else
           break
         end
@@ -1003,7 +1013,13 @@ local function connect(address, user, password, connectionMode, tls)
         response = (response or "") .. chunk
         gotNonNilChunk = true
       end
-      os.sleep(.05)
+      if not noSleep then
+        if oPull then
+          oPull(.05)
+        else
+          os.sleep(.05)
+        end
+      end
     until not chunk and gotNonNilChunk or not gotNonNilChunk and comp.uptime() - readStartTime > timeout
     return response
   end
@@ -1072,27 +1088,31 @@ local function connect(address, user, password, connectionMode, tls)
     if tls then
       socket.setTimeout(timeout)
     end
-    local success, data = pcall(read)
-    if success and data then
-      local records = readRecords(data)
-      if #records > 0 then
-        for k, v in ipairs(records) do
-          local data = codecs[v.opcode].decode(v.data)
-          if v.opcode == opcodes.EventTouch then
-            computer.pushSignal("touch", gAddr, data.x, data.y, data.button, user)
-          elseif v.opcode == opcodes.EventDrag then
-            computer.pushSignal("drag", gAddr, data.x, data.y, data.button, user)
-          elseif v.opcode == opcodes.EventDrop then
-            computer.pushSignal("drop", gAddr, data.x, data.y, data.button, user)
-          elseif v.opcode == opcodes.EventKeyDown then
-            computer.pushSignal("key_down", kAddr, data.char, data.code, user)
-          elseif v.opcode == opcodes.EventKeyUp then
-            computer.pushSignal("key_up", kAddr, data.char, data.code, user)
-          elseif v.opcode == opcodes.EventClipboard then
-            computer.pushSignal("clipboard", kAddr, data.data, user)
-          elseif v.opcode == opcodes.Ping then
-            local pong = codecs[opcodes.Pong].encode(data.ping)
-            write(createRecord(opcodes.Pong, pong):packet())
+    if not socket.finishConnect() then
+      revert()
+    else
+      local success, data = pcall(read)
+      if success and data then
+        local records = readRecords(data)
+        if #records > 0 then
+          for k, v in ipairs(records) do
+            local data = codecs[v.opcode].decode(v.data)
+            if v.opcode == opcodes.EventTouch then
+              computer.pushSignal("touch", gAddr, data.x, data.y, data.button, user)
+            elseif v.opcode == opcodes.EventDrag then
+              computer.pushSignal("drag", gAddr, data.x, data.y, data.button, user)
+            elseif v.opcode == opcodes.EventDrop then
+              computer.pushSignal("drop", gAddr, data.x, data.y, data.button, user)
+            elseif v.opcode == opcodes.EventKeyDown then
+              computer.pushSignal("key_down", kAddr, data.char, data.code, user)
+            elseif v.opcode == opcodes.EventKeyUp then
+              computer.pushSignal("key_up", kAddr, data.char, data.code, user)
+            elseif v.opcode == opcodes.EventClipboard then
+              computer.pushSignal("clipboard", kAddr, data.data, user)
+            elseif v.opcode == opcodes.Ping then
+              local pong = codecs[opcodes.Pong].encode(data.ping)
+              write(createRecord(opcodes.Pong, pong):packet())
+            end
           end
         end
       end
