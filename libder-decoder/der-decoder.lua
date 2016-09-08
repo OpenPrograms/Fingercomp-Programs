@@ -3,11 +3,6 @@
 
 local comp = require("computer")
 
--- a lua 5.2 compat hack
-_G.math.log10 = function(n)
-  return math.log(n, 10)
-end
-
 local bigint = require("bigint")
 
 local function read(s, len)
