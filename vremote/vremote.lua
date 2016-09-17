@@ -13,10 +13,10 @@ local vcomponent = require("vcomponent")
 
 -- When true, the program will be wrapped in pcall
 -- to avoid double-registering components.
-local safeMode = false
-local oPull = computer.pullSignal
-local addresses = {}
-local gSocket
+safeMode = false
+oPull = computer.pullSignal
+addresses = {}
+--local gSocket
 
 local revert -- fwdecl
 
@@ -726,8 +726,8 @@ local function registerVirtualComponents(write)
     return params.resolution.w, params.resolution.h
   end
   gpu.get = function(x, y)
-    checkArg(x, "number")
-    checkArg(y, "number")
+    checkArg(1, x, "number")
+    checkArg(2, y, "number")
     if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
       error("index out of bounds")
     end
@@ -741,10 +741,10 @@ local function registerVirtualComponents(write)
     return table.unpack(result)
   end
   gpu.set = function(x, y, chars, vertical)
-    checkArg(x, "number")
-    checkArg(y, "number")
-    checkArg(chars, "string")
-    checkArg(vertical, "boolean", "nil")
+    checkArg(1, x, "number")
+    checkArg(2, y, "number")
+    checkArg(3, chars, "string")
+    checkArg(4, vertical, "boolean", "nil")
     -- it makes no sense to send characters that are out of screen's bounds
     if vertical then
       chars = unicode.sub(chars, 1, params.resolution.h - y + 1)
@@ -1077,21 +1077,13 @@ local function connect(address, user, password, connectionMode, tls)
   -- Register the custom event listener
   oPull = computer.pullSignal
   computer.pullSignal = function(to)
-    local toSocket = to
-    if to >= .05 then
-      toSocket = to - .05
-    end
-    if to == math.huge then
-      toSocket = 5
-    end
-    timeout = toSocket
     if tls then
-      socket.setTimeout(timeout)
+      socket.setTimeout(0)
     end
     if not socket.finishConnect() then
       revert()
     else
-      local success, data = pcall(read)
+      local success, data = pcall(read, true)
       if success and data then
         local records = readRecords(data)
         if #records > 0 then
