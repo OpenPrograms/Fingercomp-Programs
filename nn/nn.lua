@@ -428,7 +428,7 @@ local function group(...)
 end
 
 local function help()
-  io.write("Run man nn for help!\n")
+  io.write("Run `man nn` or open /usr/share/doc/nn/README.md for help!\n")
   return codes.success
 end
 
