@@ -1,5 +1,7 @@
 *This is not my library, but I need it for my programs. So I've packaged it on my repository.*
 
+[The original repository](https://github.com/somesocks/lua-lockbox).
+
 # The Lua Lockbox
 
 [![Build Status](https://travis-ci.org/somesocks/lua-lockbox.svg?branch=master)](https://travis-ci.org/somesocks/lua-lockbox)
