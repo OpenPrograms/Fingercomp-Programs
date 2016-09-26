@@ -57,3 +57,6 @@ If uploading, provide file list as arguments with the following format: `<path t
   * Changes the description of the gist with the ID `12345678901234567890` to `New description` and updates contents of the file `file.lua`. Prompts for the GitHub OAuth [personal access token](https://github.com/settings/tokens).
 * `gist -s -p --d="Hello, world!" --P=s -t /hello/hello.cpp=hello.cpp`
   * Prompts for the GitHub OAuth [personal access token](https://github.com/settings/tokens) and then uploads the file `hello.cpp` to Gist. Returns a short URL to the gist.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).

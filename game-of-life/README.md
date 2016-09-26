@@ -36,3 +36,6 @@
 ## Requirements
 * T3 screen.
 * T3 graphics card.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).

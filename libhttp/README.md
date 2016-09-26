@@ -32,3 +32,6 @@ The function returns a table of functions:
 All headers returned by `response.response()` are Train-Cased, so that you don't need to worry about that.
 
 The response body is read all and stored in the buffer. If you don't specify any arguments for `response.read`, it will return *the whole buffer*. This is different from "vanilla" `request` method, where the data is returned as chunks of random length.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).

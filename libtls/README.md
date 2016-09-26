@@ -100,3 +100,6 @@ Seriously though, I think of how to boost it even more. I'd gladly appreciate an
 
 ### What's that "unknown signature algorithm" // "unknown extension" thingy?
 This is something that I'd glad to fix, basically. Please create an issue at the tracker, including the sequence of period-separated numbers in that exact order and look.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).
