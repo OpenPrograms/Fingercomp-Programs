@@ -23,3 +23,6 @@ the first tag with the "context-specific" class will be decoded as an integer, a
 I use this library to decode X.509 certificates (the standard of a very common certificate encoding, e.g., used in TLS). You, though, may have your own ideas on how to use this library. :)
 
 I'd not recommend to encode something with the DER, though, as it's not that space-efficient.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).

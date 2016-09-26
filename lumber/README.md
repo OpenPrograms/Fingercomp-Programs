@@ -30,3 +30,6 @@ The `INTERVAL` settings makes a robot wait a certain time before it'll begin the
 Robot will also drop the tool in the chest under it when it completes a cycle. This could be used to recharge or repair the tool.
 
 The tool is an axe that can chop the whole tree, not only one wood block.
+
+### License
+This program uses the CC0 1.0 license, see the `LICENSE` file for more details about the license.

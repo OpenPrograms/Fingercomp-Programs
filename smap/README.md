@@ -29,3 +29,6 @@ Currently supported devices are:
 * TxN, for his NBS player code,
 * Sangar, for his amazing mod, and midi.lua code as well,
 * FluttyProger, for helping and motivating me to fight against bugs.
+
+## License
+Some pieces of this program use the Apache 2.0 license. Such files have a comment attached at the top with the copyright information. The text of the license can be found [here](http://www.apache.org/licenses/LICENSE-2.0)

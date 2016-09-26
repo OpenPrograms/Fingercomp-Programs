@@ -178,3 +178,6 @@ As you could see, you need a password to authenticate. Where should you take it?
 
 ### Sessions
 After a bit of thinking I've got a solution to the Computronics spoofing card problem. So now you need a `<session>` for the most of network commands. This is a 16 char long password given to you on authentication.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).

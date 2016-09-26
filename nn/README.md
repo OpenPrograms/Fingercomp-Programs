@@ -70,3 +70,6 @@ This program allows the player to control their's nanomachines.
 ## Examples
 * `nn combo 1-5 12 8-15`
   * Runs the combinatoric test and excludes input #12 and combinations 1+5 and 8+15 from testing.
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).
