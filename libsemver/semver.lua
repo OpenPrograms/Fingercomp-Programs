@@ -106,87 +106,111 @@ do
     next_major = function(self)
       if self.prerelease and self.minor == 0 and self.patch == 0 then
         return Version(concat((function()
-          local _tbl_0 = { }
-          for x in {
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = {
             self.major,
             self.minor,
             self.patch
-          } do
-            local _key_0, _val_0 = tostring(x)
-            _tbl_0[_key_0] = _val_0
+          }
+          for _index_0 = 1, #_list_0 do
+            local x = _list_0[_index_0]
+            _accum_0[_len_0] = tostring(x)
+            _len_0 = _len_0 + 1
           end
-          return _tbl_0
+          return _accum_0
         end)(), '.'))
       else
         return Version(concat((function()
-          local _tbl_0 = { }
-          for x in {
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = {
             self.major + 1,
             0,
             0
-          } do
-            local _key_0, _val_0 = tostring(x)
-            _tbl_0[_key_0] = _val_0
+          }
+          for _index_0 = 1, #_list_0 do
+            local x = _list_0[_index_0]
+            _accum_0[_len_0] = tostring(x)
+            _len_0 = _len_0 + 1
           end
-          return _tbl_0
+          return _accum_0
         end)(), '.'))
       end
     end,
     next_minor = function(self)
+      if not (self.minor) then
+        error("Partial version doesn't contain the minor component!")
+      end
       if self.prerelease and self.patch == 0 then
         return Version(concat((function()
-          local _tbl_0 = { }
-          for x in {
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = {
             self.major,
             self.minor,
             self.patch
-          } do
-            local _key_0, _val_0 = tostring(x)
-            _tbl_0[_key_0] = _val_0
+          }
+          for _index_0 = 1, #_list_0 do
+            local x = _list_0[_index_0]
+            _accum_0[_len_0] = tostring(x)
+            _len_0 = _len_0 + 1
           end
-          return _tbl_0
+          return _accum_0
         end)(), '.'))
       else
         return Version(concat((function()
-          local _tbl_0 = { }
-          for x in {
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = {
             self.major,
             self.minor + 1,
             0
-          } do
-            local _key_0, _val_0 = tostring(x)
-            _tbl_0[_key_0] = _val_0
+          }
+          for _index_0 = 1, #_list_0 do
+            local x = _list_0[_index_0]
+            _accum_0[_len_0] = tostring(x)
+            _len_0 = _len_0 + 1
           end
-          return _tbl_0
+          return _accum_0
         end)(), '.'))
       end
     end,
     next_patch = function(self)
+      if not (self.patch) then
+        error("Partial version doesn't contain the patch component!")
+      end
       if self.prerelease then
         return Version(concat((function()
-          local _tbl_0 = { }
-          for x in {
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = {
             self.major,
             self.minor,
             self.patch
-          } do
-            local _key_0, _val_0 = tostring(x)
-            _tbl_0[_key_0] = _val_0
+          }
+          for _index_0 = 1, #_list_0 do
+            local x = _list_0[_index_0]
+            _accum_0[_len_0] = tostring(x)
+            _len_0 = _len_0 + 1
           end
-          return _tbl_0
+          return _accum_0
         end)(), '.'))
       else
         return Version(concat((function()
-          local _tbl_0 = { }
-          for x in {
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = {
             self.major,
             self.minor,
             self.patch + 1
-          } do
-            local _key_0, _val_0 = tostring(x)
-            _tbl_0[_key_0] = _val_0
+          }
+          for _index_0 = 1, #_list_0 do
+            local x = _list_0[_index_0]
+            _accum_0[_len_0] = tostring(x)
+            _len_0 = _len_0 + 1
           end
-          return _tbl_0
+          return _accum_0
         end)(), '.'))
       end
     end,
