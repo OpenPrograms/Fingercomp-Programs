@@ -109,21 +109,23 @@ class Version
 
   next_major: =>
     if @prerelease and @minor == 0 and @patch == 0
-      Version concat {tostring x for x in {@major, @minor, @patch}}, '.'
+      Version concat [tostring x for x in *{@major, @minor, @patch}], '.'
     else
-      Version concat {tostring x for x in {@major + 1, 0, 0}}, '.'
+      Version concat [tostring x for x in *{@major + 1, 0, 0}], '.'
 
   next_minor: =>
+    error "Partial version doesn't contain the minor component!" unless @minor
     if @prerelease and @patch == 0
-      Version concat {tostring x for x in {@major, @minor, @patch}}, '.'
+      Version concat [tostring x for x in *{@major, @minor, @patch}], '.'
     else
-      Version concat {tostring x for x in {@major, @minor + 1, 0}}, '.'
+      Version concat [tostring x for x in *{@major, @minor + 1, 0}], '.'
 
   next_patch: =>
+    error "Partial version doesn't contain the patch component!" unless @patch
     if @prerelease
-      Version concat {tostring x for x in {@major, @minor, @patch}}, '.'
+      Version concat [tostring x for x in *{@major, @minor, @patch}], '.'
     else
-      Version concat {tostring x for x in {@major, @minor, @patch + 1}}, '.'
+      Version concat [tostring x for x in *{@major, @minor, @patch + 1}], '.'
 
   coerce: (versionString, partial=false) =>
     baseRe = (s) ->
