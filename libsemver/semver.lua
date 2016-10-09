@@ -429,7 +429,7 @@ do
       makeOptional = function(origCmpFun)
         local altCmpFun
         altCmpFun = function(a, b)
-          if a == nil and b == nil then
+          if a == nil or b == nil then
             return 0
           else
             return origCmpFun(a, b)
@@ -647,7 +647,7 @@ do
       end
     end,
     __tostring = function(self)
-      return self.kind .. self.spec
+      return tostring(self.kind) .. tostring(self.spec)
     end,
     __eq = function(self, other)
       return self.kind == other.kind and self.spec == other.spec
@@ -685,8 +685,8 @@ do
     [self.__class.KIND_SHORTEQ] = self.__class.KIND_EQUAL,
     [self.__class.KIND_EMPTY] = self.__class.KIND_EQUAL
   }
-  self.reSpec = function(s)
-    local chr, v = s:match('^(.*)(%d.*)$')
+  self.reSpec = function(self, s)
+    local chr, v = s:match('^(.-)(%d.*)$')
     if not (chr == '<' or chr == '<=' or chr == '' or chr == '=' or chr == '==' or chr == '>=' or chr == '>' or chr == '!=' or chr == '^' or chr == '~') then
       return nil
     else

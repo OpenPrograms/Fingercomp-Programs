@@ -274,7 +274,7 @@ class Version
 
     makeOptional = (origCmpFun) ->
       altCmpFun = (a, b) ->
-        if a == nil and b == nil
+        if a == nil or b == nil
           0
         else
           origCmpFun(a, b)
@@ -353,8 +353,8 @@ class SpecItem
     [@@KIND_EMPTY]: @@KIND_EQUAL
   }
 
-  @reSpec: (s) ->
-    chr, v = s\match '^(.*)(%d.*)$'
+  @reSpec: (s) =>
+    chr, v = s\match '^(.-)(%d.*)$'
     if not (
         chr == '<' or
         chr == '<=' or
@@ -416,7 +416,7 @@ class SpecItem
         error "Unexpected match kind: #{@kind}"
 
   __tostring: =>
-    @kind .. @spec
+    "#{@kind}#{@spec}"
 
   __eq: (other) =>
     @kind == other.kind and @spec == other.spec
