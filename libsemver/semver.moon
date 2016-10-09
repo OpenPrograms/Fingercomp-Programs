@@ -475,7 +475,7 @@ class Spec
     ipairs @specs
 
   __tostring: =>
-    concat {tostring spec for spec in *@specs}, ','
+    concat [tostring spec for spec in *@specs], ','
 
   __eq: (other) =>
     for selfSpec in *@specs

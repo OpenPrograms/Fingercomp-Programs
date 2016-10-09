@@ -772,14 +772,15 @@ do
     end,
     __tostring = function(self)
       return concat((function()
-        local _tbl_0 = { }
+        local _accum_0 = { }
+        local _len_0 = 1
         local _list_0 = self.specs
         for _index_0 = 1, #_list_0 do
           local spec = _list_0[_index_0]
-          local _key_0, _val_0 = tostring(spec)
-          _tbl_0[_key_0] = _val_0
+          _accum_0[_len_0] = tostring(spec)
+          _len_0 = _len_0 + 1
         end
-        return _tbl_0
+        return _accum_0
       end)(), ',')
     end,
     __eq = function(self, other)
