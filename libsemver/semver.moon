@@ -59,7 +59,7 @@ identifierCmp = (a, b) ->
 
 identifierListCmp = (a, b) ->
   identifierPairs = {a[i], b[i] for i = 1, #a when b[i]}
-  for idA, idB in pairs identifierPairs do
+  for idA, idB in pairs identifierPairs
     cmpRes = identifierCmp(idA, idB)
     if cmpRes != 0
       return cmpRes
@@ -158,19 +158,19 @@ class Version
 
     prerelease, build = nil, nil
 
-    if rest\sub(1, 1) == '+' then
+    if rest\sub(1, 1) == '+'
       prerelease = ''
       build = rest\sub 2
-    elseif rest\sub(1, 1) == '.' then
+    elseif rest\sub(1, 1) == '.'
       prerelease = ''
       build = rest\sub 2
-    elseif rest\sub(1, 1) == '-' then
+    elseif rest\sub(1, 1) == '-'
       rest = rest\sub 2
       if p1 = rest\find '+'
         prerelease, build = rest\sub(1, p1 - 1), rest\sub(p1 + 1, -1)
       else
         prerelease, build = rest, ''
-    elseif p1 = rest\find '+' then
+    elseif p1 = rest\find '+'
       prerelease, build = rest\sub(1, p1 - 1), rest\sub(p1 + 1, -1)
     else
       prerelease, build = rest, ''
@@ -233,7 +233,7 @@ class Version
     {major, minor, patch, prerelease, build}
 
   _validateIdentifiers: (identifiers, allowLeadingZeroes=false) =>
-    for item in *identifiers do
+    for item in *identifiers
       if not item
         error "Invalid empty identifier #{item} in #{concat identifiers, '.'}"
       if item\sub(1, 1) == '0' and tonumber(item) and item != '0' and not allowLeadingZeroes
@@ -309,7 +309,7 @@ class Version
       {comparsionFunctions[5], @build, other.build}
     }
 
-    for cmpField in *comparsions do
+    for cmpField in *comparsions
       cmpFun, selfField, otherField = unpack cmpField
       cmpRes = cmpFun(selfField, otherField)
       if cmpRes != 0
@@ -446,7 +446,7 @@ class Spec
   filter: (versions) =>
     i = 0
     () ->
-      while true do
+      while true
         i += 1
         version = versions[i]
         return nil unless version
@@ -455,7 +455,7 @@ class Spec
 
   select: (versions) =>
     options = [x for x in @filter versions]
-    if #options > 0 then
+    if #options > 0
       max = options[1]
       for ver in *options
         if max < ver
@@ -483,7 +483,7 @@ class Spec
     for selfSpec in *@specs
       s = false
       for otherSpec in *other.specs
-        if selfSpec == otherSpec then
+        if selfSpec == otherSpec
           s = true
           break
       if not s
