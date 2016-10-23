@@ -8,7 +8,7 @@ It plays audio, does it quite well (oh, okay, not as well as I want).
 And yeah, it is a library.
 
 ## General info
-There are modules. To be exact, two types of them: input modules, and output modules.
+There are some modules. To be exact, two types of them: input modules, and output modules.
 
 ### Input modules
 They read a file and convert it into internal format.
@@ -18,7 +18,7 @@ Currenlty supported audio files are:
 * `midi`: a clumsy module, mostly a copypaste from Sangar's midi.lua code. Reads MIDI files, and plays it.
 
 ### Output modules
-They convert an internal format audio to the actual sounds!
+They convert an internal format audio to actual sounds!
 
 Currently supported devices are:
 * `inoteblock`: Computronics' Iron Note Block. Btw, it's a very good thing.
