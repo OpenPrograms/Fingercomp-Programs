@@ -12,6 +12,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.local comp = require("computer")
 
+local com = require("component")
 local unicode = require("unicode")
 local event = require("event")
 local term = require("term")
