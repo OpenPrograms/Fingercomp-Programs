@@ -29,3 +29,5 @@ This is a place where brilliant ideas become the programs.
   * An (uncomplete, though) implementation of TLS 1.2.
 * `libhttp`
   * A HTTP/HTTPS 1.1 library that allows to specify a request method (`GET`, `POST`, `DELETE`, `PATCH`, etc.)
+* `libcsv`
+  * A CSV parser.
