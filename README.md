@@ -1,10 +1,10 @@
 # Fingercomp's programs
-This is a place where brilliant ideas become the programs.
+This is a place where hopefully brilliant ideas become the programs.
 
 ## Programs
-*(go to programs' directories and see their READMEs for more info)*
+*(open programs' directories and see their READMEs for more info)*
 * `nn`
-  * Nanomachines controlling program.
+  * Nanomachines control program.
 * `gist`
   * Gist downloader and uploader.
 * `game-of-life`
@@ -26,7 +26,7 @@ This is a place where brilliant ideas become the programs.
 * `lua-lockbox`
   * The most awesome pure Lua cryptography toolkit that I've ever found.
 * `libtls`
-  * An (uncomplete, though) implementation of TLS 1.2.
+  * An implementation of TLS 1.2.
 * `libhttp`
   * A HTTP/HTTPS 1.1 library that allows to specify a request method (`GET`, `POST`, `DELETE`, `PATCH`, etc.)
 * `libcsv`

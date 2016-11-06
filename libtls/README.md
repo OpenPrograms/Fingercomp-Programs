@@ -21,7 +21,7 @@ To prevent traffic modification (e.g., pick a packet at some time and send again
 The benefit of TLS is that the already-existing applications do not require a lot of effort to switch to the secure connection, as the data stream is kept unmodified on the application layer. The server only needs to generate the private key, get a certificate, and use TLS-wrapped sockets.
 
 ## What this library is, seriously.
-This is, basically, an (non-complete, and not fully standard-compliant) implementation of TLSv1.2. It wraps the internet card's basic sockets, and tries to mimic the behaviour of internet card's sockets, at least, on a high-level. It encrypts, sends, recieves, decrypts, validates, and returns the data stream as a binary string.
+This is, basically, an implementation of TLSv1.2. It wraps the internet card's basic sockets, and tries to mimic the behaviour of internet card's sockets, at least, on a high-level. It encrypts, sends, recieves, decrypts, validates, and returns the data stream as a binary string.
 
 **It doesn't validate the certificates!** Yeah, it's kind of pointless from the security's point of view, as anyone can send a fake certificate, and thus easily decrypt your data, but, at least, the library makes it possible to connect to services using TLS.
 
