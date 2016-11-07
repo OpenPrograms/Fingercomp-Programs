@@ -1,17 +1,14 @@
 # smap
 **A Simple Minecraft Audio Player**
-(Totally simple)
 
 ## What it does?
 It plays audio, does it quite well (oh, okay, not as well as I want).
 
-And yeah, it is a library.
-
 ## General info
-There are some modules. To be exact, two types of them: input modules, and output modules.
+There are input modules and output modules.
 
 ### Input modules
-They read a file and convert it into internal format.
+They read a file and convert it to internal format.
 
 Currenlty supported audio files are:
 * `nbs`: Minecraft Note Block Studio files.
