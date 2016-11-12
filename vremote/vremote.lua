@@ -18,8 +18,6 @@ oPull = computer.pullSignal
 addresses = {}
 --local gSocket
 
-local revert -- fwdecl
-
 -- UTILITIES -------------------------------------------------------------------
 
 local function copy(tbl)
@@ -199,7 +197,7 @@ local uint8 = ">I1"
 local uint16 = ">I2"
 local uint24 = ">I3"
 local uint32 = ">I4"
-local uint64 = ">I4"
+local uint64 = ">I8"
 
 local str = ">s3"
 
@@ -487,10 +485,11 @@ codecs[opcodes.EventKeyDown] = codec(
     return s(uint32:pack(utf8.codepoint(char)) .. uint32:pack(code))
   end,
   function(stream)
-    return {
-      char = utf8.char(stream:unpack(uint32)),
+    local result = {
+      char = stream:unpack(uint32),
       code = stream:unpack(uint32)
     }
+    return result
   end
 )
 
@@ -1088,7 +1087,7 @@ local function connect(address, user, password, connectionMode, tls)
         local records = readRecords(data)
         if #records > 0 then
           for k, v in ipairs(records) do
-            local data = codecs[v.opcode].decode(v.data)
+            local data = codecs[v.opcode].decode(s(v.data))
             if v.opcode == opcodes.EventTouch then
               computer.pushSignal("touch", gAddr, data.x, data.y, data.button, user)
             elseif v.opcode == opcodes.EventDrag then
@@ -1114,7 +1113,7 @@ local function connect(address, user, password, connectionMode, tls)
   gSocket = socket
 end
 
-local function revert()
+function revert()
   computer.pullSignal = oPull
   for _, addr in pairs(addresses) do
     vcomponent.unregister(addr)
