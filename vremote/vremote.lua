@@ -152,7 +152,7 @@ local function color2index(palette, color)
       minDIdx = i
     end
   end
-  if delta(index2color(idx), color) < delta(index2color(minDIdx), color) then
+  if colorDelta(index2color(palette, idx), color) < colorDelta(index2color(palette, minDIdx), color) then
     return idx
   else
     return minDIdx
@@ -361,10 +361,10 @@ codecs[opcodes.SetChars] = codec(
     local charStr = ""
     local i = 1
     while true do
-      if #chars == 0 then
+      if unicode.len(chars) < i then
         break
       end
-      local c = chars:sub(i, i)
+      local c = unicode.sub(chars, i, i)
       if unicode.isWide(c) then
         charStr = charStr .. c .. " "
         i = i + 2
@@ -622,7 +622,7 @@ local function registerVirtualComponents(write)
     return screenAddr
   end
   gpu.getBackground = function()
-    return index2color(params.bg), params.bg < 16
+    return index2color(params.palette, params.bg), params.bg < 16
   end
   gpu.setBackground = function(color, palIdx)
     checkArg(1, color, "number")
@@ -651,7 +651,7 @@ local function registerVirtualComponents(write)
     return true
   end
   gpu.getForeground = function()
-    return index2color(params.fg), params.fg < 16
+    return index2color(params.palette, params.fg), params.fg < 16
   end
   gpu.setForeground = function(color, palIdx)
     checkArg(1, color, "number")
@@ -666,8 +666,8 @@ local function registerVirtualComponents(write)
         shouldSend = true
       end
     else
-      local color = color2index(params.palette, color)
-      if params.fg ~= coloe then
+      color = color2index(params.palette, color)
+      if params.fg ~= color then
         params.fg = color
         shouldSend = true
       end
@@ -776,7 +776,7 @@ local function registerVirtualComponents(write)
       else
         ix = ix + i
       end
-      if unicode.sub(chars, i, i) ~= char(ix, ij) or
+      if unicode.sub(chars, i, i) ~= char(ix, iy) or
           char(ix, ij, 1) ~= params.fg or
           char(ix, ij, 2) ~= params.bg then
         needsUpdate = true
@@ -792,9 +792,9 @@ local function registerVirtualComponents(write)
         else
           ix = ix + i
         end
-        char(ix, ij, 0, c)
+        char(ix, iy, 0, c)
         char(ix, iy, 1, params.fg)
-        char(ix, ij, 2, params.bg)
+        char(ix, iy, 2, params.bg)
       end
       write(createRecord(opcodes.SetChars, codecs[opcodes.SetChars].encode(x, y, chars, vertical)):packet())
     end
@@ -848,23 +848,23 @@ local function registerVirtualComponents(write)
     end
     write(createRecord(opcodes.Copy, codecs[opcodes.Copy].encode(x, y, w, h, tx, ty)):packet())
   end
-  gpu.fill = function(x, y, w, h, char)
+  gpu.fill = function(x, y, w, h, chr)
     checkArg(1, x, "number")
     checkArg(2, y, "number")
     checkArg(3, w, "number")
     checkArg(4, h, "number")
-    checkArg(5, char, "string")
+    checkArg(5, chr, "string")
     if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
       error("index out of bounds")
     end
     w = math.max(w, 0)
     h = math.max(h, 0)
-    char = unicode.sub(char, 1, 1)
-    checkArg(5, char, "string")
+    chr = unicode.sub(chr, 1, 1)
+    checkArg(5, chr, "string")
     local shouldSend = false
     for j = y, y + h - 1, 1 do
       for i = x, x + w - 1, 1 do
-        if char(i, j) ~= char then
+        if char(i, j) ~= chr then
           shouldSend = true
           char(i, j, 0, char)
           char(i, j, 1, params.fg)
@@ -873,7 +873,7 @@ local function registerVirtualComponents(write)
       end
     end
     if shouldSend then
-      write(createRecord(opcodes.Fill, codecs[opcodes.Fill].encode(x, y, w, h, char)):packet())
+      write(createRecord(opcodes.Fill, codecs[opcodes.Fill].encode(x, y, w, h, chr)):packet())
     end
   end
 
