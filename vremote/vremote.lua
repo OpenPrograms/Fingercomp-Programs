@@ -596,7 +596,7 @@ local function registerVirtualComponents(write)
     if not val then
       return params.chars[3 * (y * params.resolution.w + x) + i]
     end
-    params.chars[3 * (y + params.resolution.w + x) + i] = val
+    params.chars[3 * (y * params.resolution.w + x) + i] = val
   end
 
   -- Initialize and generate the palette
@@ -615,6 +615,7 @@ local function registerVirtualComponents(write)
 
   -- GPU proxy
   local gpu = {}
+  gpu.params = params
   gpu.bind = function()
     return false
   end
@@ -730,6 +731,8 @@ local function registerVirtualComponents(write)
     if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
       error("index out of bounds")
     end
+    x, y = x - 1, y - 1
+    print(x, y)
     local result = {
       char(x, y), char(x, y, 1), char(x, y, 2)
     }
@@ -744,6 +747,7 @@ local function registerVirtualComponents(write)
     checkArg(2, y, "number")
     checkArg(3, chars, "string")
     checkArg(4, vertical, "boolean", "nil")
+    x, y = x - 1, y - 1
     -- it makes no sense to send characters that are out of screen's bounds
     if vertical then
       chars = unicode.sub(chars, 1, params.resolution.h - y + 1)
@@ -777,15 +781,15 @@ local function registerVirtualComponents(write)
         ix = ix + i
       end
       if unicode.sub(chars, i, i) ~= char(ix, iy) or
-          char(ix, ij, 1) ~= params.fg or
-          char(ix, ij, 2) ~= params.bg then
+          char(ix, iy, 1) ~= params.fg or
+          char(ix, iy, 2) ~= params.bg then
         needsUpdate = true
         break
       end
     end
     if needsUpdate then
       for i = 0, unicode.len(chars) - 1, 1 do
-        local c = unicode.sub(chars, i, i)
+        local c = unicode.sub(chars, i + 1, i + 1)
         local ix, iy = x, y
         if vertical then
           iy = iy + i
@@ -795,6 +799,7 @@ local function registerVirtualComponents(write)
         char(ix, iy, 0, c)
         char(ix, iy, 1, params.fg)
         char(ix, iy, 2, params.bg)
+        print(x, y, ix, iy, c, params.bg, params.fg)
       end
       write(createRecord(opcodes.SetChars, codecs[opcodes.SetChars].encode(x, y, chars, vertical)):packet())
     end
@@ -810,6 +815,7 @@ local function registerVirtualComponents(write)
     if x < 1 or y < 1 or x > params.resolution.w or y > params.resolution.h then
       error("index out of bounds")
     end
+    x, y = x - 1, y - 1
     w = math.max(w, 0)
     h = math.max(h, 0)
     if w == 0 or h == 0 then
@@ -841,9 +847,9 @@ local function registerVirtualComponents(write)
       for i = x, x + w - 1, 1 do
         local ix = i + tx
         local iy = j + ty
-        char(ix, ij, 0, region[3 * (j * params.resolution.w + i)])
-        char(ix, ij, 1, region[3 + (j + params.resolution.w + i) + 1])
-        char(ix, ij, 2, region[3 + (j + params.resolution.w + i) + 2])
+        char(ix, iy, 0, region[3 * (j * params.resolution.w + i)])
+        char(ix, iy, 1, region[3 + (j + params.resolution.w + i) + 1])
+        char(ix, iy, 2, region[3 + (j + params.resolution.w + i) + 2])
       end
     end
     write(createRecord(opcodes.Copy, codecs[opcodes.Copy].encode(x, y, w, h, tx, ty)):packet())
@@ -857,6 +863,7 @@ local function registerVirtualComponents(write)
     if x < 1 or x > params.resolution.w or y < 1 or y > params.resolution.h then
       error("index out of bounds")
     end
+    x, y = x - 1, y - 1
     w = math.max(w, 0)
     h = math.max(h, 0)
     chr = unicode.sub(chr, 1, 1)
