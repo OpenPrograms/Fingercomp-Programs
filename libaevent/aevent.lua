@@ -22,8 +22,8 @@ local meta = {
       end
     end
   end,
-  __index = meta
 }
+meta.__index = meta
 
 return setmetatable({
   push = function (self, event)
