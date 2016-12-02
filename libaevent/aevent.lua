@@ -9,7 +9,7 @@ local meta = {
     -- Create a new listener for each engine
     self.eventListener = function(evt, ...)
       local e = self:event(evt)
-      self:push(e(table.pack(...)))
+      self:push(e({...}))
     end
 
     return self
