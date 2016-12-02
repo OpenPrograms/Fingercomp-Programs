@@ -81,17 +81,16 @@ return setmetatable({
   end,
 
   event = function (self, name)
-    return setmetatable({
-      cancel = function (self)
-        self.canceled = true
-      end,
-
-      get = function (self)
-        return self.data
-      end
-    }, {
+    return setmetatable({}, {
       __call = function (cls, data, once)
-        local inst = setmetatable({}, {
+        local inst = setmetatable({
+          get = function (self)
+            return self.data
+          end,
+          cancel = function (self)
+            self.canceled = true
+          end
+        }, {
           __index = function (self, k)
             local v = rawget(cls, k)
             if v then
