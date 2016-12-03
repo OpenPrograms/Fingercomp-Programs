@@ -7,21 +7,31 @@ local meta = {
     self.maxPriority = 0
 
     -- Create a new listener for each engine
-    self.eventListener = function(evt, ...)
-      local e = self:event(evt)
-      self:push(e({...}))
+    self.eventListener = function(e)
+      return function(evt, ...)
+        self:push(e({...}))
+      end
     end
 
     return self
   end,
   __gc = function (self)
-    if #self.stdEvents > 0 then
+    if self.stdEvents and #self.stdEvents > 0 then
       local event = require("event")
-      for name in pairs(self.stdEvents) do
-        event.ignore(name, self.eventListener)
+      for _, name in pairs(self.stdEvents) do
+        for _, listener in pairs(std.stdEvents[name]) do
+          listener:destroy()
+        end
       end
     end
-  end,
+
+    if self.timers and #self.timers > 0 then
+      local event = require("event")
+      for _, timer in pairs(self.timers) do
+        timer:destroy()
+      end
+    end
+  end
 }
 meta.__index = meta
 
@@ -72,12 +82,14 @@ return setmetatable({
     table.insert(priority, setmetatable({
       priority = id,
       destroy = function (hself)
-        table.remove(self.priorities[hself.priority], pos)
+        self.priorities[hself.priority][pos] = nil
       end,
       targets = {[name] = true}
     }, {
       __call = handler
     }))
+
+    return self.priorities[id][pos]
   end,
 
   event = function (self, name)
@@ -112,10 +124,57 @@ return setmetatable({
     })
   end,
 
-  stdEvent = function (self, name)
+  stdEvent = function (self, name, evt)
     local event = require("event")
     self.stdEvents = self.stdEvents or {}
-    table.insert(self.stdEvents, name)
-    event.listen(name, self.eventListener)
+    if self.stdEvents[name] then
+      for _, hdlr in pairs(self.stdEvents[name]) do
+        if hdlr.event == evt then
+          return
+        end
+      end
+    end
+    self.stdEvents[name] = self.stdEvents[name] or {}
+    local handler = self.eventListener(evt)
+    local pos = #self.stdEvents[name] + 1
+    table.insert(self.stdEvents[name], {
+      name = name,
+      event = evt,
+      handler = handler,
+      destroy = function (hself)
+        event.ignore(hself.name, hself.handler)
+        self.stdEvents[hself.name][pos] = nil
+      end
+    })
+    event.listen(name, handler)
+    return self.stdEvents[name][pos]
+  end,
+
+  timer = function (self, interval, e, times)
+    local event = require("event")
+    self.timers = self.timers or {}
+    local timerFunction = function()
+      self:push(e {
+        time = os.time(),
+        interval = interval
+      })
+    end
+    local pos = #self.timers + 1
+
+    local id = event.timer(interval, timerFunction, times)
+
+    table.insert(self.timers, {
+      interval = interval,
+      event = e,
+      handler = timerFunction,
+      id = id,
+
+      destroy = function (hself)
+        event.cancel(self.id)
+        self.timers[pos] = nil
+      end
+    })
+
+    return self.timers[pos]
   end
 }, meta)
