@@ -170,7 +170,7 @@ return setmetatable({
       id = id,
 
       destroy = function (hself)
-        event.cancel(self.id)
+        event.cancel(hself.id)
         self.timers[pos] = nil
       end
     })
