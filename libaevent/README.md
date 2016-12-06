@@ -29,7 +29,8 @@ The resulting instance has the following methods:
 | `engine:event(name: string)(data: table[, once: bool]):get()` | Returns the event's payload. |
 | `engine:push(evtinst: table)` | Pushes the event instance. |
 | `engine:subscribe(name: string, priority: number, handler: function)` | Assigns a callable (function or table with defined `__call`) to an event with a specific priority. |
-| `engine:stdEvent(eventName: string)` | Registers a new listener that will listen for the given event, and will fire aevent's events with the same name. |
+| `engine:stdEvent(eventName: string, event: table)` | Registers a new listener that will listen for the given event, and will fire instance of the given event. |
+| `engine:timer(interval: number, event: table[, times: number])` | Creates a new timer that will push the given event on every tick. |
 | `engine:__gc()` | Unregisters all listeners for the computer signals. Call this if the `__gc` metamethod is disabled. |
 
 ### Sample code
