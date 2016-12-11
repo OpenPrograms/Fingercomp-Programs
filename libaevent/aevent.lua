@@ -16,16 +16,16 @@ local meta = {
     return self
   end,
   __gc = function (self)
-    if self.stdEvents and #self.stdEvents > 0 then
+    if self.stdEvents then
       local event = require("event")
-      for _, name in pairs(self.stdEvents) do
-        for _, listener in pairs(std.stdEvents[name]) do
+      for name, v in pairs(self.stdEvents) do
+        for _, listener in pairs(v) do
           listener:destroy()
         end
       end
     end
 
-    if self.timers and #self.timers > 0 then
+    if self.timers then
       local event = require("event")
       for _, timer in pairs(self.timers) do
         timer:destroy()
