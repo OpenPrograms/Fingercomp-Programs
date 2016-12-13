@@ -1,8 +1,7 @@
 # Conway's Game of Life implementation for OpenComputers
 ![Screenshot of the game.](http://i.imgur.com/J7enOnc.png)
 
-## What should you do in this game?
-* With the simulation paused, use the controls below to place or kill cells.
+* With the simulation paused, use the controls (descibed below) to place or kill cells.
 * Press `[Space]` and observe the magic evolution of these cells.
 
 ## Rules
