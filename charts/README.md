@@ -1,3 +1,5 @@
+[Hel repository page](https://hel.fomalhaut.me/#packages/charts)
+
 ![Example](https://i.imgur.com/SCnOt85.png)
 
 This library can draw charts, actually. Right now only histograms are supported but hopefully I'll add more in the future.
