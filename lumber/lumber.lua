@@ -14,12 +14,13 @@ local comp = require("computer")
 
 local magnet = com.tractor_beam
 local inv = com.inventory_controller
+local robocom = com.robot
 
 local INV = robot.inventorySize()
 
 local wrappers = {
   rpt = function(f, to)
-    to = to or 1
+    to = to or .25
     return function(...)
       while not f(...) == true do
         os.sleep(to)
@@ -28,7 +29,7 @@ local wrappers = {
     end
   end,
   detect = function(f, to)
-    to = to or 1
+    to = to or .25
     return function(...)
       while true do
         local s, rsn = f(...)
@@ -74,7 +75,7 @@ local function row()
   for i = 1, H, 1 do
     r.fwd()
     r.left()
-    if robot.compare() and robot.durability() and robot.durability() > .1 then
+    if robocom.compare(3) and robot.durability() and robot.durability() > .1 then
       robot.select(INV)
       r.swing()
     end
@@ -84,7 +85,7 @@ local function row()
     end
     robot.select(INV - 1)
     r.around()
-    if robot.compare() and robot.durability() and robot.durability() > .1 then
+    if robocom.compare(3) and robot.durability() and robot.durability() > .1 then
       robot.select(INV)
       r.swing()
     end
@@ -118,7 +119,7 @@ end
 
 local function field()
   robot.select(1)
-  robot.useDown()
+  robot.suckDown()
   inv.equip()
   robot.select(INV - 1)
   for i = 1, W, 1 do
@@ -141,19 +142,20 @@ local function field()
   dropAll()
   r.around()
   robot.select(1)
-  robot.useDown()
+  inv.equip()
+  robot.dropDown()
 end
 
 while true do
   local x, y = term.getCursor()
-  term.clearLine(y)
+  term.clearLine()
   term.setCursor(x, y)
   io.write("Running")
   field()
   if type(INTERVAL) == "number" then
     for i = 0, INTERVAL, 1 do
       term.setCursor(x, y)
-      term.clearLine(y)
+      term.clearLine()
       io.write("Sleep: " .. i .. " out of " .. INTERVAL)
       os.sleep(1)
     end
@@ -161,7 +163,7 @@ while true do
     local time = 0
     repeat
       term.setCursor(x, y)
-      term.clearLine(y)
+      term.clearLine()
       io.write("Sleep: " .. time .. " (" .. comp.energy() .. "/" .. comp.maxEnergy() .. ")")
       os.sleep(1)
     until comp.energy() / comp.maxEnergy() > .98
