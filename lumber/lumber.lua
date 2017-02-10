@@ -6,6 +6,7 @@
 
 local W, H = 7, 11
 local INTERVAL = 30
+local DROPTOOL = false
 
 local com = require("component")
 local robot = require("robot")
@@ -118,9 +119,11 @@ local function dropAll()
 end
 
 local function field()
-  robot.select(1)
-  robot.suckDown()
-  inv.equip()
+  if DROPTOOL then
+    robot.select(1)
+    robot.suckDown()
+    inv.equip()
+  end
   robot.select(INV - 1)
   for i = 1, W, 1 do
     r.fwd()
@@ -141,9 +144,11 @@ local function field()
   r.fwd()
   dropAll()
   r.around()
-  robot.select(1)
-  inv.equip()
-  robot.dropDown()
+  if DROPTOOL then
+    robot.select(1)
+    inv.equip()
+    robot.dropDown()
+  end
 end
 
 while true do
