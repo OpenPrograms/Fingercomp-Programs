@@ -31,3 +31,15 @@ This is a place where hopefully brilliant ideas become the programs.
   * A HTTP/HTTPS 1.1 library that allows to specify a request method (`GET`, `POST`, `DELETE`, `PATCH`, etc.)
 * `libcsv`
   * A CSV parser.
+* `charts`
+  * A charts library (at lest it should become such). **Available only on the Hel Repository**.
+* `particly`
+  * A really simple program that uses Particle Card to "draw" bitmaps in the world. **Avaiable only on the Hel Repository**.
+* `pipedream`
+  * A simple graphical program. **Avaiable only on the Hel Repository**.
+* `railtank`
+  * A fancy tank monitoring program. **Available only on the Hel Repository**.
+* `sniff`
+  * A network sniffer. **Available only on the Hel Repository**.
+* `stars`
+  * A simple graphical program. **Available only on the Hel Repository**.
