@@ -1,4 +1,4 @@
-Available for downloading on the Hel repository as [the `charts` package](https://hel.fomalhaut.me/#packages/charts).
+Available for downloading on the [Hel repository](https://hel.fomalhaut.me/#packages/charts).
 
 ### Contents
 * `Container`
