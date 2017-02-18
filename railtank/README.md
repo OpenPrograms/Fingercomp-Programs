@@ -11,3 +11,5 @@ Makes it incredibly easy to monitor your RailCraft tanks.
 Place an adapter right next to a RailCraft tank and install a tank controller upgrade into the adapter. Edit configuration file (`/etc/railtank.cfg`) if needed, and run the program.
 
 That's it, pretty much.
+
+![Screenshot](https://i.imgur.com/G2ATMdU.png)
