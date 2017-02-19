@@ -54,7 +54,7 @@ Also we have the Hel Repository package manager called `hpm`. It's great, really
 * Resolves dependencies.
 * Allows to be extended by modules.
 * Makes it easy to develop your complex programs with its manifest feature.
-* The OpenPrograms module is bundled with the program that caches the packages (no need to use that slow oppm anymore).
+* The OpenPrograms module is bundled with hpm. It caches the packages to decrease installation time (no need to use that slow oppm anymore).
 
 But the repository is used not because it's cool. It needs to contain cool
 programs and a lot of packages. That's why I publish my programs both here and
