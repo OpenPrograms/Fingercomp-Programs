@@ -32,14 +32,62 @@ This is a place where hopefully brilliant ideas become the programs.
 * `libcsv`
   * A CSV parser.
 * `charts`
-  * A charts library (at lest it should become such). **Available only on the Hel Repository**.
+  * A charts library (at least it should become such). **Available on the Hel Repository**.
 * `particly`
-  * A really simple program that uses Particle Card to "draw" bitmaps in the world. **Available only on the Hel Repository**.
+  * A really simple program that uses Particle Card to "draw" bitmaps in the world. **Available on the Hel Repository**.
 * `pipedream`
-  * A simple graphical program. **Available only on the Hel Repository**.
+  * A simple graphical program. **Available on the Hel Repository**.
 * `railtank`
-  * A fancy tank monitoring program. **Available only on the Hel Repository**.
+  * A fancy tank monitoring program. **Available on the Hel Repository**.
 * `sniff`
-  * A network sniffer. **Available only on the Hel Repository**.
+  * A network sniffer. **Available on the Hel Repository**.
 * `stars`
-  * A simple graphical program. **Available only on the Hel Repository**.
+  * A simple graphical program. **Available on the Hel Repository**.
+
+### What is the Hel Repository?
+This is yet another OpenComputers program repository written by @moonlightowl and me. The key features are:
+* Sane versioning
+* Specific dependency versions
+* Public API
+
+Also we have the Hel Repository package manager called `hpm`. It's great, really.
+* Resolves dependencies.
+* Allows to be extended by modules.
+* Makes it easy to develop your complex programs with its manifest feature.
+* The OpenPrograms module is bundled with the program that caches the packages (no need to use that slow oppm anymore).
+
+But the repository is used not because it's cool. It needs to contain cool
+programs and a lot of packages. That's why I publish my programs both here and
+on the Hel Repository. If you want to use my library for your program, please
+consider using the Hel Repository for this. That'll stop your program from
+crashing when the library API changes after update because you can specify the
+version of the library that definitely works with your program.
+
+Install hpm using the following command:
+
+```
+$ pastebin run vf6upeAN
+```
+
+Update oppm cache to be able to install OpenPrograms packages:
+
+```
+$ hpm oppm:cache update
+```
+
+Install any hpm package...
+
+```
+$ hpm install hpm
+```
+
+...or OpenPrograms package:
+
+```
+$ hpm oppm:install oppm
+```
+
+#### Links
+* The [GitHub organization](https://github.com/hel-repo).
+* The [web interface](https://hel.fomalhaut.me/).
+* The topic on [the forums](https://oc.cil.li/index.php?/topic/1116-hel-repository/).
