@@ -16,21 +16,21 @@ This is a place where hopefully brilliant ideas become the programs.
 * `lumber`
   * Basic lumberjack program for OC robot which uses an axe that can chop the whole tree, e.g., thaumcraft's axe of the stream.
 * `libsemver`
-  * A MoonScript port of a parser of semantic version strings originally written in Python.
+  * A MoonScript port of a parser of semantic version strings originally written in Python. **Available on the Hel Repository**.
 * `libaevent`
-  * An advanced event library.
+  * An advanced event library. **Available on the Hel Repository**.
 * `libbigint`
-  * Enables one to have *very* big integers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported.
+  * Enables one to have *very* big integers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported. **Available on the Hel Repository**.
 * `libder-decoder`
-  * Decodes the data encoded using Distinguished Encoding Rules, a subset of ASN.1. For example, x.509 certificates.
+  * Decodes the data encoded using Distinguished Encoding Rules, a subset of ASN.1. For example, x.509 certificates. **Available on the Hel Repository**.
 * `lua-lockbox`
-  * The most awesome pure Lua cryptography toolkit that I've ever found.
+  * The most awesome pure Lua cryptography toolkit that I've ever found. **Available on the Hel Repository**.
 * `libtls`
-  * An implementation of TLS 1.2.
+  * An implementation of TLS 1.2. **Available on the Hel Repository**.
 * `libhttp`
-  * A HTTP/HTTPS 1.1 library that allows to specify a request method (`GET`, `POST`, `DELETE`, `PATCH`, etc.)
+  * A HTTP/HTTPS 1.1 library that allows to specify a request method (`GET`, `POST`, `DELETE`, `PATCH`, etc.). **Available on the Hel Repository**.
 * `libcsv`
-  * A CSV parser.
+  * A CSV parser. **Available on the Hel Repository**.
 * `charts`
   * A charts library (at least it should become such). **Available on the Hel Repository**.
 * `particly`

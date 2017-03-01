@@ -283,7 +283,7 @@ function Track:get()
   return result
 end
 
-function Track:play(len, sleepMode)
+function Track:play(len, sleepMode, skip)
   checkType(1, len, "number")
   if sleepMode == 1 or sleepMode == "allow" or sleepMode == true then
     sleepMode = "allow"
@@ -296,7 +296,8 @@ function Track:play(len, sleepMode)
   end
   local lastSleep = os.clock()
   local lastTick = 0
-  for i = 1, len, 1 do
+  local i = 1
+  while i <= len do
     if self.closed then
       return false, "close"
     end
@@ -334,6 +335,7 @@ function Track:play(len, sleepMode)
         end
       end
     end
+    i = i + 1
   end
   return true
 end
