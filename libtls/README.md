@@ -1,6 +1,8 @@
 # libtls
 *Transferring the data over a secure, TLS connection!*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/libtls).
+
 ## What TLS is, briefly.
 This is an additional, intermediate layer between the application data layer and transport control layer, that maintains the security and eavesdropping prevention.
 

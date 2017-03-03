@@ -1,5 +1,7 @@
 *This is not my library, but I need it for my programs. So I've packaged it on my repository.*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/lua-lockbox).
+
 [The original repository](https://github.com/somesocks/lua-lockbox).
 
 # The Lua Lockbox

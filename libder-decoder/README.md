@@ -1,6 +1,8 @@
 # der-decoder
 *Suprisingly, it does what the name says: decodes DER-encoded data*.
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/libder-decoder).
+
 ## Description
 The library returns a decoder function: `decode(data: string, kwargs: table)`
 

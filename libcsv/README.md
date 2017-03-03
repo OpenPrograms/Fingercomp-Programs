@@ -1,6 +1,8 @@
 # libcsv
 *A CSV parser*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/libcsv).
+
 ## Description
 Returns a function that accepts the string to decode as the first argument and returns the decoded value.
 

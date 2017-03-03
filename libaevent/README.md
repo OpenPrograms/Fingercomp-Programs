@@ -1,6 +1,8 @@
 # Libaevent
 *An advanced event library*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/libaevent).
+
 The library was written by @LeshaInc. I only packaged it here so it's now available to be downloaded with OPPM, and wrote the documentation.
 
 ## Advantages

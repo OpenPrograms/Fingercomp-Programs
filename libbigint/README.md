@@ -1,6 +1,7 @@
 # libbigint
 *May the big numbers be with you.*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/libbigint).
 
 ## Description
 When required, the `bigint` function is returned for creation big integers. Those are the table values with a metatable assigned to them that provides some metamethods:

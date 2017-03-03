@@ -1,6 +1,8 @@
 # libsemver
 *A parser of Semantic Version strings ported to MoonScript*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/libsemver).
+
 Original version was written in Python and is available [here](https://git.io/vKTbW).
 
 Since it's a port, you can use the documentation [here](https://python-semanticversion.readthedocs.io/en/latest/). I didn't modify the way it functions.
