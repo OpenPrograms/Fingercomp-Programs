@@ -1,6 +1,10 @@
 local com = require("component")
+local fs = require("filesystem")
 local term = require("term")
 local unicode = require("unicode")
+
+local srl = require("serialization").serialize
+local unsrl = require("serialization").unserialize
 
 local forms = require("forms")
 
@@ -9,7 +13,7 @@ local screen = com.screen
 
 local cardTypes = {
   {name = "Redstone control",
-   options = function(frame)
+   options = function(frame, old)
      local addr = frame:addList(2, 2, function() end)
      addr.W = math.floor(frame.W / 2) - 2
      addr.H = frame.H - 2
@@ -21,6 +25,9 @@ local cardTypes = {
      for a in com.list("redstone") do
        table.insert(addr.items, a)
        table.insert(addr.lines, a)
+       if old and old.addr == a then
+         addr.index = #addr.items
+       end
      end
 
      local side = frame:addList(math.floor(frame.W / 2) + 1, 2, function() end)
@@ -40,23 +47,16 @@ local cardTypes = {
        "right/west",
        "left/east"
      }
+     if old and old.side then
+       side.index = old.side
+     end
+
      return {
        addr = addr,
        side = side
      }
    end,
-   func = function(frame, state)
-     if state.addr.index == 0 then
-       return
-     end
-     if not com.type(state.addr.items[state.addr.index]) then
-       return
-     end
-     if state.side.index == 0 then
-       return
-     end
-     local addr = state.addr.items[state.addr.index]
-     local side = state.side.items[state.side.index]
+   constructCardHandler = function(addr, side)
      return {
        func = function(self, card)
          if not com.type(addr) then
@@ -89,27 +89,43 @@ local cardTypes = {
              input:redraw()
            end
          end)
-       end}
+       end,
+       addr = addr,
+       side = side
+     }
+   end,
+   func = function(self, frame, state)
+     if state.addr.index == 0 then
+       return
+     end
+     if not com.type(state.addr.items[state.addr.index]) then
+       return
+     end
+     if state.side.index == 0 then
+       return
+     end
+     local addr = state.addr.items[state.addr.index]
+     local side = state.side.items[state.side.index]
+     return self.constructCardHandler(addr, side)
+   end,
+   save = function(handler)
+     return {addr = handler.addr, side = handler.side}
+   end,
+   load = function(self, data)
+     return self.constructCardHandler(data.addr, data.side)
    end}
 }
 
 local main = forms.addForm()
 
 local edit = forms.addForm()
-edit.left = math.ceil(edit.W / 8)
-edit.W = math.ceil(edit.W * 3 / 4)
-edit.top = math.ceil(edit.H / 8)
-edit.H = math.ceil(edit.H * 3 / 4)
 edit.color = 0x696969
 edit.fontColor = 0xFFFFFF
 
 local addCard = forms.addForm()
-addCard.left = math.ceil(addCard.W / 4)
-addCard.W = math.ceil(addCard.W / 2)
-addCard.top = math.ceil(addCard.H / 12)
-addCard.H = math.ceil(addCard.H * 5 / 6)
 addCard.color = 0x4B4B4B
 addCard.fontColor = 0xFFFFFF
+addCard.editing = false
 
 local content = main:addFrame(1, 1, 0)
 content.W = main.W - 1
@@ -194,20 +210,36 @@ function content:paint()
 
   local height = 1
   for i = 1, #self.cards + 1, 1 do
-    local card = self:addFrame(2, height + 1, 0)
+    local topOffset = 1
+    if self.cards[i] then
+      local title = self:addFrame(2, height + 1, 0)
+      title.W = self.W - 2
+      title.H = 1
+      title.color = 0xFFFFFF
+      title.fontColor = 0x878787
+      local titleLabel = title:addLabel(1, 1, cardTypes[self.cards[i].handler].name .. " [" .. self.cards[i].name .. "]")
+      titleLabel.W = title.W - 2
+      titleLabel.alignRight = true
+      titleLabel.autoSize = false
+      titleLabel.color = title.color
+      titleLabel.fontColor = title.fontColor
+      self.cards[i].title = title
+      topOffset = 2
+    end
+    local card = self:addFrame(2, height + topOffset, 0)
     card.W = self.W - 2
     card.H = 3
     card.color = 0xFFFFFF
     card.fontColor = 0x000000
     if self.cards[i] then
-      self.cards[i]:func(card)
+      self.cards[i].func(self.cards[i], card)
       self.cards[i].card = card
     else
       self:newCard(card)
     end
-    card.top = height + 1
+    card.top = height + topOffset
     card.scroll = self.scroll
-    height = height + card.H + 1
+    height = height + card.H + topOffset
   end
   self.contentHeight = height
   self:shift(self.scrollOffset)
@@ -266,21 +298,35 @@ function cardList:updateList()
   end
 end
 
-local cardUp = edit:addButton(edit.W - 13, 3, "▲", function() end)
+local cardUp = edit:addButton(edit.W - 13, 3, "▲", function()
+  if cardList.index > 1 then
+    local i = cardList.index
+    content.cards[i - 1], content.cards[i] = content.cards[i], content.cards[i - 1]
+    cardList.index = i - 1
+    cardList:updateList()
+    cardList:redraw()
+  end
+end)
 cardUp.W = 5
 cardUp.H = 1
 cardUp.color = 0x878787
 cardUp.fontColor = 0xFFFFFF
 
-local cardDown = edit:addButton(edit.W - 13 + 5 + 3, 3, "▼", function() end)
+local cardDown = edit:addButton(edit.W - 13 + 5 + 3, 3, "▼", function()
+  if cardList.index ~= 0 and #cardList.items > 1 and cardList.index ~= #cardList.items then
+    local i = cardList.index
+    content.cards[i + 1], content.cards[i] = content.cards[i], content.cards[i + 1]
+    cardList.index = i + 1
+    cardList:updateList()
+    cardList:redraw()
+  end
+end)
 cardDown.W = 5
 cardDown.H = 1
 cardDown.color = 0x878787
 cardDown.fontColor = 0xFFFFFF
 
-local cardAdd = edit:addButton(edit.W - 13, 5, "Add card   ", function()
-  addCard:setActive()
-end)
+local cardAdd = edit:addButton(edit.W - 13, 5, "Add card   ", function() end)
 cardAdd.W = 13
 cardAdd.H = 1
 cardAdd.color = 0x878787
@@ -295,7 +341,6 @@ cardEdit.fontColor = 0xFFFFFF
 local cardDelete = edit:addButton(edit.W - 13, 9, "Delete card", function()
   if cardList.index ~= 0 then
     local i = cardList.index
-    content.cards[i].card:destruct()
     table.remove(content.cards, i)
     cardList:updateList()
     cardList.index = 0
@@ -343,7 +388,8 @@ addTypes.color = 0x696969
 addTypes.fontColor = 0xD2D2D2
 addTypes.selColor = 0x878787
 addTypes.sfColor = 0xFFFFFF
-for k, v in pairs(cardTypes) do
+for i = 1, #cardTypes, 1 do
+  local v = cardTypes[i]
   table.insert(addTypes.items, v)
   table.insert(addTypes.lines, v.name)
 end
@@ -387,10 +433,15 @@ local addSave = addCard:addButton(math.floor(addCard.W / 2) + 1, addCard.H - 1, 
     addTypes:redraw()
     return
   end
-  local result = addTypes.items[addTypes.index].func(addOptions, addTypes.state)
+  local result = addTypes.items[addTypes.index]:func(addOptions, addTypes.state)
   if type(result) == "table" then
     result.name = addName.text
-    table.insert(content.cards, result)
+    result.handler = addTypes.index
+    if addCard.editing then
+      content.cards[addCard.editing] = result
+    else
+      table.insert(content.cards, result)
+    end
     cardList:updateList()
     edit:setActive()
   else
@@ -406,7 +457,64 @@ addSave.H = 1
 addSave.color = 0x696969
 addSave.fontColor = 0xFFFFFF
 
+cardAdd.onClick = function()
+  addName.text = ""
+  addTypes.index = 0
+  for i = #(addOptions.elements or {}), 1, -1 do
+    addOptions.elements[i]:destruct()
+  end
+  addCard.editing = false
+  addCard:setActive()
+end
 
+cardEdit.onClick = function()
+  local i = cardList.index
+  if i ~= 0 then
+    local v = content.cards[i]
+    addName.text = v.name
+    addTypes.index = v.handler
+    for i = #(addOptions.elements or {}), 1, -1 do
+      addOptions.elements[i]:destruct()
+    end
+    addTypes.state = cardTypes[v.handler].options(addOptions, v)
+    addCard.editing = i
+    addCard:setActive()
+  end
+end
+
+do
+  local oldDestruct = getmetatable(getmetatable(content)).destruct
+  getmetatable(getmetatable(content)).destruct = function(self)
+    oldDestruct(self)
+    for i = #(self.elements or {}), 1, -1 do
+      self.elements[i]:destruct()
+    end
+  end
+  local timer = main:addTimer(1,function() end)
+  timer:stop()
+  getmetatable(timer).destruct = function(self)
+    self:stop()
+  end
+end
+
+
+do
+  if fs.exists("/etc/varis.cfg") then
+    local f = io.open("/etc/varis.cfg", "r")
+    local all = f:read("*a")
+    f:close()
+    local cfg = unsrl(all)
+    for i = 1, #cfg, 1 do
+      local v = cfg[i]
+      local card = cardTypes[v[1]]:load(v[2])
+      card.name = v[3]
+      card.handler = v[1]
+      table.insert(content.cards, card)
+    end
+  end
+end
+
+cardList:updateList()
 content:redraw()
 
 scrollBar.scroll = content.scroll
@@ -415,7 +523,24 @@ main:addEvent("interrupted", function()
   forms.stop()
 end)
 
+local function saveConfig()
+  local data = {}
+  for i = 1, #content.cards, 1 do
+    local card = content.cards[i]
+    local v = {card.handler, cardTypes[card.handler].save(card), card.name}
+    table.insert(data, v)
+  end
+  local content = srl(data)
+  local f = io.open("/etc/varis.cfg", "w")
+  f:write(content)
+  f:close()
+end
+
+main:addTimer(30, saveConfig)
+
 forms.run(main)
+
+saveConfig()
 
 os.sleep(0)
 term.clear()
