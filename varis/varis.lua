@@ -65,13 +65,13 @@ local cardTypes = {
            label.color = card.color
            return
          end
-         local input = card:addLabel(2, 2, "I=" .. ("%d"):format(com.invoke(addr, "getInput", side)))
+         local input = card:addLabel(2, 2, "Input: " .. ("%d"):format(com.invoke(addr, "getInput", side)))
          input.color = card.color
          input.fontColor = card.fontColor
-         local outLabel = card:addLabel(9, 2, "O=")
+         local outLabel = card:addLabel(14, 2, "Output: ")
          outLabel.color = card.color
          outLabel.fontColor = card.fontColor
-         local output = card:addEdit(11, 1, function(self)
+         local output = card:addEdit(22, 1, function(self)
            if com.type(addr) and tonumber(self.text) then
              com.invoke(addr, "setOutput", side, tonumber(self.text))
            end
@@ -85,7 +85,7 @@ local cardTypes = {
 
          card:addTimer(1, function(self)
            if com.type(addr) then
-             input.caption = "I=" .. ("%d"):format(com.invoke(addr, "getInput", side))
+             input.caption = "Input: " .. ("%d"):format(com.invoke(addr, "getInput", side))
              input:redraw()
            end
          end)
@@ -188,6 +188,9 @@ scrollBar.drag = scrollBar.touch
 scrollBar.drop = scrollBar.touch
 
 function content:shift(offset)
+  if offset == self.scrollOffset then
+    return
+  end
   if self.contentHeight - offset < self.H then
     offset = self.contentHeight - self.H
   end
@@ -200,10 +203,11 @@ function content:shift(offset)
   end
 
   self.scrollOffset = offset
+  self:redraw()
   scrollBar:redraw()
 end
 
-function content:paint()
+function content:update()
   for i = #(self.elements or {}), 1, -1 do
     self.elements[i]:destruct()
   end
@@ -246,7 +250,7 @@ function content:paint()
 end
 
 function content:scroll(_, _, delta)
-  content:shift(content.contentHeight - delta)
+  content:shift(content.scrollOffset - delta)
 end
 
 function content:newCard(card)
@@ -273,7 +277,8 @@ editTitle.fontColor = topBar.fontColor
 
 local editReturn = topBar:addButton(topBar.W - 3 + 1, 1, "×", function()
   main:setActive()
-  content:shift(content.scrollOffset)
+  content:update()
+  content:redraw()
 end)
 editReturn.W = 3
 editReturn.H = 1
@@ -515,7 +520,7 @@ do
 end
 
 cardList:updateList()
-content:redraw()
+content:update()
 
 scrollBar.scroll = content.scroll
 
