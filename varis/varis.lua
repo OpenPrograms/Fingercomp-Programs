@@ -59,13 +59,7 @@ local cardTypes = {
    constructCardHandler = function(addr, side)
      return {
        func = function(self, card)
-         if not com.type(addr) then
-           local label = card:addLabel(2, 2, "Error: component is no longer available")
-           label.fontColor = 0xFF2400
-           label.color = card.color
-           return
-         end
-         local input = card:addLabel(2, 2, "Input: " .. ("%d"):format(com.invoke(addr, "getInput", side)))
+         local input = card:addLabel(2, 2, "Input: ...")
          input.color = card.color
          input.fontColor = card.fontColor
          local outLabel = card:addLabel(14, 2, "Output: ")
@@ -76,17 +70,38 @@ local cardTypes = {
              com.invoke(addr, "setOutput", side, tonumber(self.text))
            end
          end)
-         output.text = ("%d"):format(com.invoke(addr, "getOutput", side))
+         output.text = ""
          output.W = 5
          output.H = 3
          output.border = 1
          output.color = card.color
          output.fontColor = card.fontColor
 
+         local errFrame = card:addFrame(1, 1, 0)
+         errFrame.W = card.W
+         errFrame.H = card.H
+         errFrame.color = card.color
+         errFrame.fontColor = card.fontColor
+         local errLabel = errFrame:addLabel(2, 2, "Error: component is no longer available")
+         errLabel.fontColor = 0xFF2400
+         errLabel.color = card.color
+         errFrame.visible = false
+
          card:addTimer(1, function(self)
            if com.type(addr) then
+             if errFrame.visible then
+               errFrame:hide()
+             end
+             if output.text == "" then
+               output.text = ("%d"):format(com.invoke(addr, "getOutput", side))
+             end
              input.caption = "Input: " .. ("%d"):format(com.invoke(addr, "getInput", side))
              input:redraw()
+             output:redraw()
+           else
+             if not errFrame.visible then
+               errFrame:show()
+             end
            end
          end)
        end,
@@ -113,6 +128,133 @@ local cardTypes = {
    end,
    load = function(self, data)
      return self.constructCardHandler(data.addr, data.side)
+   end},
+  {name = "ME network monitoring",
+   options = function(frame, old)
+     local addr = frame:addList(2, 2, function() end)
+     addr.W = frame.W
+     addr.H = frame.H - 2
+     addr.border = 0
+     addr.color = 0x696969
+     addr.fontColor = 0xD2D2D2
+     addr.selColor = 0x878787
+     addr.sfColor = 0xFFFFFF
+     for a in com.list("me_controller") do
+       table.insert(addr.items, a)
+       table.insert(addr.lines, a)
+       if old and old.addr == a then
+         addr.index = #addr.items
+       end
+     end
+
+     return {
+       addr = addr
+     }
+   end,
+   constructCardHandler = function(addr)
+     return {
+       func = function(self, card)
+         card.H = 10
+         local avgUse = card:addLabel(2, 2, "Avg power usage: ...")
+         avgUse.fontColor = card.fontColor
+         avgUse.color = card.color
+         local avgGen = card:addLabel(2, 3, "     generation: ...")
+         avgGen.fontColor = card.fontColor
+         avgGen.color = card.color
+
+         local stored = card:addLabel(math.ceil(card.W / 2 + 1), 2, "Energy stored: ...")
+         stored.fontColor = card.fontColor
+         stored.color = card.color
+         local max = card:addLabel(math.ceil(card.W / 2 + 1), 3, "          max: ...")
+         max.fontColor = card.fontColor
+         max.color = card.color
+
+         local availItemsCount = card:addLabel(2, 5, "Items available: ...")
+         availItemsCount.fontColor = card.fontColor
+         availItemsCount.color = card.color
+         local availItems = card:addList(2, 6, function() end)
+         availItems.W = card.W - 2
+         availItems.H = 4
+         availItems.border = 0
+         availItems.color = card.color
+         availItems.fontColor = card.fontColor
+         availItems.selColor = card.color
+         availItems.sfColor = card.fontColor
+
+         local errFrame = card:addFrame(1, 1, 0)
+         errFrame.W = card.W
+         errFrame.H = card.H
+         errFrame.color = card.color
+         errFrame.fontColor = card.fontColor
+         local errLabel = errFrame:addLabel(2, 2, "Error: component is no longer available")
+         errLabel.fontColor = 0xFF2400
+         errLabel.color = card.color
+         errFrame.visible = false
+
+         local function update(self)
+           if com.type(addr) then
+             if errFrame.visible then
+               errFrame:hide()
+             end
+
+             avgUse.caption = "Avg power usage: " .. ("%.3f"):format(com.invoke(addr, "getAvgPowerUsage")) .. " AE"
+             avgGen.caption = "     generation: " .. ("%.3f"):format(com.invoke(addr, "getAvgPowerInjection")) .. " AE"
+             stored.caption = "Energy stored: " .. ("%.3f"):format(com.invoke(addr, "getEnergyStored")) .. " AE"
+             max.caption = "          max: " .. ("%.3f"):format(com.invoke(addr, "getMaxEnergyStored")) .. " AE"
+
+             local avail = com.invoke(addr, "getAvailableItems", "ALL")
+             local oldShift = availItems.shift
+             availItems:clear()
+             local amount = 0
+             for k, v in pairs(avail) do
+               if v.size ~= 0 then
+                 table.insert(availItems.lines, ("%6d"):format(v.size) .. " " .. v.item.display_name)
+                 table.insert(availItems.items, v.size)
+               end
+               amount = amount + v.size
+             end
+             if oldShift >= #avail - availItems.H + 1 then
+               availItems.shift = #avail - availItems.H + 1
+             else
+               availItems.shift = oldShift
+             end
+             availItems:sort(function(self, a, b)
+               return self.lines[a] < self.lines[b]
+             end)
+             availItemsCount.caption = "Items available: " .. ("%d"):format(#avail) .. " types, " .. ("%d"):format(amount) .. " total"
+
+             avgGen:redraw()
+             avgUse:redraw()
+             stored:redraw()
+             max:redraw()
+             availItemsCount:redraw()
+           else
+             if not errFrame.visible then
+               errFrame:show()
+             end
+           end
+         end
+         card:addTimer(5, update)
+         update()
+       end,
+       addr = addr
+     }
+   end,
+   func = function(self, frame, state)
+     if state.addr.index == 0 then
+       return
+     end
+     if not com.type(state.addr.items[state.addr.index]) then
+       return
+     end
+     local addr = state.addr.items[state.addr.index]
+     return self.constructCardHandler(addr, side)
+   end,
+   save = function(self)
+     return {addr = self.addr}
+   end,
+   load = function(self, data)
+     return self.constructCardHandler(data.addr)
    end}
 }
 
