@@ -12,6 +12,18 @@ local sides = {
   "RIGHT"
 }
 
+local function patch(base, head)
+  for k, v in pairs(head) do
+    if base[k] then
+      if type(v) ~= "table" or type(base[k]) ~= "table" then
+        base[k] = v
+      else
+        patch(base[k], v)
+      end
+    end
+  end
+end
+
 local Histogram
 
 do
@@ -131,7 +143,7 @@ do
     end
   end
 
-  Histogram = function()
+  Histogram = function(tbl)
     local obj = {
       values = {},
       align = sides.LEFT,
@@ -143,6 +155,9 @@ do
         value = nil
       }
     }
+    if tbl then
+      patch(obj, tbl)
+    end
     return setmetatable(obj, meta)
   end
 end
@@ -233,7 +248,7 @@ do
     end
   end
 
-  ProgressBar = function()
+  ProgressBar = function(tbl)
     local obj = {
       direction = sides.RIGHT,
       min = 0,
@@ -243,62 +258,10 @@ do
         return container.fg, container.bg
       end
     }
+    if tbl then
+      patch(obj, tbl)
+    end
     return setmetatable(obj, meta)
-  end
-end
-
-local Line
-do
-  local meta = {}
-  meta.__index = meta
-
-  local dots = {1, 2, 4, 64, 8, 16, 32, 128}
-
-  local function newBoard(w, h)
-    local board = {}
-    for i = 0, w * h - 1, 1 do
-      board[i] = 0
-    end
-    board.w = w
-    board.h = h
-    return board
-  end
-
-  local function getPixel(board, x, y)
-    local lx = math.floor((x + 1) / 2) - 1
-    local ly = math.floor((x + 3) / 4) - 1
-    local cell = board[ly * board.w + lx]
-
-    local bx = x - lx * 2 - 1
-    local by = y - ly * 2
-    return bit32.band(cell, dots[bx * 5 + by])
-  end
-
-  local function setPixel(board, x, y, v)
-    local lx = math.floor((x + 1) / 2) - 1
-    local ly = math.floor((x + 3) / 4) - 1
-    local cell = board[ly * board.w + lx]
-
-    local bx = x - lx * 2 - 1
-    local by = y - ly * 2
-    local n = dots[bx * 5 + by]
-    if bit32.band(cell, n) == 0 and v then
-      cell = cell + n
-    elseif bit32.band(cell, n) == n and not v then
-      cell = cell - n
-    end
-    board[ly * board.w + lx] = cell
-  end
-
-  function meta:draw(container)
-    local board = newBoard(container:getX(), container:getY())
-  end
-
-  Line = function()
-     local obj = {
-       points = {}
-     }
-     return setmetatable(obj, meta)
   end
 end
 
@@ -338,7 +301,7 @@ do
     return self.y + self.payloadY - 1
   end
 
-  Container = function()
+  Container = function(tbl)
     local obj = {
       gpu = component.gpu,
       fg = 0xffffff,
@@ -351,7 +314,7 @@ do
       height = 25,
       payload = nil
     }
-
+    patch(obj, tbl)
     return setmetatable(obj, meta)
   end
 end
