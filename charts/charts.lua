@@ -254,9 +254,7 @@ do
       min = 0,
       max = 1,
       value = 0,
-      colorFunc = function(value, perc, prbar, container)
-        return container.fg, container.bg
-      end
+      colorFunc = function(value, perc, prbar, container) end
     }
     if tbl then
       patch(obj, tbl)
