@@ -1,5 +1,5 @@
 # nn
-**_Gives you a control of your nanomachines_**
+*Gives you control of your nanomachines.*
 
 ## Synopsis
 `nn [action] [agruments...]`
