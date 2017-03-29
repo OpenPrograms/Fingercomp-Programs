@@ -103,6 +103,11 @@ local function row()
   end
   for i = 1, H, 1 do
     r.back()
+    if i % 2 == 0 then
+      -- collect the saplings when going back
+      -- useful when fastleafdecay is installed
+      r.suck()
+    end
     if i ~= H then
       r.back()
     end
