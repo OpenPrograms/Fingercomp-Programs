@@ -91,6 +91,13 @@ local instrActions = {
     end
     return validChannel, reason
   end,
+  volume = function(dev, channel, volume)
+    local validChannel, reson = checkChannel(channel)
+    if validChannel then
+      return dev.setVolume(channel, volume)
+    end
+    return validChannel, reason
+  end,
   wave = function(dev, channel, waveType, ...)
     local validChannel, reason = checkChannel(channel)
     if not validChannel then
@@ -125,16 +132,19 @@ local instrActions = {
 -- Wave type, freq, attack, decay, attenuation, release, volume
 local noteInstructions = {
   [audio[audio.formatTypes.NOTE].instr.piano] = function(freq, len)
-    return "SINE", freq, 1, len * .5, 0, len * .1, 1
+    return "SINE", freq, 1, len * .5, 0.5, len * .1, 1
   end,
   [audio[audio.formatTypes.NOTE].instr.drum] = function(freq, len)
+    return "WHITE", freq / 4, 1, len, 0, 1, .4
   end,
   [audio[audio.formatTypes.NOTE].instr.snare] = function(freq, len)
+    return "WHITE", freq / 2, 1, len, 0, 1, .4
   end,
   [audio[audio.formatTypes.NOTE].instr.click] = function(freq, len)
+    return "WHITE", freq * 2, 1, len, 0, 1, .4
   end,
   [audio[audio.formatTypes.NOTE].instr.bass] = function(freq, len)
-    return "SINE", freq / 4, 1, len * .7, 0, len * .175, 1
+    return "SINE", freq / 4, 1, len * .7, 0.5, len * .175, 1
   end
 }
 
@@ -150,7 +160,8 @@ function new(addr)
   if not sound.type == "sound" then
     return false, "wrong device"
   end
-  return audio.Device(function(self, tbl)
+  return audio.Device(function(self, instrs)
+    local length = 0
     local notes = 0
     for _, item in pairs(instrs) do
       if item.__name == "Instruction" then
@@ -159,28 +170,35 @@ function new(addr)
           instrActions[name](sound, table.unpack(instruction))
         end
       elseif item.__name == "Chord" and notes < 8 then
-        notes = notes + 1
-        local waveType, freq, attack, decay, attenuation, release, volume = noteInstructions[item[3]](item[1], item[2])
-        local i = audio[audio.formatTypes.WAVE].Instruction
-        local queve = {
-          i("open", notes),
-          i("wave", notes, waveType),
-          i("freq", notes, freq),
-          i("adsr", notes, attack, decay, attenuation, release),
-          i("volume", notes, volume)
-        }
-        for _, instruction in pairs(queve) do
-          instrActions[instruction.name](sound, table.unpack(instruction))
+        for freq, len, instr, vol in pairs(item) do
+          notes = notes + 1
+          if notes > 8 then
+            break
+          end
+          local waveType, freq, attack, decay, attenuation, release, volume = noteInstructions[instr](freq, len)
+          local i = audio[audio.formatTypes.WAVE].Instruction
+          local queue = {
+            i("open", notes),
+            i("wave", notes, waveType),
+            i("freq", notes, freq),
+            i("adsr", notes, attack, decay, attenuation, release),
+            i("volume", notes, volume * vol)
+          }
+          length = math.max(length, len)
+          for _, instruction in ipairs(queue) do
+            instrActions[instruction.name](sound, table.unpack(instruction))
+          end
         end
       end
     end
+    instrActions.delay(sound, length)
     while not sound.process() do
-      os.sleep(.05)
+      os.sleep(0.05)
     end
   end,
   FORMATTYPE,
   function(self, volume)
-    sound.setVolume(volume)
+    sound.setTotalVolume(volume)
   end)
 end
 

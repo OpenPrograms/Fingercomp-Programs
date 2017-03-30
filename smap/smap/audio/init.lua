@@ -308,8 +308,11 @@ function Track:play(len, sleepMode, skip)
     if not success then
       return success, reason
     end
-    if not (#success == 0 and (i - lastTick) / self.tempo > .1) then
+    if #success > 0 then
+      print("", success)
       coroutine.yield(success)
+    end
+    if not (#success == 0 and (i - lastTick) / self.tempo > .1) then
       local sleepTime = (i - lastTick) / self.tempo
       lastTick = i
       if sleepMode == "force" and sleepTime < .05 then
