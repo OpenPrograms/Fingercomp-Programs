@@ -309,7 +309,6 @@ function Track:play(len, sleepMode, skip)
       return success, reason
     end
     if #success > 0 then
-      print("", success)
       coroutine.yield(success)
     end
     if not (#success == 0 and (i - lastTick) / self.tempo > .1) then
