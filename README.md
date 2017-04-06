@@ -20,7 +20,7 @@ This is a place where hopefully brilliant ideas become the programs.
 * `libaevent`
   * An advanced event library. **Available on the Hel Repository**.
 * `libbigint`
-  * Enables one to have *very* big integers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported. **Available on the Hel Repository**.
+  * **Not mine!** Enables one to have *very* big integers, storing them in a metatable. Basic arithmetic operations (like abs, addition, division, etc.) are supported. **Available on the Hel Repository**.
 * `libder-decoder`
   * Decodes the data encoded using Distinguished Encoding Rules, a subset of ASN.1. For example, x.509 certificates. **Available on the Hel Repository**.
 * `lua-lockbox`

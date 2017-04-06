@@ -1,3 +1,5 @@
+Originally written **not by me**. I've put it here and fixed things to make it work.
+
 # libbigint
 *May the big numbers be with you.*
 
