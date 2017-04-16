@@ -14,12 +14,10 @@ local sides = {
 
 local function patch(base, head)
   for k, v in pairs(head) do
-    if base[k] then
-      if type(v) ~= "table" or type(base[k]) ~= "table" then
-        base[k] = v
-      else
-        patch(base[k], v)
-      end
+    if type(v) ~= "table" or type(base[k]) ~= "table" then
+      base[k] = v
+    else
+      patch(base[k], v)
     end
   end
 end
