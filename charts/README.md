@@ -59,12 +59,13 @@ Progress bar, uh, is a bar that displays the progress. Well, you've probably alr
 local charts = require("charts")
 
 local container = charts.Container()
-local payload = charts.Histogram()
-payload.max = 80
-payload.align = charts.sides.RIGHT
-payload.colorFunc = function(index, norm, value, self, container)
-  return 0x20ff20
-end
+local payload = charts.Histogram {
+  max = 80,
+  align = charts.sides.RIGHT,
+  colorFunc = function(index, norm, value, self, container)
+    return 0x20ff20
+  end
+}
 container.payload = payload
 
 for i = 1, 400, 1 do
@@ -80,51 +81,67 @@ local charts = require("charts")
 local term = require("term")
 local event = require("event")
 
-local cleft = charts.Container()
-cleft.x, cleft.y, cleft.width, cleft.height = 1, 1, 50, 2
-local pleft = charts.ProgressBar()
-pleft.direction = charts.sides.LEFT
-pleft.value = 0
-pleft.colorFunc = function(_, perc)
-  if perc >= .9 then
-    return 0x20afff
-  elseif perc >= .75 then
-    return 0x20ff20
-  elseif perc >= .5 then
-    return 0xafff20
-  elseif perc >= .25 then
-    return 0xffff20
-  elseif perc >= .1 then
-    return 0xffaf20
-  else
-    return 0xff2020
-  end
-end
-cleft.payload = pleft
+local cleft = charts.Container {
+  x = 1,
+  y = 1,
+  width = 50,
+  height = 2,
+  payload = charts.ProgressBar {
+    direction = charts.sides.LEFT,
+    value = 0,
+    colorFunc = function(_, perc)
+      if perc >= .9 then
+        return 0x20afff
+      elseif perc >= .75 then
+        return 0x20ff20
+      elseif perc >= .5 then
+        return 0xafff20
+      elseif perc >= .25 then
+        return 0xffff20
+      elseif perc >= .1 then
+        return 0xffaf20
+      else
+        return 0xff2020
+      end
+    end
+  }
+}
 
-local cright = charts.Container()
-cright.x, cright.y, cright.width, cright.height = 1, 4, 50, 2
-local pright = charts.ProgressBar()
-pright.direction = charts.sides.RIGHT
-pright.value = 0
-pright.colorFunc = pleft.colorFunc
-cright.payload = pright
+local cright = charts.Container {
+  x = 1,
+  y = 4,
+  width = 50,
+  height = 2,
+  payload = charts.ProgressBar {
+    direction = charts.sides.RIGHT,
+    value = 0,
+    colorFunc = cleft.payload.colorFunc
+  }
+}
 
-local ctop = charts.Container()
-ctop.x, ctop.y, ctop.width, ctop.height = 55, 1, 2, 20
-local ptop = charts.ProgressBar()
-ptop.direction = charts.sides.TOP
-ptop.value = 0
-ptop.colorFunc = pleft.colorFunc
-ctop.payload = ptop
+local ctop = charts.Container {
+  x = 55,
+  y = 1,
+  width = 2,
+  height = 20,
+  payload = charts.ProgressBar {
+    direction = charts.sides.TOP,
+    value = 0,
+    colorFunc = cleft.payload.colorFunc
+  }
+}
 
-local cbottom = charts.Container()
-cbottom.x, cbottom.y, cbottom.width, cbottom.height = 59, 1, 2, 20
-local pbottom = charts.ProgressBar()
-pbottom.direction = charts.sides.BOTTOM
-pbottom.value = 0
-pbottom.colorFunc = pleft.colorFunc
-cbottom.payload = pbottom
+local cbottom = charts.Container {
+  x = 59,
+  y = 1,
+  width = 2,
+  height = 20,
+  payload = charts.ProgressBar {
+    direction = charts.sides.BOTTOM,
+    value = 0,
+    colorFunc = cleft.payload.colorFunc
+  }
+}
 
 for i = 0, 100, 1 do
   term.clear()
@@ -132,7 +149,7 @@ for i = 0, 100, 1 do
   cleft.gpu.set(5, 11, "Max:   " .. pleft.min)
   cleft.gpu.set(5, 12, "Min:   " .. pleft.max)
 
-  pleft.value, pright.value, ptop.value, pbottom.value = i / 100, i / 100, i / 100, i / 100
+  cleft.payload.value, cright.payload.value, ctop.payload.value, cbottom.payload.value = i / 100, i / 100, i / 100, i / 100
 
   cleft:draw()
   ctop:draw()
@@ -141,7 +158,7 @@ for i = 0, 100, 1 do
 
   if event.pull(0.05, "interrupted") then
     term.clear()
-    break
+    os.exit()
   end
 end
 
