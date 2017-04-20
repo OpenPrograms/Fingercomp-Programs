@@ -67,8 +67,8 @@ local cbottom = charts.Container {
 for i = 0, 100, 1 do
   term.clear()
   cleft.gpu.set(5, 10, "Value: " .. ("%.2f"):format(i / 100) .. " [" .. ("%3d"):format(i) .. "%]")
-  cleft.gpu.set(5, 11, "Max:   " .. pleft.min)
-  cleft.gpu.set(5, 12, "Min:   " .. pleft.max)
+  cleft.gpu.set(5, 11, "Max:   " .. cleft.payload.min)
+  cleft.gpu.set(5, 12, "Min:   " .. cleft.payload.max)
 
   cleft.payload.value, cright.payload.value, ctop.payload.value, cbottom.payload.value = i / 100, i / 100, i / 100, i / 100
 
