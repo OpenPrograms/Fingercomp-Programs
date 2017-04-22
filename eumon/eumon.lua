@@ -187,8 +187,8 @@ local progress = charts.Container {
 gpu.fill(1, 1, w, h, " ")
 gpu.set(2,  14, " 10m")
 gpu.set(2,  25, " 1m")
-gpu.set(42, 14, " 30s")
-gpu.set(42, 25, " 1s")
+gpu.set(43, 14, " 30s")
+gpu.set(43, 25, " 1s")
 
 local maxDelta = 1
 local minDelta = 0
@@ -197,7 +197,6 @@ local lastValue = mfsu.getEUStored()
 while not event.pull(1, "interrupted") do
   local stored, capacity = mfsu.getEUStored(), mfsu.getEUCapacity()
   local delta = stored - lastValue
-  local redraw = true
   progress.payload.value = stored
 
   for k, histogram in pairs(hist) do
@@ -213,10 +212,16 @@ while not event.pull(1, "interrupted") do
   end
 
   local prev = {maxDelta, minDelta}
+  maxDelta, minDelta = 1, 0
   for k, histogram in pairs(histDelta) do
     histogram.timer = histogram.timer - 1
     if histogram.timer <= 0 then
-      table.insert(histogram.payload.values, delta)
+      local storedHist = hist[k].payload.values
+      local diff = 0
+      if storedHist[#storedHist - 1] then
+        diff = storedHist[#storedHist] - storedHist[#storedHist - 1]
+      end
+      table.insert(histogram.payload.values, diff / histogram.update)
       if #histogram.payload.values > histogram.width then
         table.remove(histogram.payload.values, 1)
       end
@@ -237,7 +242,11 @@ while not event.pull(1, "interrupted") do
 
   lastValue = stored
 
+  local redraw = prev[1] ~= maxDelta or prev[2] ~= minDelta
   local range = math.max(math.abs(minDelta), maxDelta)
+  if range == 0 then
+    range = 1
+  end
 
   for k, histogram in pairs(histDelta) do
     histogram.payload.min = -range
@@ -251,4 +260,4 @@ while not event.pull(1, "interrupted") do
   end
 end
 
-gpu.fill(1, 1, gpu.getViewport(), select(2, gpu.getViewport()), " ")
+gpu.fill(1, 1, w, h, " ")
