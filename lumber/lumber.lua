@@ -58,8 +58,20 @@ local r = {
   up = wrappers.rpt(robot.up),
   down = wrappers.rpt(robot.down),
   suck = function()
+    robot.select(INV)
     while magnet.suck() do
-      os.sleep(.05)
+      os.sleep(0.05)
+    end
+    if robot.count() ~= 64 then
+      for i = 1, INV, 1 do
+        if robot.count(i) > 0 then
+          if robocom.compareTo(i) then
+            robot.select(i)
+            robocom.transferTo(INV)
+            robot.select(INV)
+          end
+        end
+      end
     end
   end,
   swing = wrappers.detect(function()
@@ -76,6 +88,7 @@ local function row()
   for i = 1, H, 1 do
     r.fwd()
     r.left()
+    robot.select(INV - 1)
     if robocom.compare(3) and robot.durability() and robot.durability() > .1 then
       robot.select(INV)
       r.swing()
