@@ -113,6 +113,9 @@ data.fontColor = 0x000000
 data.color = 0xCCCCCC
 data.W = 72
 function data:setTextHex(bytes)
+  if type(bytes) ~= "string" then
+    bytes = tostring(bytes)
+  end
   self:clear()
   for i = 1, #bytes, 8 do
     local sub = bytes:sub(i, i + 7)
