@@ -100,7 +100,7 @@ local function newHTTPRequest(kwargs, ...)
   -- domain sanity checks
   local isIP = (function()
     local parts = {}
-    for subdomain in domain:gmatch("[^.]") do
+    for subdomain in domain:gmatch("[^.]+") do
       -- reverse the order of table, will store something like this:
       -- com, google, www
       table.insert(parts, 1, subdomain)
@@ -109,7 +109,7 @@ local function newHTTPRequest(kwargs, ...)
     assert(#parts > 1, "bad domain name")
     -- tld must have more than 1 character
     assert(#parts[1] > 1, "bad domain name")
-    for _, p in pairs(p) do
+    for _, p in pairs(parts) do
       -- subdomain must consist of letters, numbers, or -
       assert(p:match("^[A-Za-z0-9-]+$"), "bad domain name")
       -- it mustn't start or end with hyphen
@@ -132,6 +132,9 @@ local function newHTTPRequest(kwargs, ...)
             break
           end
         end
+        if not isIP then
+          break
+        end
       end
     end
     if isIP then
@@ -142,8 +145,8 @@ local function newHTTPRequest(kwargs, ...)
     assert(parts[1]:match("^[A-Za-z]+$"), "bad domain name")
 
     -- it's surely a domain
-    return true
-  end)
+    return false
+  end)()
   -- find query (?a=b)
   local queryStr = ""
   if path:find("?") then
@@ -172,12 +175,14 @@ local function newHTTPRequest(kwargs, ...)
   -- escape the fragment string
   fragment = encode(fragment)
   headers = headers or {}
+  local newHeaders = {}
   -- Train-Case the header names, and strip some characters
   for k, v in pairs(headers) do
     k = k:gsub("[^" .. tokenChars .. "]", "")
     assert(k:sub(1, 1) ~= "-" and k:sub(-1, -1) ~= "-", "bad header name")
-    headers[trainCase(k)] = v:gsub("[^ \t" .. visibleChars .. "\x80-\xff]", "")
+    newHeaders[trainCase(k)] = v:gsub("[^ \t" .. visibleChars .. "\x80-\xff]", "")
   end
+  headers = newHeaders
   -- set headers
   headers["Content-Type"] = headers["Content-Type"] or "text/html; encoding=utf-8"
   headers["Accept"] = "*/*"
@@ -295,12 +300,9 @@ local function newHTTPRequest(kwargs, ...)
   local status = {}
   while not status.version do
     local line = read2crlf(response)
-    status.version, status.status, status.reason = line:match("^(%S+)%s(%S+)%s(%S+)\r\n")
+    status.version, status.status, status.reason = line:match("^(%S+)%s(%S+)%s(.*)\r\n")
     if not status and line:sub(-1, -1) == "[%s\t]" then
       -- ignore
-    end
-    if #response[0] then
-      return nil, "bad response"
     end
   end
   local headers = {}
