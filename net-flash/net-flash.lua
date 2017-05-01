@@ -10,9 +10,18 @@ if #args ~= 1 then
   io.stderr:write([==[
 Usage: net-flash [--c=<chunk size>]
                  [--port=<port>]
-                 [{-r|--response=<timeout>}] <source>
+                 [{-r|--response=<timeout>}]
+                 [--addr=<remote address>] <source>
 ]==])
   return 1
+end
+
+local function send(port, ...)
+  if type(options.addr) == "string" then
+    modem.send(options.addr, port, ...)
+  else
+    send(port, ...)
+  end
 end
 
 local input = io.stdin
@@ -37,7 +46,7 @@ end
 local port = tonumber(options.p or options.port) or 1370
 for i = 1, #chunks, 1 do
   local isEnd = i == #chunks
-  modem.broadcast(port, "net-eeprom", "eeprom", isEnd, chunks[i])
+  send(port, "net-eeprom", "eeprom", isEnd, chunks[i])
 end
 
 if options.r or options.response then
@@ -45,8 +54,9 @@ if options.r or options.response then
   if not wasOpen then
     modem.open(port)
   end
-  local timeout = tonumber(options.r or options.response) or math.huge
-  local e = {event.pull(timeout, "modem_message", _, _, port, _, "net-eeprom")}
+  local timeout = tonumber(options.r) or tonumber(options.response) or math.huge
+  local addr = type(options.addr) == "string" and options.addr or nil
+  local e = {event.pull(timeout, "modem_message", _, addr, port, _, "net-eeprom")}
   if e[1] then
     if e[7] == "success" then
       local lastNonNil = 8
