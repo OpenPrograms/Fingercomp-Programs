@@ -7,28 +7,28 @@ SYNOPSIS
 DESCRIPTION
   This program makes it easy to download and upload files to/from Gist.
   
-  This program requires an internet card with HTTP requests enabled in the mod's configuration.
+  This program requires an internet card with HTTP enabled in the OpenComputers configuration.
 
 OPTIONS
-  When uploading, provide list of files as arguments: <path to local file>=<gist filename with .extension>
+  When uploading, provide a list of files as arguments: <path to local file>=<gist filename with .extension>
   
   -p
     Upload files to gist
 
   --P=mode or --public=mode
-    [upload] 's' mode makes gist secret, 'p' - public.
+    [upload] 's' makes gist secret, 'p' makes it public (latter is the default).
   
   --d=description or --description=description
-    [upload] Set a description for a gist.
+    [upload] Set the description of a gist.
   
   -s
-    If uploading, shorten the resulting URL. Else shorten a Github URL given as the first argument.
+    If uploading, shorten the resulting URL. Otherwise shorten a Github URL given as the first argument.
   
   -R
-    Show raw file contents URL
+    Show raw URL to a file.
   
   -q
-    Quiet mode
+    Quiet mode.
   
   -Q
     Superquiet mode: do not show errors.
@@ -37,7 +37,7 @@ OPTIONS
     List files in gist and quit.
   
   -r
-    Override an output file even if it exists.
+    Override the output file even if it exists.
   
   -i
     Show file information.
@@ -55,12 +55,12 @@ OPTIONS
     Use a specific token. Not recommended, since the token will be visible as plain text. Requires OpenComputers 1.6 and higher.
 
   --u=gistid
-    [upload] Instead of posing a new gist, update an existing one with a specific ID. Provide files to modify as if you were uploading them to Gist. Requires the correct token, see -t. Also requires OpenComputers 1.6 and higher.
+    [upload] Instead of posting a new gist, update an existing one with a specific ID. Provide files to modify as if you were uploading them to Gist. Requires a correct token, see -t. Also requires OpenComputers 1.6 and higher.
 
 GITHUB OAUTH TOKENS
-  These tokens can be used to increase API limits to 5000 queries, and to work with user's account. For example, if token is provided when uploading, the resulting gist will be in the user's account.
+  These tokens can be used to increase API limits to 5000 queries and to work with user account. For example, if token is provided when uploading, the resulting gist will be posted under the user account.
   You can get these tokens here: https://github.com/settings/tokens
-  When you do so, do not forget to set the gist scope, otherwise the token will not have any effect for the program except increasing rate limits.
+  When you do so, do not forget to set the gist scope, otherwise the token will not have any effect for the program other than increasing rate limits.
 
 EXAMPLES
   gist -s -p --P=s --d="Hello, world!" /examples/test.lua=test.lua
@@ -76,7 +76,7 @@ EXAMPLES
     Saves the contents of the file helloworld.c in the gist in helloworlds/hello.c, overrides the file if it exists.
   
   gist -t --u=12345678901234567890 -p --d="New description" /new/file=file.lua
-    Change the description of the gist with the ID 12345678901234567980 to "New description", and updates contents of the file file.lua. Prompts for the GitHub OAuth personal access token.
+    Changes the description of the gist with the ID 12345678901234567980 to "New description", and updates contents of the file file.lua. Prompts for the GitHub OAuth personal access token.
   
   gist -s -p --d="Hello, world!" --P=s -t /hello/hello.cpp=hello.cpp
     Prompts for the GitHub OAuth personal access token, and then uploads the file hello.cpp to Gist. Returns the short URL to the gist.
