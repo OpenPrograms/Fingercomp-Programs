@@ -5,9 +5,9 @@ SYNOPSIS
   nn [action] [arguments...]
 
 DESCRIPTION
-  This program allows a player to control their's nanomachines.
+  This program allows a player to control their nanomachines.
   
-  This program requires a wireless modem card.
+  This program requires the wireless modem card.
 
 ACTIONS
   get

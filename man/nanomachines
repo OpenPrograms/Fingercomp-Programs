@@ -1,34 +1,34 @@
 NANOMACHINES USER MANUAL
 
 Congratualtions on purchasing this wonderful and useful piece of software! We want to thank you by giving this manual.
-It should answer on (and probably does) the one question. And the question is--
+It should answer (and probably does) the one question. And the question is--
 Oh, wait.
 
 HOW TO USE THIS ~~DAMN~~ INCREDIBLE INVENTION?
-First thing you need to do to start is to eat the nanomachines. When this is done, the nanomachines will live inside you. So it's good idea to keep them under your control and not let them to eat you instead.
+First thing you need to do to start is to eat the nanomachines. When this is done, the nanomachines will live inside you. So it's a good idea to keep them under your control and not let them to eat you instead.
 
- 1. Charge them up. Simply stay next to the charger until the battery icon fills up.
- 2. Now you need some device with a network card. The best choice is tablet but you may use any other one.
+ 1. Charge them up. Simply stay near by the charger until the battery icon fills up.
+ 2. Now you need a device with a network card. The best choice is tablet for obvious reasons.
  3. Make sure you are near enough to the device. That is not a problem if you use tablets.
- 4. Before you start actually using them, here are the things you should know:
+ 4. Before you actually start using them, here are the things you should know:
   * Nanomachines have a specific amount of inputs. This amount depends on installed mods.
-  * Every input may or may not have a behavior - either a potion effect, particles, or custom effects.
-  * Here is where all the things become interesting. I'll use two words:
+  * Every input may or may not have a behavior - either a potion effect, particles or custom effects.
+  * This is where everything becomes interesting. I'll use two words:
    * "Buff" is a positive behavior.
    * "Debuff" is a negative behavior.
-  * You can get powerful buffs as well as very severe problems. Be hurt when nanomachines are ran out of energy, withering and instant harm effects, for example.
-  * This manual is written to help you minimize the risks.
- 5. Now you need a strange liquid called "Grog". You probably used it already to craft nanomachines. Keep it near enough from a respawn point.
- 6. Make sure there is no chargers nearby.
+  * You can get powerful buffs as well as very severe problems. You can be hurt when nanomachines ran out of energy or get withering and instant harm effects.
+  * This manual is written to help you to minimize the risks.
+ 5. Now you need a strange liquid called "Grog." You probably used it already to craft nanomachines. Keep it near enough from a respawn point.
+ 6. Make sure there are no chargers nearby.
  7. Think of saving your stuff if you die. Hoppers, gravestones, etc.
  8. Now you are ready. Run `nn init <port>` to initialize the program.
  9. Type `nn combo` and wait for a quite long time (4-6 minutes).
-10. YOU DIED:
-  * If situation is bad, you'll have 19 seconds to do the thing below. If it is VERY BAD, you'll be attacked (2.5 ♥), nanomachines will get charged, and the instant harm effect will instantly kill you.
+10. IF YOU DIED:
+  * If the situation is pretty bad, you'll have 19 seconds to do the thing below. If it is VERY BAD, you'll be attacked (2.5 ♥), nanomachines will be charged, and the instant harm effect will instantly kill you.
   * Anyway, you should take the grog and drink it.
-11. YOU ARE ALIVE:
-  * Get the tests results: `nn get` and `nn getcombo`.
-  * Use `nn on <input>` to turn on the input you want.
-  * If you have more then max safe active input count (2 by default), you will be damaged.
+11. IF YOU ARE ALIVE:
+  * Print the test result: `nn get` and `nn getcombo`.
+  * Use `nn on <input>` to turn on any input you want.
+  * If you have more than max safe active input count (2 by default), you will be damaged.
 
-And that's all. Read the program manual (`man nn`), create a group of inputs for an easier control, and have fun.
+And that's all. Read the program manual (`man nn`), create a group of inputs for an easier control and have fun.
