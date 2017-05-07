@@ -1,7 +1,7 @@
 
 ----------------------------------------- Libraries -----------------------------------------
 
-require("advancedLua")
+require("synth.advancedLua")
 local computer = require("computer")
 local keyboard = require("keyboard")
 local buffer = require("doubleBuffering")

@@ -4,8 +4,8 @@ local event = require("event")
 local kbd = require("keyboard")
 local unicode = require("unicode")
 
-local buf = require("doubleBuffering")
-local gui = require("GUI")
+local buf = require("synth.doubleBuffering")
+local gui = require("synth.GUI")
 
 local gpu = com.gpu
 local sound = com.sound
