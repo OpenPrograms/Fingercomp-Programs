@@ -1107,14 +1107,32 @@ function cardADSR(x, y)
   local card = addCard(x, y, 17, 10, 0, 0, 17, 9, "adsr", function(self)
     buf.square(self.x, self.y, 17, 9, 0xFFFFFF, 0x000000, " ")
     buf.text(self.x + 1, self.y, 0x000000, "ADSR")
-    buf.square(self.x + 1, self.y + 1, 15, 4, 0x1E1E1E, 0xFFFFFF, " ")
-    buf.text(self.x + 1, self.y + 5, 0x696969, ("Attack  %4d"):format(self._attack))
-    buf.text(self.x + 1, self.y + 6, 0x696969, ("Decay   %4d"):format(self._decay))
+    -- buf.square(self.x + 1, self.y + 1, 15, 4, 0x1E1E1E, 0xFFFFFF, " ")
+
+    local p = plot {background=0x1E1E1E, xRange={-3000, 3000}, yRange={-1, 1}}
+    p:fun(function(x)
+      x = x + 3000
+      if x <= self._attack and self._attack ~= 0 then
+        return x / self._attack * 2 - 1
+      elseif x <= self._attack + self._decay and self._decay ~= 0 then
+        return ((self._decay - (x - self._attack)) / self._decay * (1 - self._sustain) + self._sustain) * 2 - 1
+      elseif x <= self._attack + self._decay + 1000 then
+        return self._sustain * 2 - 1
+      elseif x <= self._attack + self._decay + 1000 + self._release and self._release ~= 0 then
+        return ((self._release - (x - self._attack - self._decay - 1000)) / self._release * self._sustain) * 2 - 1
+      else
+        return -1
+      end
+    end, nil, 0xE1E1E1, 1)
+    p:draw(self.x + 1, self.y + 1, 15, 4)
+
+    buf.text(self.x + 1, self.y + 5, 0x696969, ("Attack  %4d ms"):format(self._attack))
+    buf.text(self.x + 1, self.y + 6, 0x696969, ("Decay   %4d ms"):format(self._decay))
     local int, frac = math.modf(math.floor(self._sustain * 10000 + 0.5) / 100)
     frac = ("%02d"):format(frac * 100)
     frac = frac:gsub(".", function(c) return superNum[tonumber(c)] end)
     buf.text(self.x + 1, self.y + 7, 0x696969, ("Sustain  %3d%s%%"):format(int, frac))
-    buf.text(self.x + 1, self.y + 8, 0x696969, ("Release %4d"):format(self._release))
+    buf.text(self.x + 1, self.y + 8, 0x696969, ("Release %4d ms"):format(self._release))
   end)
   card._attack = 1000
   card._decay = 1000
