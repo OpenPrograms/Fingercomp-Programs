@@ -3,7 +3,7 @@
 
 local component = require("component")
 local unicode = require("unicode")
-local color = require("color")
+local color = require("synth.color")
 local image = require("synth.image")
 
 ------------------------------------------------- Constants -------------------------------------------------
