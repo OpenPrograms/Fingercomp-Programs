@@ -4,7 +4,7 @@
 require("synth.advancedLua")
 local computer = require("computer")
 local keyboard = require("keyboard")
-local buffer = require("doubleBuffering")
+local buffer = require("synth.doubleBuffering")
 local unicode = require("unicode")
 local event = require("event")
 local fs = require("filesystem")
