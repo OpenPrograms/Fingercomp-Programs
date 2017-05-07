@@ -147,10 +147,14 @@ local brailleMap do
   end
 
   local function rgb2hex(r, g, b)
+    r = math.floor(r + 0.5)
+    g = math.floor(g + 0.5)
+    b = math.floor(b + 0.5)
     return bit32.rshift(r, 16) + bit32.rshift(g, 8) + b
   end
 
   local function hex2rgb(hex)
+    hex = math.floor(hex + 0.5)
     return bit32.lshift(hex, 16),
       bit32.band(bit32.lshift(hex, 8), 0xFF),
       bit32.band(hex, 0xFF)
@@ -842,7 +846,7 @@ function cardFM(x, y)
     frac = frac:gsub(".", function(c) return superNum[tonumber(c)] end)
     buf.text(self.x + 1, self.y + 3, 0x696969, ("I=%5d%s"):format(int, frac))
   end)
-  card._intensity = 10000
+  card._intensity = 100
   local chan = addPin(card, 4, 0, 0xFFFFFF, 0x990000, "Chan", "chan", side.top, true)
   addPin(card, 12, 1, 0xFFFFFF, 0xCC4900, ">", "freqmod", side.right, false, true)
   function card:update()
@@ -945,7 +949,8 @@ local function modulateFrequency(channels, chan, modulator, value)
 end
 
 local function modulateAmplitude(channels, chan, modulator, value)
-  local modChan = channels[modulator.chan]
+  -- error(tostring(modulator) .. tostring(value) .. tostring(channels[modulator]))
+  local modChan = channels[modulator]
   if not modChan then
     return value
   end
@@ -1022,7 +1027,7 @@ local function loadChannelConfiguration(chan)
       if self.offset > 1 then
         self.offset = self.offset % 1
       end
-      if self.ampMod and not self.ampMod and not self.freqMod then
+      if self.ampMod and not self.isAmpMod and not self.isFreqMod then
         value = modulateAmplitude(channels, self, self.ampMod, value)
       end
       if self.adsr then
@@ -1052,7 +1057,7 @@ function cardPlot(x, y)
     buf.text(self.x + 1, self.y + 1, 0x000000, "Plot")
     buf.text(self.x + 6, self.y + 1, 0x696969, ("x%5d"):format(self._zoom))
     buf.square(self.x + 1, self.y + 2, 31, 9, 0x1E1E1E, 0xFFFFFF, " ")
-    local p = plot {background=0x1E1E1E, axisColor=0x3C3C3C}
+    local p = plot {background=0x1E1E1E, axisColor=0x3C3C3C, xrange={-1 / 100 * self._zoom, 1 / 100 * self._zoom}}
     local colors = {
       0x0092FF,
       0xFFB600,
@@ -1067,11 +1072,11 @@ function cardPlot(x, y)
     for _, chan in pairs(configuration) do
       chan.plotFunction = p:fun(function()
         return chan:getValue(configuration)
-      end, "Ch" .. chan.index, colors[chan.index], 1 / sampleRate * self._zoom)
+      end, tostring(chan.index), colors[chan.index], 1 / sampleRate * self._zoom)
     end
     p:draw(self.x + 1, self.y + 2, 31, 9)
   end)
-  card._zoom = 25
+  card._zoom = 250
   addPin(card, 1, 0, 0xFFFFFF, 0x990000, "Ch1", "chan", side.top, true)
   addPin(card, 5, 0, 0xFFFFFF, 0x990000, "Ch2", "chan", side.top, true)
   addPin(card, 9, 0, 0xFFFFFF, 0x990000, "Ch3", "chan", side.top, true)
