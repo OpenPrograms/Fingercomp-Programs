@@ -1,7 +1,7 @@
 
 -------------------------------------------------- Libraries --------------------------------------------------
 
-local color = require("color")
+local color = require("synth.color")
 local unicode = require("unicode")
 local fs = require("filesystem")
 local gpu = require("component").gpu
