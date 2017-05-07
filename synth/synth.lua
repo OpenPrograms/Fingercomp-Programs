@@ -260,9 +260,9 @@ local plot do
 
   function plot:draw(vx, vy, vw, vh)
     checkArg(1, vx, "number")
-    checkArg(2, vx, "number")
-    checkArg(3, vx, "number")
-    checkArg(4, vx, "number")
+    checkArg(2, vy, "number")
+    checkArg(3, vw, "number")
+    checkArg(4, vh, "number")
 
     self.lx, self.ux = self.xRange[1], self.xRange[2]
     self.ly, self.uy = self.yRange[1], self.yRange[2]
