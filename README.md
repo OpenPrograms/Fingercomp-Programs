@@ -45,6 +45,8 @@ This is a place where hopefully brilliant ideas become the programs.
   * A simple graphical program. **Available on the Hel Repository**.
 * `eumon`
   * An EU storage monitor.
+* `synth`
+  * A powerful interface to the sound card.
 
 ### What is the Hel Repository?
 This is yet another OpenComputers program repository written by @moonlightowl and me. The key features are:
