@@ -482,6 +482,18 @@ local function resetSoundCard()
   sound.process()
 end
 
+local function quit(exitCode)
+  resetSoundCard()
+
+  buf.clear(0x000000)
+  buf.draw()
+
+  gpu.setForeground(0xFFFFFF)
+  gpu.setBackground(0x000000)
+  os.exit(exitCode)
+end
+
+
 local function redraw()
   buf.clear(0x0049C0)
   local field = {}
@@ -525,6 +537,12 @@ local function redraw()
   elseif config then
     buf.clear(0x000000, 40)
     local window = gui.fullScreenWindow()
+    function window.onAnyEvent(e)
+      if e[1] == "interrupted" then
+        window:close()
+        quit()
+      end
+    end
     local container = window:addContainer(math.floor((window.width - 50) / 2), 5, 50, window.height - 4)
 
     local payloadContainer = container:addContainer(1, 1, 50, 12)
@@ -561,6 +579,12 @@ local function redraw()
   elseif cardAdd then
     buf.clear(0x000000, 40)
     local window = gui.fullScreenWindow()
+    function window.onAnyEvent(e)
+      if e[1] == "interrupted" then
+        window:close()
+        quit()
+      end
+    end
     local container = window:addContainer(math.floor((window.width - 50) / 2), 5, 50, window.height - 4)
 
     local payloadContainer = container:addContainer(1, 1, 50, 12)
@@ -1333,10 +1357,4 @@ while true do
   sound.process()
 end
 
-resetSoundCard()
-
-buf.clear(0x000000)
-buf.draw()
-
-gpu.setForeground(0xFFFFFF)
-gpu.setBackground(0x000000)
+quit()
