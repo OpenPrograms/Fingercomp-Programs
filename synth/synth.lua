@@ -998,9 +998,11 @@ local function loadChannelConfiguration(chan)
   end
   for _, pin in pairs(chan.outputs[1].connected) do
     if pin.card.type == "fm" then  -- FM
-      isFreqMod = true
+      if pin.card.outputs[1].connected[1] then
+        isFreqMod = pin.card.outputs[1].connected[1].card._chan
+      end
     elseif pin.card.type == "chan" then  -- AM
-      isAmpMod = true
+      isAmpMod = pin.card._chan
     end
   end
   return {
@@ -1015,20 +1017,37 @@ local function loadChannelConfiguration(chan)
     isFreqMod = isFreqMod,
     isAmpMod = isAmpMod,
     getValue = function(self, channels, isModulating)
-      if not isModulating and (self.isFreqMod or self.isAmpMod) then
+      -- Copy the modulator settings to avoid changes to the channels table
+      local isFreqMod, isAmpMod, freqMod, ampMod = self.isFreqMod, self.isAmpMod, self.freqMod, self.ampMod
+      -- We want to ignore modulator that isn't connected to the plot,
+      -- just as the sound card does.
+      if isFreqMod and not channels[isFreqMod] then
+        isFreqMod = nil
+      end
+      if isAmpMod and not channels[isAmpMod] then
+        isAmpMod = nil
+      end
+      if freqMod and not channels[freqMod.chan] then
+        freqMod = nil
+      end
+      if ampMod and not channels[ampMod] then
+        ampMod = nil
+      end
+
+      if not isModulating and (isFreqMod or isAmpMod) then
         return 0
       end
       local value = self.generator.generate(self.offset)
-      if self.freqMod and not self.isFreqMod and not self.isAmpMod then
-        value = modulateFrequency(channels, self, self.freqMod, value)
+      if freqMod and not isFreqMod and not isAmpMod then
+        value = modulateFrequency(channels, self, freqMod, value)
       else
         self.offset = self.offset + self.freq / sampleRate
       end
       if self.offset > 1 then
         self.offset = self.offset % 1
       end
-      if self.ampMod and not self.isAmpMod and not self.isFreqMod then
-        value = modulateAmplitude(channels, self, self.ampMod, value)
+      if ampMod and not isAmpMod and not isFreqMod then
+        value = modulateAmplitude(channels, self, ampMod, value)
       end
       if self.adsr then
         value = value * self.adsr.sustain
