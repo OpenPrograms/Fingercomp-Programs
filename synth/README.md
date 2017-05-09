@@ -12,3 +12,6 @@ This program uses a lot of libraries written by other people.
 * A bundled beautiful plotter library written by @LeshaInc; also modified by me: it now actually works and uses the doubleBuffering library.
 
 ![Screenshot](https://i.imgur.com/Ahxvlv2.png)
+
+## License
+This program uses the Apache 2.0 license. The text of the license can be obtained [here](http://www.apache.org/licenses/LICENSE-2.0).
