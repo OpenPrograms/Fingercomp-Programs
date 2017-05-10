@@ -53,20 +53,6 @@ do
     return characters[1]:rep(spaces) .. part .. characters[9]:rep(blocks)
   end
 
-  local function getMinMax(tbl)
-    local max = -math.huge
-    local min = math.huge
-    for k, v in pairs(tbl) do
-      if v > max then
-        max = v
-      end
-      if v < min then
-        min = v
-      end
-    end
-    return max
-  end
-
   function meta:draw(container)
     if self.max == self.min and self.max == 0 then
       error("min and max are both 0!")
@@ -310,7 +296,9 @@ do
       height = 25,
       payload = nil
     }
-    patch(obj, tbl)
+    if tbl then
+      patch(obj, tbl)
+    end
     return setmetatable(obj, meta)
   end
 end
