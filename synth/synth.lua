@@ -49,7 +49,7 @@ local side = {
   {1, 0}
 }
 
-local cardADSR, cardFM, cardPlot, cardWave, cardSoundCard, cardVolume, cardChannel, cardFrequency
+local cardADSR, cardFM, cardPlot, cardWave, cardSoundCard, cardVolume, cardChannel, cardFrequency, cardLFSR
 
 local function isin(value, tbl)
   for k, v in pairs(tbl) do
@@ -659,6 +659,11 @@ local function redraw()
       cardAdd = false
       window:close()
     end
+    comboBox:addItem("LFSR").onTouch = function()
+      cardLFSR(table.unpack(cardAdd))
+      cardAdd = false
+      window:close()
+    end
 
     local closeButton = container:addButton(1, 18, 50, 3, 0xFFFFFF, 0x000000, 0xC3C3C3, 0x3C3C3C, "Close")
     closeButton.onTouch = function(self)
@@ -764,7 +769,11 @@ function cardChannel(x, y)
       sound.setAM(self._chan, ampMod.connected[1].card._chan)
     end
     if wave.connected[1] then
-      sound.setWave(self._chan, sound.modes[wave.connected[1].card._wave:lower()])
+      if wave.connected[1].card.type == "wave" then
+        sound.setWave(self._chan, sound.modes[wave.connected[1].card._wave:lower()])
+      elseif wave.connected[1].card.type == "lfsr" then
+        sound.setLFSR(self._chan, wave.connected[1].card._value, wave.connected[1].card._mask)
+      end
     end
     if volume.connected[1] then
       sound.setVolume(self._chan, volume.connected[1].card._volume)
@@ -944,12 +953,18 @@ end
 local generators
 generators = {
   noise = {
-    generate = function(offset)
-      return math.random(-1000000, 1000000) / 1000000
+    type = "noise",
+    output = 0,
+    generate = function(self)
+      return self.output
+    end,
+    update = function(self, offset)
+      self.output = math.random(-1000000, 1000000) / 1000000
     end
   },
   square = {
-    generate = function(offset)
+    type = "square",
+    generate = function(self, offset)
       local v = generators.sine.generate(offset)
       if v > 0 then
         v = 1
@@ -960,20 +975,41 @@ generators = {
     end
   },
   sine = {
-    generate = function(offset)
+    type = "sine",
+    generate = function(self, offset)
       return math.sin(2 * math.pi * offset)
     end
   },
   triangle = {
-    generate = function(offset)
+    type = "triangle",
+    generate = function(self, offset)
       return 1 - math.abs(offset - 0.5) * 4
     end
   },
   sawtooth = {
-    generate = function(offset)
+    type = "sawtooth",
+    generate = function(self, offset)
       return 2 * offset - 1
     end
-  }
+  },
+  lfsr = function(value, mask)
+    return {
+      type = "lfsr",
+      output = 0,
+      generate = function(self)
+        return self.output
+      end,
+      update = function()
+        if bit32.band(value, 1) ~= 0 then
+          value = bit32.bxor(bit32.rshift(value, 1), mask)
+          output = 1
+        else
+          value = bit32.rshift(value, 1)
+          output = -1
+        end
+      end
+    }
+  end
 }
 
 local function modulateFrequency(channels, chan, modulator, value)
@@ -998,7 +1034,7 @@ end
 local function loadChannelConfiguration(chan)
   local generator = generators.sine
   local index = chan._chan
-  local freq = 440
+  local freq = 0
   local offset = 0
   local freqMod
   local ampMod
@@ -1009,7 +1045,11 @@ local function loadChannelConfiguration(chan)
   for _, pin in pairs(chan.inputs) do
     if pin.connected[1] then
       if pin.type == "wave" then
-        generator = generators[pin.connected[1].card._wave:lower()]
+        if pin.connected[1].card.type == "wave" then
+          generator = generators[pin.connected[1].card._wave:lower()]
+        elseif pin.connected[1].card.type == "lfsr" then
+          generator = generators.lfsr(pin.connected[1].card._value, pin.connected[1].card._mask)
+        end
       elseif pin.type == "freq" then
         freq = pin.connected[1].card._frequency
       elseif pin.type == "freqmod" then
@@ -1075,7 +1115,7 @@ local function loadChannelConfiguration(chan)
       if not isModulating and (isFreqMod or isAmpMod) then
         return 0
       end
-      local value = self.generator.generate(self.offset)
+      local value = self.generator:generate(self.offset)
       if freqMod and not isFreqMod and not isAmpMod then
         value = modulateFrequency(channels, self, freqMod, value)
       else
@@ -1083,6 +1123,9 @@ local function loadChannelConfiguration(chan)
       end
       if self.offset > 1 then
         self.offset = self.offset % 1
+        if self.generator.update then
+          self.generator:update(self.offset)
+        end
       end
       if ampMod and not isAmpMod and not isFreqMod then
         value = modulateAmplitude(channels, self, ampMod, value)
@@ -1242,6 +1285,43 @@ function cardADSR(x, y)
     end
   end
   return card
+end
+
+function cardLFSR(x, y)
+  local card = addCard(x, y, 13, 3, 0, 0, 12, 3, "lfsr", function(self)
+    buf.square(self.x, self.y, 12, 3, 0xFFFFFF, 0x000000, " ")
+    buf.text(self.x + 1, self.y, 0x000000, "LFSR noise")
+    buf.text(self.x + 1, self.y + 1, 0x696969, ("v=%08X"):format(self._value))
+    buf.text(self.x + 1, self.y + 2, 0x696969, ("m=%08X"):format(self._mask))
+  end)
+  card._value = 0
+  card._mask = 0
+  addPin(card, 12, 1, 0x000000, 0xFF00FF, ">", "wave", side.right, false, true)
+  function card:config(container)
+    container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Initial value")
+    local textValue = container:addInputTextBox(1, 2, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, ("0x%X"):format(self._value))
+    function textValue.validator(text)
+      if tonumber(text) and tonumber(text) >= 0 and tonumber(text) <= 0xFFFFFFFF then
+        return true
+      end
+      return false
+    end
+    function textValue.onInputFinished(text)
+      self._value = tonumber(text) or self._value
+    end
+
+    container:addLabel(1, 6, container.width, 1, 0xFFFFFF, "Bitmask")
+    local textMask = container:addInputTextBox(1, 7, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, ("0x%X"):format(self._mask))
+    function textMask.validator(text)
+      if tonumber(text) and tonumber(text) >= 0 and tonumber(text) <= 0xFFFFFFFF then
+        return true
+      end
+      return false
+    end
+    function textMask.onInputFinished(text)
+      self._mask = tonumber(text) or self._mask
+    end
+  end
 end
 
 local function inBounds(x, y, bx, by, bw, bh)
