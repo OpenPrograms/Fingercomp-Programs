@@ -544,7 +544,7 @@ local function redraw()
   if selected then
     buf.clear(0x000000, 40)
     for _, pin in pairs(pins) do
-      if pin == selected or pin.isInput and pin.type == selected.type then
+      if pin == selected or pin.isInput and pin.type == selected.type and pin.card ~= selected.card then
         pin:draw()
       end
     end
@@ -954,8 +954,11 @@ local generators
 generators = {
   noise = {
     type = "noise",
-    output = 0,
+    output = nil,
     generate = function(self)
+      if not self.output then
+        self:update()
+      end
       return self.output
     end,
     update = function(self, offset)
@@ -995,17 +998,20 @@ generators = {
   lfsr = function(value, mask)
     return {
       type = "lfsr",
-      output = 0,
+      output = nil,
       generate = function(self)
+        if not self.output then
+          self:update()
+        end
         return self.output
       end,
-      update = function()
+      update = function(self)
         if bit32.band(value, 1) ~= 0 then
           value = bit32.bxor(bit32.rshift(value, 1), mask)
-          output = 1
+          self.output = 1
         else
           value = bit32.rshift(value, 1)
-          output = -1
+          self.output = -1
         end
       end
     }
@@ -1357,17 +1363,17 @@ while true do
             end
           end
         end
-        if touchedPin then
-          break
-        end
-        if inBounds(x, y, o.x + o.bx, o.y + o.by, o.x + o.bx + o.bw, o.y + o.by + o.bh) then
+        local inside = inBounds(x, y, o.x + o.bx, o.y + o.by, o.x + o.bx + o.bw, o.y + o.by + o.bh)
+        if inside then
           touchedObject = o
+        end
+        if touchedPin or inside then
           break
         end
       end
     end
     if selected then
-      if touchedPin and touchedPin.isInput then
+      if touchedPin and touchedPin.isInput and touchedPin.type == selected.type and selected.card ~= touchedPin.card then
         if isin(selected, touchedPin.connected) then
           table.remove(touchedPin.connected, select(2, isin(selected, touchedPin.connected)))
           table.remove(selected.connected, select(2, isin(touchedPin, selected.connected)))
