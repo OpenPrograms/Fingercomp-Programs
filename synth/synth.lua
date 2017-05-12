@@ -481,16 +481,16 @@ local function getPinLineCoords(pin)
 end
 
 local function resetSoundCard()
-  sound.setTotalVolume(1)
   for i = 1, 8, 1 do
+    sound.setFrequency(i, 0)
     sound.close(i)
     sound.resetEnvelope(i)
     sound.resetFM(i)
     sound.resetAM(i)
     sound.setWave(i, sound.modes.sine)
-    sound.setFrequency(i, 0)
     sound.setVolume(i, 1)
   end
+  sound.setTotalVolume(1)
   sound.process()
   sound.clear()
   sound.process()
