@@ -871,7 +871,7 @@ function cardFrequency(x, y)
     container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Frequency")
     local textFreq = container:addInputTextBox(1, 2, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(card._frequency))
     function textFreq.validator(text)
-      if text:match("^%d+%.?%d*$") and tonumber(text) < 44100 then
+      if text:match("^%d+%.?%d*$") and tonumber(text) <= 44100 then
         return true
       end
       return false
@@ -1202,7 +1202,7 @@ function cardPlot(x, y)
     container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Zoom level (small values may cause lag)")
     local textZoom = container:addInputTextBox(1, 2, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(self._zoom))
     function textZoom.validator(text)
-      if text:match("^%d+$") and tonumber(text) < 44100 then
+      if text:match("^%d+$") and tonumber(text) <= 44100 then
         return true
       end
       return false
