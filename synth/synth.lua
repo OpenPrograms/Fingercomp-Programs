@@ -26,8 +26,6 @@ local sound = com.sound
 
 local w, h = gpu.getViewport()
 
-local sampleRate = 44100
-
 buf.start()
 buf.clear(0x0049C0)
 buf.draw(true)
@@ -557,15 +555,15 @@ local function redraw()
         quit()
       end
     end
-    local container = window:addContainer(math.floor((window.width - 50) / 2), 5, 50, window.height - 4)
+    local container = window:addContainer(math.floor((window.width - 50) / 2), 2, 50, window.height - 2)
 
-    local payloadContainer = container:addContainer(1, 1, 50, 12)
+    local payloadContainer = container:addContainer(1, 1, 50, 14)
 
     if config.config then
       config:config(payloadContainer)
     end
 
-    local deleteButton = container:addButton(1, 14, 50, 3, 0xCC0000, 0xFFFFFF, 0xFF0000, 0x000000, "Delete object")
+    local deleteButton = container:addButton(1, container.height - 6, 50, 3, 0xCC0000, 0xFFFFFF, 0xFF0000, 0x000000, "Delete object")
     deleteButton.onTouch = function(self)
       for _, pinTable in pairs({config.inputs, config.outputs}) do
         for _, pin in pairs(pinTable) do
@@ -581,7 +579,7 @@ local function redraw()
       window:close()
     end
 
-    local closeButton = container:addButton(1, 18, 50, 3, 0xFFFFFF, 0x000000, 0xC3C3C3, 0x3C3C3C, "Close")
+    local closeButton = container:addButton(1, container.height - 2, 50, 3, 0xFFFFFF, 0x000000, 0xC3C3C3, 0x3C3C3C, "Close")
     closeButton.onTouch = function(self)
       config = false
       window:close()
@@ -838,7 +836,7 @@ function cardVolume(x, y)
     frac = frac:gsub(".", function(c) return superNum[tonumber(c)] end)
     buf.text(self.x + 1, self.y + 1, 0x696969, ("%3d%s%%"):format(int, frac))
   end)
-  card._volume = 0.9999
+  card._volume = 1
   addPin(card, 8, 0, 0x000000, 0xFFB600, ">", "volume", side.right, false, true)
   function card:config(container)
     container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Volume (in percents)")
@@ -871,7 +869,7 @@ function cardFrequency(x, y)
     container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Frequency")
     local textFreq = container:addInputTextBox(1, 2, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(card._frequency))
     function textFreq.validator(text)
-      if text:match("^%d+%.?%d*$") and tonumber(text) <= 44100 then
+      if text:match("^%d+%.?%d*$") and tonumber(text) <= 22050 then
         return true
       end
       return false
@@ -905,13 +903,13 @@ function cardFM(x, y)
     local label = container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Modulator intensity")
     local textIntensity = container:addInputTextBox(1, 2, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(self._intensity), "Modulator intensity...")
     function textIntensity.validate(text)
-      if text:match("^%d+%.?%d*$") and tonumber(text) <= 44100 then
+      if text:match("^%d+%.?%d*$") and tonumber(text) <= 22050 then
         return true
       end
       return false
     end
     function textIntensity.onInputFinished(text)
-      self._intensity = tonumber(text) or 0
+      self._intensity = tonumber(text) or self._intensity
     end
   end
   return card
@@ -968,7 +966,7 @@ generators = {
   square = {
     type = "square",
     generate = function(self, offset)
-      local v = generators.sine.generate(offset)
+      local v = generators.sine:generate(offset)
       if v > 0 then
         v = 1
       elseif v < 0 then
@@ -1024,12 +1022,11 @@ local function modulateFrequency(channels, chan, modulator, value)
     return value
   end
   local deviation = modChan:getValue(channels, true) * modulator.index
-  chan.offset = chan.offset + (chan.freq + deviation) / sampleRate
+  chan.offset = chan.offset + (chan.freq + deviation) / channels.sampleRate
   return value
 end
 
 local function modulateAmplitude(channels, chan, modulator, value)
-  -- error(tostring(modulator) .. tostring(value) .. tostring(channels[modulator]))
   local modChan = channels[modulator]
   if not modChan then
     return value
@@ -1125,7 +1122,7 @@ local function loadChannelConfiguration(chan)
       if freqMod and not isFreqMod and not isAmpMod then
         value = modulateFrequency(channels, self, freqMod, value)
       else
-        self.offset = self.offset + self.freq / sampleRate
+        self.offset = self.offset + self.freq / channels.sampleRate
       end
       if self.offset > 1 then
         self.offset = self.offset % 1
@@ -1154,16 +1151,22 @@ local function loadOutputConfiguration(output)
       end
     end
   end
+  channels.sampleRate = output._sampleRate
   return channels
 end
 
 function cardPlot(x, y)
-  local card = addCard(x, y, 33, 12, 0, 0, 33, 12, "plot", function(self)
-    buf.square(self.x, self.y, 33, 12, 0xFFFFFF, 0x000000, " ")
+  local card = addCard(x, y, 33, 13, 0, 0, 33, 13, "plot", function(self)
+    buf.square(self.x, self.y, 33, 13, 0xFFFFFF, 0x000000, " ")
     buf.text(self.x + 1, self.y + 1, 0x000000, "Plot")
-    buf.text(self.x + 6, self.y + 1, 0x696969, ("x%5d"):format(self._zoom))
+    buf.text(self.x + 6, self.y + 1, 0x696969, ("x%10d%%"):format(self._zoom))
+    buf.text(self.x + 1, self.y + 11, 0x696969, ("Sample rate: %d"):format(self._sampleRate))
+    local int, frac = math.modf(math.floor(self._ampRange * 100 + 0.5) / 100)
+    frac = ("%02d"):format(math.floor(frac * 100 + 0.5))
+    frac = frac:gsub(".", function(c) return superNum[tonumber(c)] end)
+    buf.text(self.x + 1, self.y + 12, 0x696969, ("Range: %d%s"):format(int, frac))
     buf.square(self.x + 1, self.y + 2, 31, 9, 0x1E1E1E, 0xFFFFFF, " ")
-    local p = plot {background=0x1E1E1E, axisColor=0x3C3C3C, xrange={-1 / 100 * self._zoom, 1 / 100 * self._zoom}}
+    local p = plot {background=0x1E1E1E, axisColor=0x3C3C3C, xRange={-1 / (self._zoom / 100), 1 / (self._zoom / 100)}, yRange={-self._ampRange, self._ampRange}}
     local colors = {
       0x0092FF,
       0xFFB600,
@@ -1175,14 +1178,18 @@ function cardPlot(x, y)
       0xCCFF80
     }
     local configuration = loadOutputConfiguration(self)
-    for _, chan in pairs(configuration) do
-      chan.plotFunction = p:fun(function()
-        return chan:getValue(configuration)
-      end, tostring(chan.index), colors[chan.index], 1 / sampleRate * self._zoom)
+    for k, chan in pairs(configuration) do
+      if type(k) == "number" then
+        chan.plotFunction = p:fun(function()
+          return chan:getValue(configuration)
+        end, tostring(chan.index), colors[chan.index], 1 / self._sampleRate)
+      end
     end
     p:draw(self.x + 1, self.y + 2, 31, 9)
   end)
-  card._zoom = 250
+  card._sampleRate = 8000
+  card._zoom = 25000
+  card._ampRange = 1
   addPin(card, 1, 0, 0xFFFFFF, 0x990000, "Ch1", "chan", side.top, true)
   addPin(card, 5, 0, 0xFFFFFF, 0x990000, "Ch2", "chan", side.top, true)
   addPin(card, 9, 0, 0xFFFFFF, 0x990000, "Ch3", "chan", side.top, true)
@@ -1199,16 +1206,40 @@ function cardPlot(x, y)
     end
   end
   function card:config(container)
-    container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Zoom level (small values may cause lag)")
+    container:addLabel(1, 1, container.width, 1, 0xFFFFFF, "Zoom level")
     local textZoom = container:addInputTextBox(1, 2, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(self._zoom))
     function textZoom.validator(text)
-      if text:match("^%d+$") and tonumber(text) <= 44100 then
+      if text:match("^%d+$") then
         return true
       end
       return false
     end
     function textZoom.onInputFinished(text)
       self._zoom = tonumber(text) or self._zoom
+    end
+
+    container:addLabel(1, 6, container.width, 1, 0xFFFFFF, "Sample rate (big values may affect perfomance)")
+    local textSampleRate = container:addInputTextBox(1, 7, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(self._sampleRate))
+    function textSampleRate.validator(text)
+      if text:match("^%d+$") then
+        return true
+      end
+      return false
+    end
+    function textSampleRate.onInputFinished(text)
+      self._sampleRate = tonumber(text) or self._sampleRate
+    end
+
+    container:addLabel(1, 11, container.width, 1, 0xFFFFFF, "Amplitude range")
+    local textAmpRange = container:addInputTextBox(1, 12, container.width, 3, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, tostring(self._ampRange))
+    function textAmpRange.validator(text)
+      if text:match("^%d+%.?%d*$") and tonumber(text) > 0 then
+        return true
+      end
+      return false
+    end
+    function textAmpRange.onInputFinished(text)
+      self._ampRange = tonumber(text) or self._ampRange
     end
   end
   return card
@@ -1380,12 +1411,12 @@ while true do
         else
           if touchedPin.single and touchedPin.connected[1] then
             local other = touchedPin.connected[1]
-            table.remove(other.connected, 1)
+            table.remove(other.connected, select(2, isin(touchedPin, other.connected)))
             table.remove(touchedPin.connected, 1)
           end
           if selected.single and selected.connected[1] then
             local other = selected.connected[1]
-            table.remove(other.connected, 1)
+            table.remove(other.connected, select(2, isin(selected, other.connected)))
             table.remove(selected.connected, 1)
           end
           table.insert(touchedPin.connected, selected)
