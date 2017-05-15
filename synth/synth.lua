@@ -16,6 +16,7 @@ local bit32 = require("bit32")
 local com = require("component")
 local event = require("event")
 local kbd = require("keyboard")
+local shell = require("shell")
 local unicode = require("unicode")
 
 local buf = require("synth.doubleBuffering")
@@ -47,7 +48,7 @@ local side = {
   {1, 0}
 }
 
-local cardADSR, cardFM, cardPlot, cardWave, cardSoundCard, cardVolume, cardChannel, cardFrequency, cardLFSR
+local cardADSR, cardFM, cardPlot, cardWave, cardSoundCard, cardVolume, cardChannel, cardFrequency, cardLFSR, cardPCM
 
 local function isin(value, tbl)
   for k, v in pairs(tbl) do
@@ -56,6 +57,14 @@ local function isin(value, tbl)
     end
   end
   return false
+end
+
+local function int(v, size)
+  local result = ""
+  for i = 1, math.ceil(size / 8), 1 do
+    result = result .. string.char(bit32.band(bit32.rshift(v, 8 * (i - 1)), 0xFF))
+  end
+  return result
 end
 
 local braille = {
@@ -662,6 +671,11 @@ local function redraw()
       cardAdd = false
       window:close()
     end
+    comboBox:addItem("PCM output").onTouch = function()
+      cardPCM(table.unpack(cardAdd))
+      cardAdd = false
+      window:close()
+    end
 
     local closeButton = container:addButton(1, 18, 50, 3, 0xFFFFFF, 0x000000, 0xC3C3C3, 0x3C3C3C, "Close")
     closeButton.onTouch = function(self)
@@ -1141,17 +1155,17 @@ local function loadChannelConfiguration(chan)
   }
 end
 
-local function loadOutputConfiguration(output)
+local function loadOutputConfiguration(output, sampleRate)
   local channels = {}
   for idx, pin in pairs(output.inputs) do
     if pin.type == "chan" then
-      if pin.connected[1] then
-        local chanConf = loadChannelConfiguration(pin.connected[1].card)
+      for _, other in pairs(pin.connected) do
+        local chanConf = loadChannelConfiguration(other.card)
         channels[chanConf.index] = chanConf
       end
     end
   end
-  channels.sampleRate = output._sampleRate
+  channels.sampleRate = output._sampleRate or sampleRate
   return channels
 end
 
@@ -1245,11 +1259,184 @@ function cardPlot(x, y)
   return card
 end
 
+function cardPCM(x, y)
+  local card = addCard(x, y, 9, 3, 0, 0, 9, 3, "pcm", function(self)
+    buf.square(self.x, self.y, 9, 3, 0xFFFFFF, 0x000000, " ")
+    buf.text(self.x + 1, self.y + 1, 0x000000, "PCM out")
+  end)
+  addPin(card, 3, 0, 0xFFFFFF, 0x990000, "Chs", "chan", side.top)
+  function card:config(container)
+    local updateUI
+
+    local sampleRate = 44100
+    container:addLabel(1, 1, 18, 1, 0xFFFFFF, "Sample rate")
+    local textSampleRate = container:addInputTextBox(20, 1, 31, 1, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, "44100")
+    textSampleRate.validator = function(text)
+      if text:match("^%d+$") then
+        return true
+      end
+      return false
+    end
+    textSampleRate.onInputFinished = function(text)
+      sampleRate = tonumber(text) or sampleRate
+      updateUI()
+    end
+
+    local depth = 8
+    container:addLabel(1, 3, 18, 1, 0xFFFFFF, "Depth")
+    local comboDepth = container:addComboBox(20, 3, 31, 1, 0xFFFFFF, 0x000000, 0xB2B2B2, 0x969696)
+    comboDepth:addItem("8 bit").onTouch = function()
+      depth = 8
+      updateUI()
+    end
+    comboDepth:addItem("16 bit").onTouch = function()
+      depth = 16
+      updateUI()
+    end
+    comboDepth:addItem("32 bit").onTouch = function()
+      depth = 32
+      updateUI()
+    end
+
+    local len = 5
+    container:addLabel(1, 5, 18, 1, 0xFFFFFF, "Length (in secs)")
+    local textLen = container:addInputTextBox(20, 5, 31, 1, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, "5")
+    textLen.validator = function(text)
+      if text:match("^%d+$") then
+        return true
+      end
+      return false
+    end
+    textLen.onInputFinished = function(text)
+      len = tonumber(text) or len
+      updateUI()
+    end
+
+    local format = "pcm"
+    container:addLabel(1, 7, 18, 1, 0xFFFFFF, "Format")
+    local comboFormat = container:addComboBox(20, 7, 31, 1, 0xFFFFFF, 0x000000, 0xB2B2B2, 0x969696)
+    comboFormat:addItem("Raw PCM").onTouch = function()
+      format = "pcm"
+      updateUI()
+    end
+    comboFormat:addItem("WAV").onTouch = function()
+      format = "wav"
+      updateUI()
+    end
+
+    local path = "/home/out.pcm"
+    container:addLabel(1, 9, 18, 1, 0xFFFFFF, "Path")
+    local textPath = container:addInputTextBox(20, 9, 31, 1, 0xC3C3C3, 0x3C3C3C, 0xFFFFFF, 0x000000, "/home/out.pcm")
+    textPath.onInputFinished = function(text)
+      path = shell.resolve(text or path)
+    end
+
+    container:addLabel(1, 11, 18, 1, 0xFFFFFF, "Total file size")
+    local labelSize = container:addLabel(20, 11, 31, 1, 0xFFFFFF, "Calculating...")
+
+    local progress = container:addProgressBar(20, 13, 31, 0x0092FF, 0xC3C3C3, 0xFFFFFF, 0, true, false)
+
+    local buttonGen = container:addButton(1, 13, 18, 1, 0x0092FF, 0xC3C3C3, 0x0049FF, 0xFFFFFF, "Generate")
+    buttonGen.onTouch = function()
+      buttonGen.text = "Loading config"
+      buttonGen:press()
+      buf.draw()
+      local config = loadOutputConfiguration(self, sampleRate)
+      local f, reason = io.open(path, "w")
+      if not f then
+        buttonGen.text = "Can't open file"
+        buttonGen:draw()
+        buf.draw()
+        os.sleep(0.5)
+        button.text = "Generate"
+        button:release()
+        buf.draw()
+        return
+      end
+      local amplitudeRange = 1
+      for i = 1, sampleRate * len, 1 do
+        local value = 0
+        for k, v in pairs(config) do
+          if type(k) == "number" then
+            value = value + v:getValue(config)
+          end
+        end
+        amplitudeRange = math.max(amplitudeRange, math.abs(value))
+      end
+      config = loadOutputConfiguration(self, sampleRate)
+      local maxAmplitude = (2^depth - 1) / 2
+
+      buttonGen.text = "Generating"
+      buttonGen:getFirstParent():draw()
+      buf.draw()
+
+      if format == "wav" then
+        local totalDataSize = sampleRate * len * depth / 8
+        -- Headers
+        --   Chunk 1
+        f:write("RIFF")
+        f:write(int(36 + totalDataSize, 32))
+        f:write("WAVE")
+        --   Chunk 1.1
+        f:write("fmt ")
+        f:write(int(16, 32))
+        f:write(int(1, 16))
+        f:write(int(1, 16))  -- channels
+        f:write(int(sampleRate, 32))
+        f:write(int(sampleRate * 1 * depth / 8, 32))  -- byte rate
+        f:write(int(1 * depth / 8, 16))  -- block align
+        f:write(int(depth, 16))
+        --  Chunk 1.2
+        f:write("data")
+        f:write(int(totalDataSize, 32))
+        -- Data follows headers
+      end
+
+      local lastSleep = os.clock()
+      for i = 1, sampleRate * len, 1 do
+        local value = 0
+        if os.clock() - lastSleep > .2 then
+          progress.value = i / sampleRate / len * 100
+          progress:draw()
+          buf.draw()
+          os.sleep(0)
+          lastSleep = os.clock()
+        end
+        for k, v in pairs(config) do
+          if type(k) == "number" then
+            local chanValue = v:getValue(config)
+            value = value + chanValue
+          end
+        end
+        local amplitude = math.floor(value / amplitudeRange * maxAmplitude)
+        f:write(int(amplitude, depth))
+      end
+      f:close()
+      buttonGen.text = "Generate"
+      buttonGen:release()
+      progress.value = 0
+      progress:draw()
+      buf.draw()
+    end
+
+    function updateUI(noDraw)
+      local fileSize = sampleRate * depth / 8 * len
+      if format == "wav" then
+        fileSize = fileSize + 44  -- headers
+      end
+      labelSize.text = ("%.2f kB"):format(fileSize / 1024)
+      labelSize.text = labelSize.text .. (" "):rep(18 - unicode.len(labelSize.text))
+      buttonGen:getFirstParent():draw()
+      buf.draw()
+    end
+    updateUI()
+  end
+end
+
 function cardADSR(x, y)
   local card = addCard(x, y, 17, 10, 0, 0, 17, 9, "adsr", function(self)
     buf.square(self.x, self.y, 17, 9, 0xFFFFFF, 0x000000, " ")
     buf.text(self.x + 1, self.y, 0x000000, "ADSR")
-    -- buf.square(self.x + 1, self.y + 1, 15, 4, 0x1E1E1E, 0xFFFFFF, " ")
 
     local p = plot {background=0x1E1E1E, xRange={-3000, 3000}, yRange={-1, 1}}
     p:fun(function(x)
