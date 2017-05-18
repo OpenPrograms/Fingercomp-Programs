@@ -3,6 +3,8 @@
 
 This is a library (obviously) that returns a HTTP request function. It tries to mimic behaviour of `component.internet.request`, at the same time enabling to choose a request method to use (`GET`, `POST`, `PATCH`, etc.).
 
+It's much slower than the default-provided request function. Use **only** if you really need to use a request method different from `GET` and `POST`.
+
 ## Usage
 
 * `http(url: string[, body: string[, headers: table[, method: string]]])` — starts a new request.
