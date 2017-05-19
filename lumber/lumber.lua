@@ -189,6 +189,7 @@ while true do
       term.clearLine()
       io.write("Sleep: " .. time .. " (" .. comp.energy() .. "/" .. comp.maxEnergy() .. ")")
       os.sleep(1)
+      time = time + 1
     until comp.energy() / comp.maxEnergy() > .98
   end
   os.sleep(0)
