@@ -1,31 +1,41 @@
 local complex = require("complex")
 
 local function reverseBits(num, len)
-  return num ~ (2^len - 1)
+  local result = 0
+  local n = 1 << len
+  local nrev = num
+  for i = 1, len - 1, 1 do
+    num = num >> 1
+    nrev = nrev << 1
+    nrev = nrev | (num & 1)
+  end
+  nrev = nrev & (n - 1)
+  return nrev
 end
 
-local function fftOld(x)
+local function fft(x)
   local bitlen = math.ceil(math.log(#x, 2))
   local data = {}
+  print("bitlen is " .. bitlen .. "; #x=" .. #x)
   os.sleep()
   local lastSleep = os.clock()
   for i = 0, #x, 1 do
-    data[reverseBits(i, bitlen)] = x[i]
+    data[reverseBits(i, bitlen)] = complex(x[i])
   end
 
   print("GO")
 
-  for i = 0, bitlen - 1, 1 do
-    local m = 1 << i
-    local n = m * 2
-    local alpha = -(2 * math.pi / n)
-    for k = 0, m - 1, 1 do
-      local oddMp = complex.exp(complex {0, alpha * k})
-      for j = k, #x - 1, n do
-        local evenPart = data[j]
-        local oddPart = oddMp * data[j + m]
-        data[j] = evenPart + oddPart
-        data[j + m] = evenPart - oddPart
+  for s = 1, bitlen, 1 do
+    local m = 2^s
+    local omegaM = (complex{0, -2 * math.pi / m}):exp()
+    for k = 0, #x, m do
+      local omega = complex(1)
+      for j = 0, m / 2 - 1 do
+        local t = omega * data[k + j + m / 2]
+        local u = data[k + j]
+        data[k + j] = u + t
+        data[k + j + m / 2] = u - t
+        omega = omega * omegaM
         if os.clock() - lastSleep > 2.5 then
           os.sleep(0)
           lastSleep = os.clock()
@@ -39,7 +49,7 @@ end
 os.sleep(0)
 local lastSleep = os.clock()
 
-local function fft(x, direct)
+local function fftOld(x, direct)
   if #x == 1 then return x end
   local frameHalfSize = (#x + 1) >> 1
   local frameFullSize = #x + 1
@@ -77,46 +87,74 @@ local all = f:read("*a")
 print("a")
 f:close()
 depth = math.floor(depth / 8)
-local samples = {}
-for i = 1, math.min(rate, #all), depth do
-  local sample = all:sub(i, i + 1)
-  sample = ("<i" .. depth):unpack(sample)
-  samples[i] = sample / (2^(depth * 8) / 2)
-end
-print("s")
 
-local requiredLen = 2^math.ceil(math.log(#samples, 2))
-for i = #samples, requiredLen, 1 do
-  table.insert(samples, 0)
-end
+local chans = {}
 
-for i = 1, #samples, 1 do
-  samples[i - 1] = samples[i]
-end
+local step = 2^math.ceil(math.log(math.min(8192, rate / 10), 2)) - 1
+local sleep = (step + 1) / rate
 
-samples[#samples] = nil
+print(step, sleep)
 
-print("Running FFT")
+while #all > 0 do
+  print(#all)
+  local samples = {}
+  for i = 1, math.min(step, #all), depth do
+    local sample = all:sub(i, i + 1)
+    sample = ("<i" .. depth):unpack(sample)
+    samples[i] = sample / (2^(depth * 8) / 2)
+  end
+  print("s")
 
-samples = fft(samples, true)
-result = samples
+  local requiredLen = 2^math.ceil(math.log(#samples, 2))
+  for i = #samples, requiredLen - 1, 1 do
+    table.insert(samples, 0)
+  end
 
-for i = 0, #result, 1 do
-  result[i] = result[i] / (#result + 1)
-end
+  for i = 1, #samples, 1 do
+    samples[i - 1] = samples[i]
+  end
 
-print("DECOMPOSED, GOT " .. #result .. " ENTRIES")
+  samples[#samples] = nil
 
-for i = 1, #result, 1 do
-  result[i] = {i * rate / (#result + 1), result[i]:abs() / (#result + 1), select(2, result[i]:polar())}
-end
+  print("Running FFT")
 
-for i = #result, 1, -1 do
-  result[i + 1] = result[i]
-end
+  samples = fft(samples, true)
+  result = samples
 
-for i = math.floor(#result / 2), #result, 1 do
-  result[i] = nil
+  print("Removing noise")
+
+  for i = 0, #result, 1 do
+    local a = #result / 2
+    local t = (i - a) / (0.5 * a)
+    t = t^2
+    t = math.exp(-t/2)
+    result[i] = result[i] * t
+  end
+
+  print("DECOMPOSED, GOT " .. #result .. " ENTRIES")
+
+  for i = 1, #result, 1 do
+    result[i] = {i * rate / (#result + 1), result[i]:abs() / (#result + 1), select(2, result[i]:polar())}
+  end
+
+  for i = #result, 1, -1 do
+    result[i + 1] = result[i]
+  end
+
+  for i = math.floor(#result / 2), #result, 1 do
+    result[i] = nil
+  end
+
+  table.sort(result, function(lhs, rhs)
+    return lhs[2] > rhs[2]
+  end)
+
+  for i = 1, 8, 1 do
+    table.insert(chans, result[i][1])
+    table.insert(chans, result[i][2])
+  end
+
+  all = all:sub(step + 2, -1)
 end
 
 local component = require("component")
@@ -365,42 +403,42 @@ end
 
 term.clear()
 
-local p = plot()
+--[[local p = plot()
 p:fun(function(x)
   return result[x][2]
 end, 0xFFFFFF, 1, "Spectre")
 
 os.sleep(0)
 
-p:render(1, 1, 80, 25)
-
-table.sort(result, function(lhs, rhs)
-  return lhs[2] > rhs[2]
-end)
+p:render(1, 1, 80, 25)]]--
 
 local s = component.sound
 
-local i = 1
-local idx = 0
-while true do
-  if idx == 8 or i > #result then break end
-  if result[i][1] < math.huge then
-    idx = idx + 1
-    s.setWave(idx, s.modes.sine)
-    s.setFrequency(idx, result[i][1])
-    s.setVolume(idx, result[i][2] / p.uy)
-    s.resetEnvelope(idx)
-    s.resetFM(idx)
-    s.resetAM(idx)
-    s.open(idx)
-    print(result[i][1], result[i][2], result[i][3])
-  end
-  i = i + 1
+local maxAmplitude = 0
+for i = 2, #chans, 2 do
+  maxAmplitude = math.max(maxAmplitude, chans[i])
 end
 
-while not event.pull(1, "interrupted") do
-  s.delay(1000)
-  s.process()
+local iteration = 1
+
+for sample = 1, #chans, 8 * 2 do
+  print(iteration)
+  local i = 1
+  for chan = sample, sample + 8 * 2 - 1, 2 do
+    s.setWave(i, s.modes.sine)
+    s.setFrequency(i, chans[chan])
+    s.setVolume(i, chans[chan + 1] / maxAmplitude)
+    s.resetEnvelope(i)
+    s.resetFM(i)
+    s.resetAM(i)
+    s.open(i)
+    i = i + 1
+  end
+  s.delay(sleep * 1000)
+  while not s.process() do
+    os.sleep(0)
+  end
+  iteration = iteration + 1
 end
 
 term.clear()
