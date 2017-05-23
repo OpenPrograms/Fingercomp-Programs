@@ -1,3 +1,9 @@
+local component = require("component")
+local unicode = require("unicode")
+local event = require("event")
+local term = require("term")
+local gpu = component.gpu
+
 local complex = require("complex")
 
 local function reverseBits(num, len)
@@ -16,14 +22,11 @@ end
 local function fft(x)
   local bitlen = math.ceil(math.log(#x, 2))
   local data = {}
-  print("bitlen is " .. bitlen .. "; #x=" .. #x)
   os.sleep()
   local lastSleep = os.clock()
   for i = 0, #x, 1 do
     data[reverseBits(i, bitlen)] = complex(x[i])
   end
-
-  print("GO")
 
   for s = 1, bitlen, 1 do
     local m = 2^s
@@ -78,32 +81,37 @@ local function fftOld(x, direct)
   return spectrum
 end
 
-path, depth, rate = ...
+path, depth, rate, sampleSize, step, len = ...
 depth, rate = tonumber(depth), tonumber(rate)
-print(path, depth / 8, rate)
+sampleSize = tonumber(sampleSize) or 1024
+step = tonumber(step)
 local f = io.open(path, "r")
-print("b")
+print("Reading file...")
 local all = f:read("*a")
-print("a")
 f:close()
+len = tonumber(len) or #all / rate
 depth = math.floor(depth / 8)
+all = all:sub(1, len * rate / depth)
 
 local chans = {}
 
-local step = 2^math.ceil(math.log(math.min(8192, rate / 10), 2)) - 1
-local sleep = (step + 1) / rate
+sampleSize = 2^math.ceil(math.log(sampleSize, 2)) - 1
+step = math.floor((sampleSize + 1) / step + .5)
+local sleep = step / rate
 
-print(step, sleep)
+print("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize + 1) .. " samples -> " .. math.floor(step) .. "]")
+
+local total = #all
+local iTime = os.clock()
+local startTime = iTime
 
 while #all > 0 do
-  print(#all)
   local samples = {}
-  for i = 1, math.min(step, #all), depth do
+  for i = 1, math.min(sampleSize, #all), depth do
     local sample = all:sub(i, i + 1)
     sample = ("<i" .. depth):unpack(sample)
     samples[i] = sample / (2^(depth * 8) / 2)
   end
-  print("s")
 
   local requiredLen = 2^math.ceil(math.log(#samples, 2))
   for i = #samples, requiredLen - 1, 1 do
@@ -116,11 +124,10 @@ while #all > 0 do
 
   samples[#samples] = nil
 
-  print("Running FFT")
-
   samples = fft(samples, true)
   result = samples
 
+  --[[
   print("Removing noise")
 
   for i = 0, #result, 1 do
@@ -129,13 +136,27 @@ while #all > 0 do
     t = t^2
     t = math.exp(-t/2)
     result[i] = result[i] * t
-  end
-
-  print("DECOMPOSED, GOT " .. #result .. " ENTRIES")
+  end]]
 
   for i = 1, #result, 1 do
     result[i] = {i * rate / (#result + 1), result[i]:abs() / (#result + 1), select(2, result[i]:polar())}
   end
+
+  --[[
+  print("Post-filtering")
+
+  for i = 1, #result, 1 do
+    local f = result[i][1]
+    local m = 0
+    local Q = 10
+    local Tl = 150
+    local E = 2/3
+    if f > Tl then
+      m = Q * (Tl / f)^E
+    end
+    result[i][2] = result[i][2] * m
+  end
+  ]]--
 
   for i = #result, 1, -1 do
     result[i + 1] = result[i]
@@ -154,14 +175,18 @@ while #all > 0 do
     table.insert(chans, result[i][2])
   end
 
-  all = all:sub(step + 2, -1)
+  if #all < sampleSize then
+    break
+  end
+  all = all:sub(step + 1, -1)
+  term.clearLine()
+  local dig = math.ceil(math.log(total, 10))
+  io.write(("%" .. dig .. ".0f B processed out of %" .. dig .. ".0f B (took %.3fs)"):format(total - #all, total, os.clock() - iTime))
+  iTime = os.clock()
 end
 
-local component = require("component")
-local unicode = require("unicode")
-local event = require("event")
-local term = require("term")
-local gpu = component.gpu
+term.clearLine()
+print(("%.0f B processed for %.3fs (%.2f B/s)"):format(total, os.clock() - startTime, total / (os.clock() - startTime)))
 
 local brailleMap do
   brailleMap = {}
@@ -401,8 +426,6 @@ local plot do
   })
 end
 
-term.clear()
-
 --[[local p = plot()
 p:fun(function(x)
   return result[x][2]
@@ -422,7 +445,8 @@ end
 local iteration = 1
 
 for sample = 1, #chans, 8 * 2 do
-  print(iteration)
+  term.clearLine()
+  io.write(("Playing: %.2fs (%3.0f%%)"):format(iteration * sleep, iteration * sleep / len * 100))
   local i = 1
   for chan = sample, sample + 8 * 2 - 1, 2 do
     s.setWave(i, s.modes.sine)
@@ -441,4 +465,4 @@ for sample = 1, #chans, 8 * 2 do
   iteration = iteration + 1
 end
 
-term.clear()
+print("\n\nExiting")
