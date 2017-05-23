@@ -1,10 +1,12 @@
 local component = require("component")
-local unicode = require("unicode")
-local event = require("event")
+local fs = require("filesystem")
+local shell = require("shell")
 local term = require("term")
-local gpu = component.gpu
+local unicode = require("unicode")
 
 local complex = require("complex")
+
+local gpu = component.gpu
 
 local function reverseBits(num, len)
   local result = 0
@@ -22,76 +24,40 @@ end
 local function fft(x)
   local bitlen = math.ceil(math.log(#x, 2))
   local data = {}
-  os.sleep()
-  local lastSleep = os.clock()
   for i = 0, #x, 1 do
     data[reverseBits(i, bitlen)] = complex(x[i])
   end
 
   for s = 1, bitlen, 1 do
     local m = 2^s
+    local hm = m * 0.5
     local omegaM = (complex{0, -2 * math.pi / m}):exp()
     for k = 0, #x, m do
       local omega = complex(1)
-      for j = 0, m / 2 - 1 do
-        local t = omega * data[k + j + m / 2]
+      for j = 0, hm - 1 do
+        local t = omega * data[k + j + hm]
         local u = data[k + j]
         data[k + j] = u + t
-        data[k + j + m / 2] = u - t
+        data[k + j + hm] = u - t
         omega = omega * omegaM
-        if os.clock() - lastSleep > 2.5 then
-          os.sleep(0)
-          lastSleep = os.clock()
-        end
       end
     end
   end
   return data
 end
 
-os.sleep(0)
-local lastSleep = os.clock()
-
-local function fftOld(x, direct)
-  if #x == 1 then return x end
-  local frameHalfSize = (#x + 1) >> 1
-  local frameFullSize = #x + 1
-  local frameOdd = {}
-  local frameEven = {}
-  for i = 0, frameHalfSize - 1, 1 do
-    local j = i << 1
-    frameOdd[i] = x[j + 1]
-    frameEven[i] = x[j]
-  end
-  if os.clock() - lastSleep > 2.5 then
-    os.sleep(0)
-    lastSleep = os.clock()
-  end
-  local spectrumOdd = fft(frameOdd, direct)
-  local spectrumEven = fft(frameEven, direct)
-  local arg = direct and (-2 * math.pi / frameFullSize) or (2 * math.pi / frameFullSize)
-  local omegaPowBase = complex {math.cos(arg), math.sin(arg)}
-  local omega = complex(1, 0)
-  local spectrum = {}
-  for j = 0, frameHalfSize - 1, 1 do
-    spectrum[j] = spectrumEven[j] + omega * spectrumOdd[j]
-    spectrum[j + frameHalfSize] = spectrumEven[j] - omega * spectrumOdd[j]
-    omega = omega * omegaPowBase
-  end
-  return spectrum
-end
-
 path, depth, rate, sampleSize, step, len = ...
 depth, rate = tonumber(depth), tonumber(rate)
 sampleSize = tonumber(sampleSize) or 1024
 step = tonumber(step)
-local f = io.open(path, "r")
-print("Reading file...")
-local all = f:read("*a")
-f:close()
-len = tonumber(len) or #all / rate
+
+local f = io.open(path, "rb")
+local total = fs.size(shell.resolve(path))
+
 depth = math.floor(depth / 8)
-all = all:sub(1, len * rate / depth)
+len = tonumber(len) or total / rate / depth
+
+total = len * rate * depth
 
 local chans = {}
 
@@ -101,14 +67,18 @@ local sleep = step / rate
 
 print("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize + 1) .. " samples -> " .. math.floor(step) .. "]")
 
-local total = #all
 local iTime = os.clock()
 local startTime = iTime
 
-while #all > 0 do
+os.sleep(0)
+local lastSleep = os.clock()
+
+local shift = 0
+
+while shift < total do
   local samples = {}
-  for i = 1, math.min(sampleSize, #all), depth do
-    local sample = all:sub(i, i + 1)
+  for i = 1, math.min(sampleSize, total - shift) * depth, depth do
+    local sample = f:read(depth)
     sample = ("<i" .. depth):unpack(sample)
     samples[i] = sample / (2^(depth * 8) / 2)
   end
@@ -175,15 +145,21 @@ while #all > 0 do
     table.insert(chans, result[i][2])
   end
 
-  if #all < sampleSize then
+  if total - shift < sampleSize then
     break
   end
-  all = all:sub(step + 1, -1)
+  shift = shift + step
   term.clearLine()
   local dig = math.ceil(math.log(total, 10))
-  io.write(("%" .. dig .. ".0f B processed out of %" .. dig .. ".0f B (took %.3fs)"):format(total - #all, total, os.clock() - iTime))
+  io.write(("%" .. dig .. ".0f B processed out of %" .. dig .. ".0f B (took %.3fs)"):format(shift, total, os.clock() - iTime))
   iTime = os.clock()
+  if os.clock() - lastSleep > 2.5 then
+    os.sleep(0)
+    lastSleep = os.clock()
+  end
 end
+
+f:close()
 
 term.clearLine()
 print(("%.0f B processed for %.3fs (%.2f B/s)"):format(total, os.clock() - startTime, total / (os.clock() - startTime)))
@@ -342,11 +318,9 @@ local plot do
   end
 
   function plot:render(vx, vy, vw, vh)
-    gpu.setBackground(0x0B0C0E)
     gpu.fill(vx, vy, vw, vh, " ")
 
     vh = vh - self:renderLabels(vx, vy, vw, vh)
-    gpu.setForeground(0x1B1C1E)
     self:renderXAxis(vx, vy, vw, vh)
     self:renderYAxis(vx, vy, vw, vh)
     self:renderXYPoint()
@@ -412,28 +386,24 @@ local plot do
       self.labels = {}
 
       self.lx = 1
-      self.ux = #result
+      self.ux = rate / 2
 
       local max = 0
-      for i = 1, #result, 1 do
-        max = math.max(max, result[i][2])
+      for i = 2, #chans, 2 do
+        max = math.max(max, chans[i])
       end
       self.ly = 0
       self.uy = max
+      if self.ly == self.uy and self.uy == 0 then
+        self.uy = 1
+      end
 
       return self
     end
   })
 end
 
---[[local p = plot()
-p:fun(function(x)
-  return result[x][2]
-end, 0xFFFFFF, 1, "Spectre")
-
 os.sleep(0)
-
-p:render(1, 1, 80, 25)]]--
 
 local s = component.sound
 
@@ -460,9 +430,12 @@ for sample = 1, #chans, 8 * 2 do
   end
   s.delay(sleep * 1000)
   while not s.process() do
-    os.sleep(0)
+    os.sleep(0.05)
   end
+  os.sleep(sleep)
   iteration = iteration + 1
 end
+
+s.process()
 
 print("\n\nExiting")
