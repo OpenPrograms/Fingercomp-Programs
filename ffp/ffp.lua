@@ -97,7 +97,7 @@ if options.l or options.load then
   --                      × 8 channels
   --                      × 2 numbers (frequency and amplitude)
   len = tonumber(len) or total / rate / 8 / 8 / 2 * sampleSize
-  total = math.min(total, len * rate * 8 * 8 / sampleSize * 2)
+  total = math.min(total, len * rate * 8 * 8 * 2 / sampleSize)
   log:write("Loading " .. math.floor(total) .. " B of " .. path .. "\n")
   for i = 1, total, 8 do
     chans[#chans + 1] = (">n"):unpack(f:read(8))
@@ -121,10 +121,10 @@ else
 
   total = math.min(total, len * rate * depth)
 
-  sampleSize = 2^math.ceil(math.log(sampleSize, 2)) - 1
-  step = math.floor((sampleSize + 1) / step + .5)
+  sampleSize = 2^math.ceil(math.log(sampleSize, 2))
+  step = math.floor(sampleSize / step + .5)
 
-  log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize + 1) .. " samples -> " .. math.floor(step) .. "]\n")
+  log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize) .. " samples -> " .. math.floor(step) .. "]\n")
   standalone(function()
     io.stdout:write((">nnnn"):pack(depth, rate, sampleSize, step))
   end)
@@ -224,28 +224,44 @@ opencomputers(function()
   local delay = 0
 
   local s = component.sound
+  s.setTotalVolume(1)
   local sleep = step / rate
 
   local lastSleep = os.clock()
+
+  log:write("Sleep interval: " .. sleep .. "\n")
+
+  local threshold = math.ceil(sleep * 1000 / 50) * 50
+
+  local instructions = 0
+
+  local function instr()
+    instructions = instructions + 1
+  end
+
+  for i = 1, 8, 1 do
+    s.setWave(i, s.modes.sine)
+    s.open(i)
+  end
 
   for sample = 1, #chans, 8 * 2 do
     clearLine()
     log:write(("Playing: %.2fs/%.2fs (%3.0f%%)"):format(iteration * sleep, len, iteration * sleep / len * 100))
     local i = 1
     for chan = sample, sample + 8 * 2 - 1, 2 do
-      s.setWave(i, s.modes.sine)
-      s.setFrequency(i, chans[chan])
-      s.setVolume(i, chans[chan + 1] / maxAmplitude)
-      s.open(i)
+      instr(s.setFrequency(i, chans[chan]))
+      instr(s.setVolume(i, chans[chan + 1] / maxAmplitude))
       i = i + 1
     end
-    s.delay(math.floor(sleep * 1000))
+    instr(s.delay(math.floor(sleep * 1000)))
     delay = delay + math.floor(sleep * 1000)
-    if delay > 100 then
+    if instructions > 1000 then
       s.process()
-      os.sleep(0.1)
+      instructions = 0
+    elseif delay > threshold then
       s.process()
-      delay = 0
+      os.sleep(threshold / 1000)
+      delay = delay - threshold
     end
     iteration = iteration + 1
   end
