@@ -87,10 +87,9 @@ if options.l or options.load then
   end
   local f = io.open(path, "rb")
 
-  depth, rate, sampleSize, step = (">nnnn"):unpack(f:read(8 * 4))
-  local cur = 32
-  local total = f:seek("end") - 32
-  f:seek("set", cur)
+  rate, sampleSize, step = (">ddd"):unpack(f:read(8 * 3))
+  local total = f:seek("end") - 24
+  f:seek("set", 24)
 
   -- 1 second byte length = (sample rate / sampleSize)
   --                      × number size (8 bytes)
@@ -100,7 +99,7 @@ if options.l or options.load then
   total = math.min(total, len * rate * 8 * 8 * 2 / sampleSize)
   log:write("Loading " .. math.floor(total) .. " B of " .. path .. "\n")
   for i = 1, total, 8 do
-    chans[#chans + 1] = (">n"):unpack(f:read(8))
+    chans[#chans + 1] = (">d"):unpack(f:read(8))
   end
 else
   path, depth, rate, sampleSize, step, len = table.unpack(args)
@@ -126,7 +125,7 @@ else
 
   log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize) .. " samples -> " .. math.floor(step) .. "]\n")
   standalone(function()
-    io.stdout:write((">nnnn"):pack(depth, rate, sampleSize, step))
+    io.stdout:write((">ddd"):pack(rate, sampleSize, step))
   end)
 
   local iTime = os.clock()
