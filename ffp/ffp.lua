@@ -77,7 +77,7 @@ end)
 
 local chans = {}
 
-local path, depth, rate, sampleSize, step, len
+local path, depth, rate, sampleSize, step, len, channels
 
 if options.l or options.load then
   path, len = table.unpack(args)
@@ -85,29 +85,30 @@ if options.l or options.load then
     io.stderr:write("Usage: ffp <path> [len]\n")
     return
   end
-  local f = io.open(path, "rb")
+  local f = io.open(shell.resolve(path), "rb")
 
-  rate, sampleSize, step = (">ddd"):unpack(f:read(8 * 3))
-  local total = f:seek("end") - 24
-  f:seek("set", 24)
+  rate, sampleSize, step, channels = (">dddd"):unpack(f:read(8 * 4))
+  local total = f:seek("end", 0) - 32
+  f:seek("set", 32)
 
   -- 1 second byte length = (sample rate / sampleSize)
   --                      × number size (8 bytes)
-  --                      × 8 channels
+  --                      × N channels
   --                      × 2 numbers (frequency and amplitude)
-  len = tonumber(len) or total / rate / 8 / 8 / 2 * sampleSize
-  total = math.min(total, len * rate * 8 * 8 * 2 / sampleSize)
+  len = tonumber(len) or total / rate / channels / 8 / 2 * sampleSize
+  total = math.min(total, len * rate * channels * 8 * 2 / sampleSize)
   log:write("Loading " .. math.floor(total) .. " B of " .. path .. "\n")
   for i = 1, total, 8 do
     chans[#chans + 1] = (">d"):unpack(f:read(8))
   end
 else
-  path, depth, rate, sampleSize, step, len = table.unpack(args)
+  path, depth, rate, channels, sampleSize, step, len = table.unpack(args)
   if not (path and depth and rate) then
-    io.stderr:write("Usage: ffp <path> <depth> <sample rate> [sample size] [sample step] [len]\n")
+    io.stderr:write("Usage: ffp <path> <depth> <sample rate> [channels] [sample size] [sample step] [len]\n")
     return
   end
   depth, rate = tonumber(depth), tonumber(rate)
+  channels = tonumber(channels) or 8
   sampleSize = tonumber(sampleSize) or 1024
   step = tonumber(step) or 1
 
@@ -125,7 +126,7 @@ else
 
   log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize) .. " samples -> " .. math.floor(step) .. "]\n")
   standalone(function()
-    io.stdout:write((">ddd"):pack(rate, sampleSize, step))
+    io.stdout:write((">dddd"):pack(channels, rate, sampleSize, step))
   end)
 
   local iTime = os.clock()
@@ -185,7 +186,7 @@ else
       return lhs[2] > rhs[2]
     end)
 
-    for i = 1, 8, 1 do
+    for i = 1, channels, 1 do
       table.insert(chans, result[i][1])
       table.insert(chans, result[i][2])
     end
@@ -238,29 +239,27 @@ opencomputers(function()
     instructions = instructions + 1
   end
 
-  for i = 1, 8, 1 do
+  for i = 1, s.channel_count, 1 do
     s.setWave(i, s.modes.sine)
     s.open(i)
   end
 
-  for sample = 1, #chans, 8 * 2 do
+  for sample = 1, #chans, channels * 2 do
     clearLine()
     log:write(("Playing: %.2fs/%.2fs (%3.0f%%)"):format(iteration * sleep, len, iteration * sleep / len * 100))
     local i = 1
-    for chan = sample, sample + 8 * 2 - 1, 2 do
+    for chan = sample, sample + channels * 2 - 1, 2 do
       instr(s.setFrequency(i, chans[chan]))
       instr(s.setVolume(i, chans[chan + 1] / maxAmplitude))
       i = i + 1
     end
     instr(s.delay(math.floor(sleep * 1000)))
     delay = delay + math.floor(sleep * 1000)
-    if instructions > 1000 then
-      s.process()
-      instructions = 0
-    elseif delay > threshold then
+    if delay > threshold then
       s.process()
       os.sleep(threshold / 1000)
       delay = delay - threshold
+      instructions = 0
     end
     iteration = iteration + 1
   end

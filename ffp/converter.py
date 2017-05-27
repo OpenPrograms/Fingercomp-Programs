@@ -27,7 +27,7 @@ if type(data[0]) == np.ndarray:
     sys.stderr.write("Mono audio required\n")
     sys.exit(1)
 
-stdout.write(struct.pack('>ddd', sample_rate, window_size, window_size))
+stdout.write(struct.pack('>dddd', sample_rate, window_size, window_size, channels))
 
 for i in range(0, len(data), window_size):
     window = data[i:i+window_size]
