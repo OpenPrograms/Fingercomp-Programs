@@ -47,6 +47,8 @@ This is a place where hopefully brilliant ideas become the programs.
   * An EU storage monitor.
 * `synth`
   * A powerful interface to the sound card.
+* `ffp`
+  * A PCM (or WAV if the provided converter is used) player.
 
 ### What is the Hel Repository?
 This is yet another OpenComputers program repository written by @moonlightowl and me. The key features are:
