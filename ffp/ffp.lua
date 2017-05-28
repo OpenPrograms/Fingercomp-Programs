@@ -77,7 +77,7 @@ end)
 
 local chans = {}
 
-local path, depth, rate, sampleSize, step, len, channels
+local path, depth, rate, windowSize, step, len, channels
 
 if options.l or options.load then
   path, len = table.unpack(args)
@@ -87,29 +87,29 @@ if options.l or options.load then
   end
   local f = io.open(shell.resolve(path), "rb")
 
-  rate, sampleSize, step, channels = (">dddd"):unpack(f:read(8 * 4))
+  rate, windowSize, step, channels = (">dddd"):unpack(f:read(8 * 4))
   local total = f:seek("end", 0) - 32
   f:seek("set", 32)
 
-  -- 1 second byte length = (sample rate / sampleSize)
+  -- 1 second byte length = (sample rate / windowSize)
   --                      × number size (8 bytes)
   --                      × N channels
   --                      × 2 numbers (frequency and amplitude)
-  len = tonumber(len) or total / rate / channels / 8 / 2 * sampleSize
-  total = math.min(total, len * rate * channels * 8 * 2 / sampleSize)
+  len = tonumber(len) or total / rate / channels / 8 / 2 * windowSize
+  total = math.min(total, len * rate * channels * 8 * 2 / windowSize)
   log:write("Loading " .. math.floor(total) .. " B of " .. path .. "\n")
   for i = 1, total, 8 do
     chans[#chans + 1] = (">d"):unpack(f:read(8))
   end
 else
-  path, depth, rate, channels, sampleSize, step, len = table.unpack(args)
+  path, depth, rate, channels, windowSize, step, len = table.unpack(args)
   if not (path and depth and rate) then
-    io.stderr:write("Usage: ffp <path> <depth> <sample rate> [channels] [sample size] [sample step] [len]\n")
+    io.stderr:write("Usage: ffp <path> <depth> <sample rate> [channels] [window size] [window step] [len]\n")
     return
   end
   depth, rate = tonumber(depth), tonumber(rate)
   channels = tonumber(channels) or 8
-  sampleSize = tonumber(sampleSize) or 1024
+  windowSize = tonumber(windowSize) or 1024
   step = tonumber(step) or 1
 
   local f = io.open(path, "rb")
@@ -121,12 +121,12 @@ else
 
   total = math.min(total, len * rate * depth)
 
-  sampleSize = 2^math.ceil(math.log(sampleSize, 2))
-  step = math.floor(sampleSize / step + .5)
+  windowSize = 2^math.ceil(math.log(windowSize, 2))
+  step = math.floor(windowSize / step + .5)
 
-  log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize) .. " samples -> " .. math.floor(step) .. "]\n")
+  log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(windowSize) .. " samples -> " .. math.floor(step) .. "]\n")
   standalone(function()
-    io.stdout:write((">dddd"):pack(rate, sampleSize, step, channels))
+    io.stdout:write((">dddd"):pack(rate, windowSize, step, channels))
   end)
 
   local iTime = os.clock()
@@ -151,7 +151,7 @@ else
 
   while shift < total do
     local samples = {}
-    for i = 1, math.min(sampleSize, total - shift) * depth, depth do
+    for i = 1, math.min(windowSize, total - shift) * depth, depth do
       local sample = read(depth)
       sample = ("<i" .. depth):unpack(sample)
       samples[#samples + 1] = sample / (2^(depth * 8) / 2)
@@ -191,7 +191,7 @@ else
       table.insert(chans, result[i][2])
     end
 
-    if total - shift < sampleSize then
+    if total - shift < windowSize then
       break
     end
     shift = shift + step * depth
