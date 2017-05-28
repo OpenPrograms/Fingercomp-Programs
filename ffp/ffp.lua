@@ -126,7 +126,7 @@ else
 
   log:write("Loading " .. ("%.2f"):format(len) .. "s of " .. path .. ": pcm_s" .. (depth * 8) .. (depth > 1 and "le" or "") .. " @ " .. rate .. " Hz [" .. math.floor(sampleSize) .. " samples -> " .. math.floor(step) .. "]\n")
   standalone(function()
-    io.stdout:write((">dddd"):pack(channels, rate, sampleSize, step))
+    io.stdout:write((">dddd"):pack(rate, sampleSize, step, channels))
   end)
 
   local iTime = os.clock()
@@ -170,11 +170,11 @@ else
 
     result = fft(samples, true)
 
-    for i = 1, #result, 1 do
+    for i = 0, #result, 1 do
       result[i] = {i * rate / (#result + 1), result[i]:abs() / (#result + 1), select(2, result[i]:polar())}
     end
 
-    for i = #result, 1, -1 do
+    for i = #result, 0, -1 do
       result[i + 1] = result[i]
     end
 
@@ -231,7 +231,7 @@ opencomputers(function()
 
   log:write("Sleep interval: " .. sleep .. "\n")
 
-  local threshold = math.ceil(sleep * 1000 / 50) * 50
+  local threshold = math.ceil(sleep * 1000 / 50) * 50 * math.ceil(channels / 8)
 
   local instructions = 0
 
@@ -241,8 +241,15 @@ opencomputers(function()
 
   for i = 1, s.channel_count, 1 do
     s.setWave(i, s.modes.sine)
+    s.setFrequency(i, 0)
+    s.setVolume(i, 0)
+    s.resetFM(i)
+    s.resetAM(i)
+    s.resetEnvelope(i)
     s.open(i)
   end
+
+  s.process()
 
   for sample = 1, #chans, channels * 2 do
     clearLine()
@@ -255,7 +262,10 @@ opencomputers(function()
     end
     instr(s.delay(math.floor(sleep * 1000)))
     delay = delay + math.floor(sleep * 1000)
-    if delay > threshold then
+    if instructions >= 1000 then
+      s.process()
+      instructions = 0
+    elseif delay > threshold then
       s.process()
       os.sleep(threshold / 1000)
       delay = delay - threshold
