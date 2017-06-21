@@ -1,3 +1,23 @@
+local _pairs, _ipairs = pairs, ipairs
+-- redefine to take a shadow copy of tables to avoid
+-- changes to tables while iterating
+local function pairs(tbl, ...)
+  local copy = {}
+  for k, v in _pairs(tbl) do
+    copy[k] = v
+  end
+  return _pairs(copy, ...)
+end
+
+local function ipairs(tbl, ...)
+  local copy = {}
+  for k, v in _ipairs(tbl) do
+    copy[k] = v
+  end
+  return _ipairs(copy, ...)
+end
+
+
 local meta = {
   __call = function (cls, incStdEvt)
     local self = setmetatable({}, {__index = cls})
@@ -41,7 +61,7 @@ return setmetatable({
       local priority = self.priorities[i]
 
       if priority then
-        for _, handler in ipairs(priority) do
+        for _, handler in pairs(priority) do
           if handler.targets[event.name] then
             handler(event)
 
