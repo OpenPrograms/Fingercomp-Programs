@@ -50,6 +50,19 @@ This is a place where hopefully brilliant ideas become the programs.
 * `ffp`
   * A PCM (or WAV if the provided converter is used) player.
 
+## How to install
+You can, of course, just copy-paste files, but that's really inconvenient.
+If you have an internet card, you can use *package managers* to make it really
+easy. Those will handle downloading all files and installing dependencies for
+you.
+
+There are two package managers that work with OpenPrograms repositories: `hpm`
+that's bundled with the `oppm` module, and `oppm`.
+
+`oppm` can be found on the oppm floppy disk included in OpenComputers. Combine
+interweb and a floppy to get it, insert the floppy into a disk drive and run
+`install`. Then you can run `oppm install program` to install `program`.
+
 ### What is the Hel Repository?
 This is yet another OpenComputers program repository written by @moonlightowl and me. The key features are:
 * Sane versioning
