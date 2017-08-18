@@ -46,9 +46,9 @@ This is a place where hopefully brilliant ideas become the programs.
 * `eumon`
   * An EU storage monitor.
 * `synth`
-  * A powerful interface to the sound card.
+  * A powerful interface to the sound card. **Available on the Hel Repository**.
 * `ffp`
-  * A PCM (or WAV if the provided converter is used) player.
+  * A PCM (or WAV if the provided converter is used) player. **Available on the Hel Repository**.
 
 ## How to install
 You can, of course, just copy-paste files, but that's really inconvenient.
