@@ -3,6 +3,8 @@
 
 Plays PCM files (the provided converter converts WAV files, too).
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/ffp).
+
 ## Usage
 ### Playing PCM files directly
 ```

@@ -1,6 +1,8 @@
 # synth
 *An easy-to-use interface to the sound card.*
 
+Available for downloading on the [Hel Repository](https://hel.fomalhaut.me/#packages/synth).
+
 ### Libraries
 This program uses a lot of libraries written by other people.
 
