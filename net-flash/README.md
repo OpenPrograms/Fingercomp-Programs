@@ -1,7 +1,7 @@
 # net-flash
 *A simple remote EEPROM "flasher".*
 
-Do you know how drone or microcontroller program debugging is done? Probably
+Do you know how to do drone or microcontroller program debugging? Probably
 yes: you pick up the drone, swap the EEPROM with another one, insert this
 EEPROM into a computer or a server, `flash` the new BIOS, take the flashed
 EEPROM back, swap it again to insert it into the drone, place the drone at
@@ -45,7 +45,7 @@ $ cat options.cfg program.lua | net-flash -
 
 Pretty cool, isn't it?
 
-Of course, this program has to have some options for you to tweak.
+Of course, this program has some options for you to tweak.
 
 * `--c` is the chunk size. You want to keep it at least slightly below the modem max packet size, or the program would just crash. `4096` will be used if not given.
 * `--port` is the, uhhh, port to use. Obviously you have to change the port on the remote host if you want to use this option.
