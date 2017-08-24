@@ -11,10 +11,11 @@ Advantages over the standard event library:
 * Priorities system.
 * The event system is *local*, which means you can have multiple event engines running simulateously, and the events *won't* interfere with other engines.
 * Events are classes.
-* Events are *cancellable*, cancelling an event makes it not to go any further.
+* Events are *cancellable*, cancelling one makes it not to go any further.
 
 ## Using the library
 The library returns an `Engine` *class*, which has to be initialized. Generally you'll need to do something like this (note the parentheses at the end):
+
 ```lua
 local EvEngine = require("aevent")()
 ```
@@ -48,7 +49,7 @@ EvtEngine:subscribe("event1", 0, function(evt)
   evt:cancel()
 end)
 
-EvtEngine:subscrive("event1", 1, function(evt)
+EvtEngine:subscribe("event1", 1, function(evt)
   print("1 callback!", evt.test)
 end)
 
