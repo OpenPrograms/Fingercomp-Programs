@@ -174,12 +174,13 @@ local function newTank(pos)
 end
 
 local function center(str, len)
-  if #str >= len then
+  local strLen = #str
+  if strLen >= len then
     return str
   end
   local lhw = math.floor(len / 2)
-  local shw = math.floor(#str / 2)
-  return ("%-" .. len .. "s"):format(("%" .. (#str + (lhw - shw)) .. "s"):format(str))
+  local shw = math.floor(strLen / 2)
+  return ("%-" .. len .. "s"):format(("%" .. (strLen + (lhw - shw)) .. "s"):format(str))
 end
 
 local oldBG = gpu.setBackground(bg)
@@ -191,7 +192,8 @@ local cycle = 0
 while true do
   do
     local clear = false
-    for pos = #tanks, 1, -1 do
+    local tanksLen = #tanks
+    for pos = tanksLen, 1, -1 do
       if not com.proxy(tanks[pos].addr) then
         table.remove(tanks, pos)
         clear = true
@@ -200,7 +202,7 @@ while true do
     if clear then
       gpu.fill(1, 1, w, h, " ")
     end
-    local i = #tanks + 1
+    local i = tanksLen + 1
     for addr in com.list("tank_controller") do
       for side = 0, 5, 1 do
         if i > tankAmount then
@@ -226,6 +228,7 @@ while true do
     end
   end
 
+  local valuesLen = #tank.hist.payload.values
   for i = 1, tankAmount, 1 do
     local tank = tanks[i]
     if tank then
@@ -240,8 +243,10 @@ while true do
         if cycle % (histUpdateInterval * 2) == 0 then
           tank.hist.payload.max = math.max(tank.hist.payload.max, data[1].capacity)
           table.insert(tank.hist.payload.values, data[1].amount)
-          if #tank.hist.payload.values > tank.hist.container.width then
+          
+          if valuesLen > tank.hist.container.width then
             table.remove(tank.hist.payload.values, 1)
+            valuesLen = valuesLen - 1
           end
         end
 
@@ -255,6 +260,7 @@ while true do
           tank.bar.container.fg = colors[data[1].name] or colors[1]
           if tank.hist.container.fg ~= tank.bar.container.fg then
             tank.hist.payload.values = {}
+            valuesLen = 0
           end
           tank.hist.container.fg = tank.bar.container.fg
           gpu.set(tank.x, 2, center(data[1].label, 20))
