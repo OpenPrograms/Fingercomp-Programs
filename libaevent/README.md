@@ -17,24 +17,33 @@ Advantages over the standard event library:
 The library returns an `Engine` *class*, which has to be initialized. Generally you'll need to do something like this (note the parentheses at the end):
 
 ```lua
-local EvEngine = require("aevent")()
+local engine = require("aevent")()
 ```
 
 ### Methods
 
-The resulting instance has the following methods:
+#### The resulting `EvEngine` instance
 
 | Method | Description |
 | ------ | ----------- |
-| `engine:event(name: string)` | Creates an event with a name `name`. It may be then called to get an instance of the event. |
-| `engine:event(name: string)(data: table[, once: bool])` | Returns an instance of the event with the specified payload. The | `once` arguments makes the event be processed by only one subscriber. Generally you'd use `instance{test="test"}`. |
-| `engine:event(name: string)(data: table[, once: bool]):cancel()` | Cancels an event. |
-| `engine:event(name: string)(data: table[, once: bool]):get()` | Returns the event's payload. |
-| `engine:push(evtinst: table)` | Pushes the event instance. |
+| `engine:event(name: string)` | Registers an event with a name `name`. It may be then called to get an instance of the event. |
+| `engine:push(event: table(Event))` | Pushes the event instance. |
 | `engine:subscribe(name: string, priority: number, handler: function)` | Assigns a callable (function or table with defined `__call`) to an event with a specific priority. |
-| `engine:stdEvent(eventName: string, event: table)` | Registers a new listener that will listen for the given event, and will fire instance of the given event. |
-| `engine:timer(interval: number, event: table[, times: number])` | Creates a new timer that will push the given event on every tick. |
+| `engine:stdEvent(eventName: string, event: table(Event))` | Registers a new listener that will listen for the given event, and will fire instance of the given event. |
+| `engine:timer(interval: number, event: table(Event)[, times: number])` | Creates a new timer that will push the given event on every tick. |
 | `engine:__gc()` | Unregisters all listeners for the computer signals. Call this if the `__gc` metamethod is disabled. |
+
+#### The `Event` instance
+
+**Constructor:**
+- `Event(data: table[, once: bool])` Returns an instance of the event with the specified payload. The `once` arguments makes the event be processed by only one subscriber. Generally you'd use `Event {test = "test"}`.
+
+| Method           | Description                  |
+| ---------------- | ---------------------------- |
+| `event:cancel()` | Cancels an event.            |
+| `event:get()`    | Returns the event's payload. |
+
+Event payload can be indexed just like tables, e.g. `event.foo`.
 
 ### Sample code
 ```lua
