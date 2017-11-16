@@ -165,7 +165,7 @@ local function getFileList(id)
 end
 
 local function getFileInfo(id, filename)
-  local response = requestUrl(format{base=URLS.basic, id=id}, nil, true, {cache=true, decode=true, timeout=100})
+  local response = requestUrl(format{base=URLS.basic, id=id}, nil, true, {cache=false, decode=true, timeout=100})
   return response.files[filename]
 end
 
