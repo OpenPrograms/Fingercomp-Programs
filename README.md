@@ -1,6 +1,8 @@
 # Fingercomp's programs
 This is a place where hopefully brilliant ideas become the programs.
 
+You may also want to check out [our own](https://github.com/cc-ru) organization, which has a few more cool things.
+
 ## Programs
 *(open programs' directories and see their READMEs for more info)*
 * `nn`
