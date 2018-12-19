@@ -14,7 +14,7 @@ You may also want to check out [our own](https://github.com/cc-ru) organization,
 * `opg-chat`
   * IRC-like OpenPeripheral glasses chat.
 * `smap`
-  * A *s*imple *M*inecraft *a*udio *p*layer.
+  * A *s*imple *M*inecraft *a*udio *p*layer. **No longer maintained**.
 * `lumber`
   * Basic lumberjack program for OC robot which uses an axe that can chop the whole tree, e.g., thaumcraft's axe of the stream.
 * `libsemver`

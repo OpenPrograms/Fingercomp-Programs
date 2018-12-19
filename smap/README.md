@@ -1,6 +1,9 @@
 # smap
 **A Simple Minecraft Audio Player**
 
+**Warning:** no longer maintained. Some things should still work (certainly not
+the player, though).
+
 ## What it does?
 It plays audio, does it quite well (oh, okay, not as well as I want).
 
