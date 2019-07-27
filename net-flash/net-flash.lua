@@ -1,4 +1,5 @@
 local com = require("component")
+local comp = require("computer")
 local event = require("event")
 local serialization = require("serialization")
 local shell = require("shell")
@@ -38,7 +39,12 @@ local bios = input:read("*a")
 input:close()
 
 local chunks = {}
-local chunkSize = tonumber(options.c or options.chunk) or modem.maxPacketSize() - 1024
+local chunkSize = tonumber(options.c or options.chunk)
+if not chunkSize then
+  local deviceInfo = comp.getDeviceInfo()[modem.address]
+  chunkSize = deviceInfo.width - 1024
+end
+
 for i = 1, #bios, chunkSize do
   table.insert(chunks, bios:sub(i, i + chunkSize - 1))
 end
