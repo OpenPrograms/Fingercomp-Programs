@@ -42,7 +42,7 @@ local chunks = {}
 local chunkSize = tonumber(options.c or options.chunk)
 if not chunkSize then
   local deviceInfo = comp.getDeviceInfo()[modem.address]
-  chunkSize = deviceInfo.width - 1024
+  chunkSize = deviceInfo.capacity - 1024
 end
 
 for i = 1, #bios, chunkSize do
