@@ -8,20 +8,24 @@ from sys import argv, stdout, stderr, exit
 if len(argv) == 1:
     print(f"{argv[0]} <file> [-o outfile]", file=stderr)
     exit(-1)
+
 f = open(argv[1], "rb")
 
 
 def sin_wave(A, f, fs, phi, t):
     """
-    :params A:    振幅
-    :params f:    信号频率
-    :params fs:   采样频率
-    :params phi:  相位
-    :params t:    时间长度
+    :params A: amplitude
+    :params f: wave frequency
+    :params fs: sample rate
+    :params phi: phase
+    :params t: time
     """
-    # 若时间序列长度为 t=1s,
-    # 采样频率 fs=1000 Hz, 则采样时间间隔 Ts=1/fs=0.001s
-    # 对于时间序列采样点个数为 n=t/Ts=1/0.001=1000, 即有1000个点,每个点间隔为 Ts
+    # An example for illustratory purposes:
+    # If we let the time t = 1 s and the sample rate fs = 1000 Hz,
+    # we obtain that the sampling interval equals Ts = 1 / fs = 0.001 s.
+    # Therefore, the number of sample points is n = t / Ts = 1000;
+    # that is, t seconds of sine wave is represented with n = t / Ts samples,
+    # taken every Ts seconds.
     Ts = 1 / fs
     n = t / Ts
     n = np.arange(n)
