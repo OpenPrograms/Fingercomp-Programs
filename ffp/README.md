@@ -49,6 +49,21 @@ Requires Python 3, NumPy, SciPy.
 * `$window_size` - size of window (1024 by default)
 * `$channels` - amount of channels to use (8 by default)
 
+### Playing converted files
+A kind person (@kebufu) has provided us with an fft audio player in Python which
+means you can enjoy the hilariously high-quality audio without even having to
+launch the game!
+
+See
+
+```
+python3 ./ffplayer.py
+```
+
+for the usage help.
+Besides Python 3 (obviously), it seems to need `pyaudio` installed —
+so make sure it is.
+
 ### Requirements
 * Audio file: must be mono.
 * The OpenComputers program itself requires Lua 5.3, the sound card, and quite
