@@ -21,7 +21,7 @@ local function send(port, ...)
   if type(options.addr) == "string" then
     modem.send(options.addr, port, ...)
   else
-    send(port, ...)
+    modem.broadcast(port, ...)
   end
 end
 
