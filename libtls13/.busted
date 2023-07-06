@@ -1,0 +1,15 @@
+return {
+  _all = {
+    ROOT = {"test"},
+    pattern = ".%.lua$",
+    verbose = true,
+  },
+
+  default = {
+    ["exclude-tags"] = {"long"},
+  },
+
+  all = {
+    ["exclude-tags"] = {},
+  }
+}

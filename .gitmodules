@@ -1,0 +1,6 @@
+[submodule "libtls13/third-party/json.lua"]
+	path = libtls13/third-party/json.lua
+	url = https://github.com/rxi/json.lua
+[submodule "libtls13/third-party/wycheproof"]
+	path = libtls13/third-party/wycheproof
+	url = https://github.com/google/wycheproof.git
