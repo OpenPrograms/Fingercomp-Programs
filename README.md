@@ -39,6 +39,8 @@ Look there for more information.
   * A powerful interface to the sound card.
 * `libtls`
   * An implementation of TLS 1.2.
+* `libtls13`
+  * An implementation of TLS 1.3.
 * `libhttp`
   * An incomplete HTTP/HTTPS 1.1 library implemented on top of TCP sockets. May be useful in some awkward cases.
 
