@@ -1707,8 +1707,14 @@ local meta = {
 
       self.__establishedContext.namedGroup = namedGroup
 
-      local sharedSecret =
+      local sharedSecret, err =
         namedGroup:deriveSharedSecret(clientShare, serverShare)
+
+      if not sharedSecret then
+        return self:sendAlert(
+          errors.alert.illegalParameter.invalidGroupElement:wrapping(err)
+        )
+      end
 
       local earlySecret = self:deriveEarlySecret().earlySecret
       local handshakeSecrets =

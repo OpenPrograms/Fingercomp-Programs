@@ -932,11 +932,11 @@ function lib.makeKeyGen(rng)
 
     return {
       public = pubKey,
-      private = privateKey,
+      private = privKey,
     }
   end
 
-  return generateKeyPair()
+  return generateKeyPair
 end
 
 function lib.deriveSharedSecret(selfKeys, otherKeys)

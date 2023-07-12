@@ -4,6 +4,7 @@ local lib = {}
 
 local aes = require("tls13.crypto.cipher.aes")
 local gcm = require("tls13.crypto.cipher.mode.gcm")
+local group = require("tls13.group")
 local handshake = require("tls13.handshake")
 local hmac = require("tls13.crypto.hmac")
 local oid = require("tls13.asn.oid")
@@ -230,30 +231,49 @@ function lib.profiles.opencomputers.certSignatureAlgorithms()
 end
 
 function lib.profiles.opencomputers.namedGroups()
-  local group = require("tls13.oc.group")
-  local secp256r1 = group.makeEcdhe(256)
-  local secp384r1 = group.makeEcdhe(384)
+  local rng = lib.profiles.opencomputers.rng()
+  local x25519 = group.makeX25519(rng)
 
-  return util.append({
+  local entries = {
     lib.makeNamedGroup {
-      code = 0x0017,
-      name = "secp256r1",
+      code = 0x001d,
+      name = "x25519",
       generateEagerly = true,
-      decodePublicKey = secp256r1.decodePublicKey,
-      encodePublicKey = secp256r1.encodePublicKey,
-      generateKeyPair = secp256r1.generateKeyPair,
-      deriveSharedSecret = secp256r1.deriveSharedSecret,
+      decodePublicKey = x25519.decodePublicKey,
+      encodePublicKey = x25519.encodePublicKey,
+      generateKeyPair = x25519.generateKeyPair,
+      deriveSharedSecret = x25519.deriveSharedSecret,
     },
+  }
 
-    lib.makeNamedGroup {
-      code = 0x0018,
-      name = "secp384r1",
-      decodePublicKey = secp384r1.decodePublicKey,
-      encodePublicKey = secp384r1.encodePublicKey,
-      generateKeyPair = secp384r1.generateKeyPair,
-      deriveSharedSecret = secp384r1.deriveSharedSecret,
-    },
-  }, lib.profiles.default.namedGroups())
+  if require("tls13.oc").getDataCardOrNil(3) then
+    local ocGroup = require("tls13.oc.group")
+    local secp256r1 = ocGroup.makeEcdhe(256)
+    local secp384r1 = ocGroup.makeEcdhe(384)
+
+    entries = util.append(entries, {
+      lib.makeNamedGroup {
+        code = 0x0017,
+        name = "secp256r1",
+        generateEagerly = false,
+        decodePublicKey = secp256r1.decodePublicKey,
+        encodePublicKey = secp256r1.encodePublicKey,
+        generateKeyPair = secp256r1.generateKeyPair,
+        deriveSharedSecret = secp256r1.deriveSharedSecret,
+      },
+
+      lib.makeNamedGroup {
+        code = 0x0018,
+        name = "secp384r1",
+        decodePublicKey = secp384r1.decodePublicKey,
+        encodePublicKey = secp384r1.encodePublicKey,
+        generateKeyPair = secp384r1.generateKeyPair,
+        deriveSharedSecret = secp384r1.deriveSharedSecret,
+      },
+    })
+  end
+
+  return util.append(entries, lib.profiles.default.namedGroups())
 end
 
 function lib.profiles.opencomputers.rng()

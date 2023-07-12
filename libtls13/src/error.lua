@@ -410,6 +410,8 @@ lib.alert.illegalParameter.namedGroupChanged =
     "named group %s server provided key exchange material for in ServerHello \z
       is different from group %s previously selected in HelloRetryRequest"
   )
+lib.alert.illegalParameter.invalidGroupElement =
+  lib.alert.illegalParameter:copied("invalid group element for key exchange")
 addAlert(
   48, "unknownCa", "unknown certification authority",
   "CA certificate could not be located or could not be matched with known \z

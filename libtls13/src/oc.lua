@@ -21,13 +21,22 @@ end
 function lib.getDataCard(tier)
   tier = tier or 3
 
+  return assert(
+    lib.getDataCardOrNil(tier),
+    ("T%d data card required"):format(tier)
+  )
+end
+
+function lib.getDataCardOrNil(tier)
+  tier = tier or 3
+
   for addr in com.list("data", true) do
     if getDataCardTier(addr) >= tier then
       return com.proxy(addr)
     end
   end
 
-  error(("T%d data card required"):format(tier))
+  return nil
 end
 
 return lib

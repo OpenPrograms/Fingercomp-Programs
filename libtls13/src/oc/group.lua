@@ -14,7 +14,7 @@ lib.curveOids = {
 }
 
 function lib.makeEcdhe(bitCount)
-  local data = oc.getDataCard(2)
+  local data = oc.getDataCard()
   local curveOid = assert(lib.curveOids[bitCount])
 
   return {
