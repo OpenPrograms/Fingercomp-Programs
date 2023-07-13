@@ -1540,7 +1540,7 @@ local function groupDoubleScalarMul(r, a, pa, b)
   end
 end
 
--- Returns `true` iff s, as a 32-bit integer, is less than p.
+-- Returns `true` iff s, as a 32-byte integer, is less than p.
 local function groupIsCanonical(s)
   assert(#s == 32)
 
