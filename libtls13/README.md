@@ -20,6 +20,8 @@ Additionally:
 
 Requires a T2 data card for RNG.
 
+Needs Lua 5.3+. Lua 5.2 is unsupported and won't work.
+
 TLS support:
 
 - Can perform a certificate-only handshake (PSKs aren't supported).
