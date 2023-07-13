@@ -1,6 +1,7 @@
 -- TLS signature algorithms.
 
 local asn = require("tls13.asn")
+local curve25519 = require("tls13.crypto.curve25519")
 local errors = require("tls13.error")
 local oid = require("tls13.asn.oid")
 local rsa = require("tls13.crypto.rsa")
@@ -108,7 +109,7 @@ function lib.makeRsaPkcs1SigAlg(hash, hashOid)
 end
 
 function lib.decodeRsaPssPublicKey(pkInfo, hashOid, saltLength)
-  if subjectPkInfo.algorithm.algorithm ~= oid then
+  if pkInfo.algorithm.algorithm ~= oid then
     return nil, errors.x509.publicKeyInvalid.subject(
       "unsupported algorithm OID"
     )
@@ -174,6 +175,36 @@ function lib.makeRsaPssPssSigAlg(hash, hashOid)
 
     -- not implemented
     sign = nil,
+  }
+end
+
+function lib.decodeEd25519PublicKey(pkInfo)
+  local subjectPublicKey = pkInfo.subjectPublicKey
+
+  if #subjectPublicKey ~= 256 then
+    return nil, errors.x509.publicKeyInvalid.subject(
+      "public key must be 256 bits long"
+    )
+  end
+
+  return subjectPublicKey:toBytes()
+end
+
+function lib.makeEd25519()
+  return {
+    decodePublicKey = function(self, pkInfo)
+      if pkInfo.algorithm.algorithm ~= oid.edDSA25519 then
+        return nil, errors.x509.publicKeyInvalid.subject(
+          "unsupported algorithm OID"
+        )
+      end
+
+      return lib.decodeEd25519PublicKey(pkInfo)
+    end,
+
+    verify = function(self, publicKey, signedMessage, signature)
+      return curve25519.verifyEd25519(publicKey, signedMessage, signature)
+    end,
   }
 end
 

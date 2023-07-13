@@ -227,4 +227,8 @@ lib.recognizedSignatureAlgorithms[oid.pkcs1.sha384WithRSAEncryption] =
 lib.recognizedSignatureAlgorithms[oid.pkcs1.sha512WithRSAEncryption] =
   lib.makeNoOrNullParamSigAlg("sha512WithRSAEncryption")
 
+lib.recognizedSignatureAlgorithms[oid.x25519] = lib.makeNoParamSigAlg("X25519")
+lib.recognizedSignatureAlgorithms[oid.edDSA25519] =
+  lib.makeNoParamSigAlg("edDSA25519")
+
 return lib

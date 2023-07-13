@@ -53,6 +53,9 @@ lib.pkix.ad.caIssuers(2)
 lib.pkix.ad.timeStamping(3)
 lib.pkix.ad.caRepository(5)
 
+lib.x25519 = lib.iso.identifiedOrganization.thawte(101).x25519(110)
+lib.edDSA25519 = lib.iso.identifiedOrganization.thawte(101).edDSA25519(112)
+
 lib.pkcs1 = lib
   .iso
   .memberBody(2)

@@ -118,8 +118,17 @@ local rsaPssPssSha384 =
 local rsaPssPssSha512 =
   sigalg.makeRsaPssPssSigAlg(sha2.sha512, oid.hashalgs.sha512)
 
+local ed25519 = sigalg.makeEd25519()
+
 function lib.profiles.default.signatureAlgorithms()
   return {
+    lib.makeSignatureAlgorithm {
+      code = 0x0807,
+      name = "ed25519",
+      decodePublicKey = ed25519.decodePublicKey,
+      verify = ed25519.verify,
+    },
+
     lib.makeSignatureAlgorithm {
       code = 0x0804,
       name = "rsa_pss_rsae_sha256",
@@ -200,34 +209,37 @@ end
 -- Extends the default profile with data card algorithms (such as ECDSA).
 lib.profiles.opencomputers = util.copyMap(lib.profiles.default)
 
-function lib.profiles.opencomputers.signatureAlgorithms()
-  local sigalg = require("tls13.oc.sigalg")
-  local ecdsaSecp256r1Sha256 = sigalg.makeEcdsaSecp256r1SigAlg()
+local function makeOcSignatureAlgorithms()
+  if require("tls13.oc").getDataCardOrNil(3) then
+    local sigalg = require("tls13.oc.sigalg")
+    local ecdsaSecp256r1Sha256 = sigalg.makeEcdsaSecp256r1SigAlg()
 
-  return util.append({
-    lib.makeSignatureAlgorithm {
-      code = 0x0403,
-      name = "ecdsa_secp256r1_sha256",
-      decodePublicKey = ecdsaSecp256r1Sha256.decodePublicKey,
-      verify = ecdsaSecp256r1Sha256.verify,
-      sign = ecdsaSecp256r1Sha256.sign,
-    },
-  }, lib.profiles.default.signatureAlgorithms())
+    return {
+      lib.makeSignatureAlgorithm {
+        code = 0x0403,
+        name = "ecdsa_secp256r1_sha256",
+        decodePublicKey = ecdsaSecp256r1Sha256.decodePublicKey,
+        verify = ecdsaSecp256r1Sha256.verify,
+        sign = ecdsaSecp256r1Sha256.sign,
+      },
+    }
+  end
+
+  return {}
+end
+
+function lib.profiles.opencomputers.signatureAlgorithms()
+  return util.append(
+    makeOcSignatureAlgorithms(),
+    lib.profiles.default.signatureAlgorithms()
+  )
 end
 
 function lib.profiles.opencomputers.certSignatureAlgorithms()
-  local sigalg = require("tls13.oc.sigalg")
-  local ecdsaSecp256r1Sha256 = sigalg.makeEcdsaSecp256r1SigAlg()
-
-  return util.append({
-    lib.makeSignatureAlgorithm {
-      code = 0x0403,
-      name = "ecdsa_secp256r1_sha256",
-      decodePublicKey = ecdsaSecp256r1Sha256.decodePublicKey,
-      verify = ecdsaSecp256r1Sha256.verify,
-      sign = ecdsaSecp256r1Sha256.sign,
-    },
-  }, lib.profiles.default.certSignatureAlgorithms())
+  return util.append(
+    makeOcSignatureAlgorithms(),
+    lib.profiles.default.certSignatureAlgorithms()
+  )
 end
 
 function lib.profiles.opencomputers.namedGroups()
