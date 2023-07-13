@@ -360,8 +360,8 @@ local function fieldIsZero(f)
   fieldReduce(t, f)
   local bits = 0
 
-  for i = 1, #f, 1 do
-    bits = bits | f[i]
+  for i = 1, #t, 1 do
+    bits = bits | t[i]
   end
 
   return bits == 0
