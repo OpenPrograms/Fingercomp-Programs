@@ -16,7 +16,9 @@ Additionally:
 
   - SHA2 family of hash functions
 
-Requires a T3 data card for elliptic-curve cryptography and RNG.
+  - Curve25519: X25519 and Ed25519 (port of libsodium / ref10)
+
+Requires a T2 data card for RNG.
 
 TLS support:
 
@@ -43,10 +45,12 @@ Crypto:
   - `rsa_pss_rsae_sha256`, `rsa_pss_rsae_sha384`, `rsa_pss_rsae_sha512`
   - `rsa_pss_pss_sha256`, `rsa_pss_pss_sha384`, `rsa_pss_pss_sha512`
   - `ecdsa_secp256r1_sha256`
+  - `ed25519`
 
 - Key exchange (groups):
 
   - `secp256r1`, `secp384r1`
+  - `x25519`
 
 Assumes blocking I/O for simplicity.
 Since it's Lua, use coroutines if you don't like that.
@@ -89,7 +93,6 @@ Not that I'm planning to do it.
 But if you have a free summer or two, here's what would be nice:
 
 - Certification path validation. Pretty tough.
-- X25519 / X448 (in Lua). Reasonably straightforward.
 - PSK support and 0-RTT data. A bit tricky.
 - Integrate TLS 1.2. Roughly two weeks of work, immense benefits.
 
