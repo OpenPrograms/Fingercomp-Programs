@@ -65,6 +65,8 @@ See `example/client.lua`.
 Everything that matters has a doc comment in the code.
 The main module (`src/init.lua`) in particular.
 
+The example program is also heavily documented.
+
 ## Tests
 There are a few tests for the crypto stuff.
 You'll need `busted` to run them.
