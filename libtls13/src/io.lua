@@ -15,7 +15,7 @@ local meta = {
         local chunk, err = self.__f:read(n and (n - self.__buf:remaining()))
 
         if not chunk then
-          return nil, err or "unknown error"
+          return nil, err
         elseif #chunk > 0 then
           n = n or #chunk
           self.__buf:append(chunk)
@@ -32,7 +32,7 @@ local meta = {
         local written, err = self.__f:write(remaining)
 
         if not written then
-          return nil, err or "unknown error"
+          return nil, err
         end
 
         remaining = remaining:sub(written + 1)
