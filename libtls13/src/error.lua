@@ -556,5 +556,9 @@ addError(
   "tls", "localCloseAlert", "sent closure alert to remote peer",
   "sent closure alert to remote peer: %s"
 )
+addError(
+  "tls", "close", "remote peer has closed connection",
+  "remote peer has closed connection"
+)
 
 return lib

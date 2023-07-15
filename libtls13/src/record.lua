@@ -25,8 +25,17 @@ lib.TLS_LEGACY_VERSION = TLS_LEGACY_VERSION
 
 local meta = {
   __index = {
+    _mapEofToErr = function(self, ...)
+      if (...) == nil and select(2, ...) == nil then
+        return nil, errors.tls.close()
+      else
+        return ...
+      end
+    end,
+
     read = function(self)
-      local contentType, version, length = self.__sock:readUnpack(">BI2I2")
+      local contentType, version, length =
+        self:_mapEofToErr(self.__sock:readUnpack(">BI2I2"))
 
       if not contentType then
         return nil, version
@@ -38,7 +47,8 @@ local meta = {
         ))
       end
 
-      local content, err = self.__sock:read(length)
+      local content, err =
+        self:_mapEofToErr(self.__sock:read(length))
 
       if not content then
         return nil, err

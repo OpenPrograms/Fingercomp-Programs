@@ -457,7 +457,9 @@ local meta = {
 
         local cipherSuite, legacyCompressionMethod = self:unpackMessage(">I2B")
 
-        if legacyCompressionMethod ~= 0 then
+        if not cipherSuite then
+          return nil, legacyCompressionMethod
+        elseif legacyCompressionMethod ~= 0 then
           return self:sendAlert(errors.alert.decodeError.compressionMethod(
             legacyCompressionMethod
           ))
@@ -690,7 +692,11 @@ local meta = {
 
       [lib.handshakeMessages.finished] = function(self)
         local hashSize = self.__hmac.HASH_SIZE
-        local verifyData = self:consumeFromBuffer(hashSize)
+        local verifyData, err = self:consumeFromBuffer(hashSize)
+
+        if not verifyData then
+          return nil, err
+        end
 
         return {
           type = "finished",
@@ -700,9 +706,11 @@ local meta = {
       end,
 
       [lib.handshakeMessages.keyUpdate] = function(self)
-        local updateRequested = self:unpackMessage("B")
+        local updateRequested, err = self:unpackMessage("B")
 
-        if updateRequested == 0 then
+        if not updateRequested then
+          return nil, err
+        elseif updateRequested == 0 then
           updateRequested = false
         elseif updateRequested == 1 then
           updateRequested = true
@@ -958,7 +966,11 @@ local meta = {
         local entry = lib.recognizedExtensions[extensionType]
 
         if not entry and allowUnknown then
-          self:consumeFromBuffer(extensionLength)
+          local extData, err = self:consumeFromBuffer(extensionLength)
+
+          if not extData then
+            return nil, err
+          end
 
           return false
         end

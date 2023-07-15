@@ -219,17 +219,7 @@ while true do
   -- ...alternatively, use OpenOS threads. it's all coroutines either way.
   local chunk, err = sock:read()
 
-  -- a bit of a hack: errors originating outside of libtls13 are passed as-is.
-  -- this includes OC socket errors. on EOF, the internet card's socket's read
-  -- method returns a plain `nil` without a message. so libtls13 will give you a
-  -- `nil` for an `err`. this is how you can detect an abrupt close.
-  --
-  -- (TLS requires each party to notify its peer before closing the connection
-  -- so that the EOF is protected by TLS as well. if your server is
-  -- well-behaved, you'll get into the elseif branch down there.)
-  if chunk == nil and not err then
-    break
-  elseif chunk == nil and err == tlsErrors.tls.remoteCloseAlert then
+  if chunk == nil and err == tlsErrors.tls.remoteCloseAlert then
     -- libtls13's error objects can be compared by code (see the line above).
     -- makes for nicer error handling.
 
