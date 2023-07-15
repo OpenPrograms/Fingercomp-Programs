@@ -644,7 +644,8 @@ local meta = {
           return nil, err
         end
 
-        local extensions, err = self:decodeExtensions("certificateRequest")
+        local extensions, err =
+          self:decodeExtensions("certificateRequest", true)
 
         if not extensions then
           return nil, err
