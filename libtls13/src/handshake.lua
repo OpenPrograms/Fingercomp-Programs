@@ -816,13 +816,13 @@ local meta = {
       self:pushLimit(n)
       local result, err = f(self, ...)
 
-      if not result then
+      if result == nil then
         return nil, err
       end
 
       local success, err = self:popLimit()
 
-      if not success then
+      if success == nil then
         return nil, err
       end
 
