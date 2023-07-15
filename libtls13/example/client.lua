@@ -253,6 +253,16 @@ while true do
   -- remoteCloseAlert was handled above. you do want handle that one separately.
   -- probably localCloseAlert as well. remoteAlert/localAlert are both fatal and
   -- you should treat them as such.
+  --
+  -- you'll get a `close` error if:
+  -- - your server is not standards-compliant, or
+  -- - the connection died, or
+  -- - you did not handle the remoteCloseAlert after all and found that the
+  --   server did, in fact, close the connection after it has said so
+  -- in any case, the only way you can be sure it was the server that closed the
+  -- connection and not somebody/something else is by getting a close_notify
+  -- alert, because the alert is protected by TLS.
+  -- (well, you can't rule out MITM, as libtls13 does not do cert validation.)
   print(assertOk(chunk, err))
 end
 
