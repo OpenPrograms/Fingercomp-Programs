@@ -123,7 +123,7 @@ sock = assertOk(tls.wrap(sock, nil, {
   -- this callback is called if the server wants you to present your client
   -- certificate. if you don't have any, just don't specify the callback.
   -- alternatively, you may return `false` (it HAS to be `false`, not `nil`.
-  -- `nil` is treated as an error, and the second return values as the error
+  -- `nil` is treated as an error, and the second return value as the error
   -- message/object).
   --
   -- for testing purposes, this example includes a client certificate and its
@@ -236,7 +236,7 @@ while true do
     -- only then close the connection (sending out an alert as well),
     -- since the closure alert only indicates the remote peer closed its side of
     -- the connection. you can still send data to it. presumably.
-    -- if you know C and Berkley sockets, it's kind of like `shutdown(SHUT_WR)`
+    -- if you know C and Berkeley sockets, it's kind of like `shutdown(SHUT_WR)`
     -- on their side.
     -- in reality most servers just `close()` the socket, which is a bit
     -- unfortunate. though probably they just sticked to the old, TLS 1.2-
