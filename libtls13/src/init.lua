@@ -118,7 +118,8 @@ local rsaPssPssSha384 =
 local rsaPssPssSha512 =
   sigalg.makeRsaPssPssSigAlg(sha2.sha512, oid.hashalgs.sha512)
 
-local ed25519 = sigalg.makeEd25519()
+local ecdsaSecp384r1Sha384 = sigalg.makeEcdsaSecp384r1SigAlg()
+local ed25519 = sigalg.makeEd25519SigAlg()
 
 function lib.profiles.default.signatureAlgorithms()
   return {
@@ -127,6 +128,13 @@ function lib.profiles.default.signatureAlgorithms()
       name = "ed25519",
       decodePublicKey = ed25519.decodePublicKey,
       verify = ed25519.verify,
+    },
+
+    lib.makeSignatureAlgorithm {
+      code = 0x0503,
+      name = "ecdsa_secp384r1_sha384",
+      decodePublicKey = ecdsaSecp384r1Sha384.decodePublicKey,
+      verify = ecdsaSecp384r1Sha384.verify,
     },
 
     lib.makeSignatureAlgorithm {

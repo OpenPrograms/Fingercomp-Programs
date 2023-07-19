@@ -1313,14 +1313,6 @@ local function groupProjToExtended(r, p)
   fieldMul(r[4], p[1], p[2])
 end
 
--- Sets r, in projective coordinates, to p, in extended coordinates.
--- TODO: remove
-local function groupExtendedToProj(r, p)
-  fieldCopy(r[1], p[1])
-  fieldCopy(r[2], p[2])
-  fieldCopy(r[3], p[3])
-end
-
 -- Sets r to 2 * p.
 --
 -- r is an EC point in per-coordinate projective representation.
@@ -1344,9 +1336,7 @@ end
 -- r is an EC point in per-coordinate projective representation.
 -- p is an EC point in extended coordinates.
 local function groupExtendedDouble(r, p)
-  local q = groupExtendedZero()
-  groupExtendedToProj(q, p)
-  groupProjDouble(r, q)
+  return groupProjDouble(r, p)
 end
 
 -- Sets r to p + q.

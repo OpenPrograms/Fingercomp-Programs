@@ -5,6 +5,7 @@ local curve25519 = require("tls13.crypto.curve25519")
 local errors = require("tls13.error")
 local oid = require("tls13.asn.oid")
 local rsa = require("tls13.crypto.rsa")
+local secp384r1 = require("tls13.crypto.secp384r1")
 
 local lib = {}
 
@@ -190,7 +191,7 @@ function lib.decodeEd25519PublicKey(pkInfo)
   return subjectPublicKey:toBytes()
 end
 
-function lib.makeEd25519()
+function lib.makeEd25519SigAlg()
   return {
     decodePublicKey = function(self, pkInfo)
       if pkInfo.algorithm.algorithm ~= oid.edDSA25519 then
@@ -204,6 +205,98 @@ function lib.makeEd25519()
 
     verify = function(self, publicKey, signedMessage, signature)
       return curve25519.verifyEd25519(publicKey, signedMessage, signature)
+    end,
+  }
+end
+
+function lib.decodeEcdsaSignature(signature)
+  local result = {}
+  local decoded, err = asn.decode(signature)
+
+  if not decoded then
+    return nil, "invalid DER encoding"
+  end
+
+  if decoded.TAG ~= asn.asnTags.universal.sequence then
+    return nil, "top-level tag is not SEQUENCE"
+  end
+
+  local r = decoded[1]
+  local s = decoded[2]
+
+  if not r or r.TAG ~= asn.asnTags.universal.integer then
+    return nil, "r is absent or not INTEGER"
+  end
+
+  if not s or s.TAG ~= asn.asnTags.universal.integer then
+    return nil, "s is absent or not INTEGER"
+  end
+
+  if #decoded > 2 then
+    return nil, "extraneous elements present"
+  end
+
+  local rNegative, sNegative
+
+  if r.long then
+    rNegative = r[1][0]
+  else
+    rNegative = r[1] < 0
+  end
+
+  if s.long then
+    sNegative = s[1][0]
+  else
+    sNegative = s[1] < 0
+  end
+
+  if rNegative or sNegative then
+    return nil, "r or s is negative"
+  end
+
+  local sr = r.long and r[1]:toBytes() or (">I8"):pack(r[1])
+  local ss = s.long and s[1]:toBytes() or (">I8"):pack(s[1])
+
+  -- skip trailing zeros
+  if #sr == 49 and sr:byte() == 0 then
+    sr = sr:sub(2)
+  end
+
+  if #ss == 49 and ss:byte() == 0 then
+    ss = ss:sub(2)
+  end
+
+  return sr, ss
+end
+
+function lib.makeEcdsaSecp384r1SigAlg()
+  return {
+    decodePublicKey = function(self, pkInfo)
+      if pkInfo.algorithm.algorithm ~= oid.ansiX962.keyType.ecPublicKey then
+        return nil, errors.x509.publicKeyInvalid.subject(
+          "algorithm OID is invalid"
+        )
+      end
+
+      if pkInfo.algorithm.parameters.namedCurve
+          ~= oid.iso.identifiedOrganization.certicom.curve.ansip384r1 then
+        return nil, errors.x509.publicKeyInvalid.subject("unsupported curve")
+      end
+
+      return pkInfo.subjectPublicKey:toBytes()
+    end,
+
+    verify = function(self, publicKey, signedMessage, signature)
+      local sr, ss = lib.decodeEcdsaSignature(signature)
+
+      if not sr then
+        return false
+      end
+
+      local success, err =
+        secp384r1.ecdsaVerifySha384(signedMessage, sr, ss, publicKey)
+
+      return success and true or false
     end,
   }
 end

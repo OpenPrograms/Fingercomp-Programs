@@ -3,6 +3,8 @@ return function(_ENV)
 
   local lib = {}
 
+  lib.json = json
+
   function lib.makeWycheproofTests(args)
     local f =
       assert(io.open("third-party/wycheproof/testvectors/" .. args.file, "r"))

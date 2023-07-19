@@ -264,7 +264,9 @@ end
 
 lib.tagParsers[lib.asnTags.universal.octetString] = function(buf, context)
   if context.encoding ~= "primitive" then
-    return nil, buf:makeParserError(errors.asn.derConstructedForbidden)
+    return nil, buf:makeParserError(
+      errors.asn.derConstructedForbidden, context.tagSpec
+    )
   end
 
   local bytes, err = buf:read(context.length)
@@ -278,7 +280,9 @@ end
 
 lib.tagParsers[lib.asnTags.universal.null] = function(buf, context)
   if context.encoding ~= "primitive" then
-    return nil, buf:makeParserError(errors.asn.invalidEncoding)
+    return nil, buf:makeParserError(
+      errors.asn.invalidEncoding, context.encoding
+    )
   end
 
   return context:makeValue({})
@@ -286,7 +290,9 @@ end
 
 lib.tagParsers[lib.asnTags.universal.objectIdentifier] = function(buf, context)
   if context.encoding ~= "primitive" then
-    return nil, buf:makeParserError(errors.asn.invalidEncoding)
+    return nil, buf:makeParserError(
+      errors.asn.invalidEncoding, context.encoding
+    )
   end
 
   local components = {-1}
@@ -320,7 +326,9 @@ lib.tagParsers[lib.asnTags.universal.utf8String] =
 
 lib.tagParsers[lib.asnTags.universal.sequence] = function(buf, context)
   if context.encoding ~= "constructed" then
-    return nil, buf:makeParserError(errors.asn.invalidEncoding)
+    return nil, buf:makeParserError(
+      errors.asn.invalidEncoding, context.encoding
+    )
   end
 
   local values = {}
@@ -477,7 +485,12 @@ local function parseAsnLength(buf)
     if not length then
       return nil, err
     elseif type(length) == "table" then
-      length = length:leastSignificantWord(false)
+      -- err is the length size
+      return nil, buf:makeParserError(errors.asn.valueTooLong, err)
+    end
+
+    if length < 0x80 then
+      return nil, buf:makeParserError(errors.asn.overlongEncoding)
     end
 
     return length

@@ -77,7 +77,6 @@ lib.ansiX962 = lib.iso.memberBody.us(840).ansiX962(10045)
 lib.ansiX962.keyType(2).ecPublicKey(1)
 
 lib.ansiX962.curves(3).prime(1).prime256r1(7)
-lib.ansiX962.curves(3).prime(1).prime384r1(34)
 
 lib.ansiX962.signatures(4).ecdsaWithSHA2(3).ecdsaWithSHA256(2)
 lib.ansiX962.signatures(4).ecdsaWithSHA2(3).ecdsaWithSHA384(3)
@@ -90,6 +89,8 @@ lib.sha1 = lib
   .secsig(3)
   .algorithms(3)
   .sha1(26)
+
+lib.iso.identifiedOrganization.certicom(132).curve(0).ansip384r1(34)
 
 lib.jointIsoCcitt = lib.root.jointIsoCcitt(2)
 

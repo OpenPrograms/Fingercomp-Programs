@@ -110,6 +110,10 @@ addError(
   "%s: length octet 0xff is reserved"
 )
 addError(
+  "asn", "valueTooLong", "value is too long",
+  "%s: value length tag is more than 8 bytes long (%d bytes)"
+)
+addError(
   "asn", "trailingValueBytes", "contents are smaller than specified length",
   "%s: length %d was specified for contents of length %d"
 )
@@ -126,7 +130,7 @@ addError(
 addError(
   "asn", "derConstructedForbidden",
   "constructed encoding is forbidden by DER",
-  "%s: constructed encoding for %s/%s is forbidden by DER"
+  "%s: constructed encoding for %s is forbidden by DER"
 )
 addError(
   "asn", "invalidEncoding", "encoding not supported for type",

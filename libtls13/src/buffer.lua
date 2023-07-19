@@ -288,10 +288,10 @@ local meta = {
       end
 
       if n <= 8 then
-        return ((">%s%d"):format(signed and "i" or "I", n):unpack(bytes))
+        return ((">%s%d"):format(signed and "i" or "I", n):unpack(bytes)), n
       end
 
-      return bitstring.fromBytes(bytes)
+      return bitstring.fromBytes(bytes), n
     end,
   }
 }
