@@ -18,6 +18,8 @@ Additionally:
 
   - Curve25519: X25519 and Ed25519 (port of libsodium / ref10)
 
+  - ECDSA (secp384r1) signature verification
+
 Requires a T2 data card for RNG.
 
 Needs Lua 5.3+. Lua 5.2 is unsupported and won't work.
@@ -46,12 +48,12 @@ Crypto:
 
   - `rsa_pss_rsae_sha256`, `rsa_pss_rsae_sha384`, `rsa_pss_rsae_sha512`
   - `rsa_pss_pss_sha256`, `rsa_pss_pss_sha384`, `rsa_pss_pss_sha512`
-  - `ecdsa_secp256r1_sha256`
+  - `ecdsa_secp256r1_sha256` (needs a T3 data card), `ecdsa_secp384r1_sha384`
   - `ed25519`
 
 - Key exchange (groups):
 
-  - `secp256r1`, `secp384r1`
+  - `secp256r1`, `secp384r1` (both need a T3 data card)
   - `x25519`
 
 Assumes blocking I/O for simplicity.
