@@ -5,6 +5,7 @@ local com = require("component")
 local tls = require("tls13")
 local tlsBase64 = require("tls13.base64")
 local tlsErrors = require("tls13.error")
+local tlsUtil = require("tls13.util")
 
 local data = com.data
 local inet = com.internet
@@ -132,7 +133,12 @@ sock = assertOk(tls.wrap(sock, nil, {
   -- most likely you just won't.
   onCertificateRequest = function(signatureAlgorithms, certificateRequest)
     if privKey then
-      local sigalg = tls.profiles.opencomputers.signatureAlgorithms()[1]
+      local _, sigalg = tlsUtil.find(
+        tls.profiles.opencomputers.signatureAlgorithms(),
+        function(sigalg)
+          return sigalg.name == "ecdsa_secp256r1_sha256"
+        end
+      )
 
       return {
         encodedCert = cer,

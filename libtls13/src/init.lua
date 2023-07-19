@@ -326,10 +326,10 @@ end
 --     they are useless for this implementation because it does not support
 --     PSK handshakes, but can be exported to resume the session
 --
---   - onCertificateRequest: a function called when the server request client
+--   - onCertificateRequest: a function called when the server requests client
 --     authentication via an X.509 certificate
 --
---     the callback return either return false if it does not intend to send a
+--     the callback should return either false if it does not intend to send a
 --     certificate, or a table with the following entries:
 --
 --     - encodedCert: an X.509-encoded certificate
