@@ -10,7 +10,7 @@ local lib = {}
 
 lib.curveOids = {
   [256] = oid.ansiX962.curves.prime.prime256r1,
-  [384] = oid.ansiX962.curves.prime.prime384r1,
+  [384] = oid.iso.identifiedOrganization.certicom.curve.ansip384r1,
 }
 
 function lib.makeEcdhe(bitCount)
