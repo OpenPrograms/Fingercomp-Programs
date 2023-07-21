@@ -1357,7 +1357,7 @@ lib.group.groupJacobianDouble = groupJacobianDouble
 
 -- Sets d to p + q.
 --
--- Returns 1 if p = q and 0 otherwise.
+-- Returns 1 if p.Y = q.Y and 0 otherwise.
 --
 -- This function may produce the point at infinity even though p + q ≠ 𝕆.
 -- This is indicated by the return value of 1, in which case doubling should be
@@ -1414,9 +1414,9 @@ local function groupJacobianAddUnchecked(d, p, q)
   -- special cases.
   --
   -- - P = Q. this means Z₃ = 0, H = 0, r = 0, and we're producing the point at
-  --   infinity. for this curve, x³ - 3x + b = 0 has no solutions, which in turn
-  --   implies there's no point of order 2. thus, unless P = Q = 𝕆,
-  --   the result is invalid. the function has to return `false`.
+  --   infinity. for this curve, the cofactor of G is 1, which means the group
+  --   is cyclic and there's no point of order 2. thus, unless P = Q = 𝕆,
+  --   the result is invalid. the function has to return 1.
   --
   -- - P = -Q. this means Z₃ = 0, H = 0, r ≠ 0, and we're producing the point at
   --   infinity. this is correct.
@@ -1443,9 +1443,11 @@ local function groupJacobianAdd(d, p, q)
 
   local moveP = groupJacobianZeroFlag(q)
   local moveQ = groupJacobianZeroFlag(p)
+  local sameY = groupJacobianAddUnchecked(result, p, q)
   local needDouble =
-    groupJacobianAddUnchecked(result, p, q)
+    sameY
     & ~(moveP | moveQ)
+    & groupJacobianZeroFlag(result)
 
   -- this handles the case of p or q being zero.
   groupCmov(result, p, moveP)
@@ -1554,7 +1556,7 @@ lib.group.groupJacobianToBytes = groupJacobianToBytes
 
 -- Sets d to p + q, performing mixed addition (i.e., assuming q.Z is 1).
 --
--- Returns 1 if p = q and 0 otherwise.
+-- Returns 1 if p.Y = q.Y and 0 otherwise.
 --
 -- This function may produce the point at infinity even though p + q ≠ 𝕆.
 -- This is indicated by the return value of 1, in which case doubling should be
@@ -1617,9 +1619,11 @@ local function groupJacobianMixedAdd(d, p, q)
 
   local moveP = groupJacobianZeroFlag(q)
   local moveQ = groupJacobianZeroFlag(p)
+  local sameY = groupJacobianMixedAddUnchecked(result, p, q)
   local needDouble =
-    groupJacobianMixedAddUnchecked(result, p, q)
+    sameY
     & ~(moveP | moveQ)
+    & groupJacobianZeroFlag(result)
 
   groupCmov(result, p, moveP)
   groupCmov(result, q, moveQ)
