@@ -1546,7 +1546,7 @@ lib.group.groupJacobianToAffine = groupJacobianToAffine
 --
 -- Assumes q < 2p.
 local function groupJacobianToBytes(q)
-  local d = {}
+  local d = groupJacobianZero()
   groupJacobianToAffine(d, q)
 
   return "\x04" .. fieldToBytes(d[1]) .. fieldToBytes(d[2])
@@ -1666,13 +1666,13 @@ local function getChain(k)
   -- the precomputed points are {-31P, -29P, ..., 29P, 31P}.
   for i = 1, 384, 1 do
     if r[i] == 1 then
-      -- the maximum multiple (31) is 5 bits wide. but we want to check 1 extra
-      -- bit to make it extra efficient (see the comment below).
+      -- the maximum multiple factor (31) is 5 bits wide. but we want to check
+      -- 1 extra bit to make it extra efficient (see the comment below).
       for b = 1, 5, 1 do
         if i + b > 384 then
           break
         elseif r[i + b] == 1 then
-          -- try to "glue" this bit to the window index.
+          -- try to "glue" this bit to the factor.
           --
           -- e.g., if bit i + 1 is set, we'll be adding (as r[i] == 1) P to the
           -- accumulator, then double and add P once more. but we already have
@@ -1696,19 +1696,19 @@ local function getChain(k)
           -- happen when we're looking at the 5th bit from i, which considers
           -- 32P.
           local bit = r[i + b] << b
-          local windowIdx = r[i] + bit
+          local factor = r[i] + bit
 
-          if windowIdx <= 31 then
-            r[i] = windowIdx
+          if factor <= 31 then
+            r[i] = factor
             r[i + b] = 0
           else
-            windowIdx = r[i] - bit
+            factor = r[i] - bit
 
-            if windowIdx < -31 then
+            if factor < -31 then
               break
             end
 
-            r[i] = windowIdx
+            r[i] = factor
 
             for j = i + b, 385, 1 do
               if r[j] == 0 then
@@ -1729,8 +1729,6 @@ local function getChain(k)
 end
 
 -- Prepares an array of {P, 3P, 5P, ..., 31P}.
---
--- Assumes P.Z is 1. Every returned point has Z equal to 1 (or 0).
 local function groupDoScalarMultPrecomputation(p)
   local result = {p}
 
@@ -1739,8 +1737,7 @@ local function groupDoScalarMultPrecomputation(p)
 
   for i = 2, 16, 1 do
     result[i] = groupJacobianZero()
-    groupJacobianMixedAdd(result[i], pt2, result[i - 1])
-    groupJacobianToAffine(result[i], result[i])
+    groupJacobianAdd(result[i], pt2, result[i - 1])
   end
 
   return result
@@ -1764,6 +1761,10 @@ local g = {
 }
 
 local gWindow = groupDoScalarMultPrecomputation(g)
+
+for i, p in ipairs(gWindow) do
+  groupJacobianToAffine(p, p)
+end
 
 -- Given p, an EC point in Jacobian coordinates, and u, v, two 384-bit scalars,
 -- represented as arrays of 13 30-bit words, little-endian,
@@ -1791,9 +1792,9 @@ local function groupJacobianDoubleBaseScalarMulAdd(d, p, u, v)
     end
 
     if pChain[i] > 0 then
-      groupJacobianMixedAdd(d, d, pWindow[1 + (pChain[i] >> 1)])
+      groupJacobianAdd(d, d, pWindow[1 + (pChain[i] >> 1)])
     elseif pChain[i] < 0 then
-      groupJacobianMixedSub(d, d, pWindow[1 + (-pChain[i] >> 1)])
+      groupJacobianSub(d, d, pWindow[1 + (-pChain[i] >> 1)])
     end
   end
 end
