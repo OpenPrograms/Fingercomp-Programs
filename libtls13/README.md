@@ -14,6 +14,8 @@ Additionally:
 
   - AES ciphers (+ GCM)
 
+  - ChaCha20 (stream cipher) and Poly1305 (MAC)
+
   - SHA2 family of hash functions
 
   - Curve25519: X25519 and Ed25519 (port of libsodium / ref10)
@@ -43,6 +45,7 @@ Crypto:
 
   - `TLS_AES_128_GCM_SHA256`
   - `TLS_AES_256_GCM_SHA384`
+  - `TLS_CHACHA20_POLY1305_SHA256`
 
 - Signature algorithms:
 

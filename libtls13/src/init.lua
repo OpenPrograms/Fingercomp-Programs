@@ -3,6 +3,7 @@
 local lib = {}
 
 local aes = require("tls13.crypto.cipher.aes")
+local chacha20poly1305 = require("tls13.crypto.cipher.chacha20-poly1305")
 local gcm = require("tls13.crypto.cipher.mode.gcm")
 local group = require("tls13.group")
 local handshake = require("tls13.handshake")
@@ -91,6 +92,13 @@ lib.profiles.default = {}
 
 function lib.profiles.default.cipherSuites()
   return {
+    lib.makeCipherSuite {
+      code = 0x1303,
+      name = "TLS_CHACHA20_POLY1305_SHA256",
+      hash = sha2.sha256,
+      aead = chacha20poly1305.chacha20Poly1305,
+    },
+
     lib.makeCipherSuite {
       code = 0x1301,
       name = "TLS_AES_128_GCM_SHA256",
