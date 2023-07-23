@@ -94,12 +94,10 @@ function lib.chacha20:encrypt(plaintext, key, nonce, counter)
 
   local result = {}
   local i8x8 = "<" .. ("I8"):rep(8)
-  local blockCount = util.idivCeil(#plaintext, 64)
   local state = makeChacha20State(key, counter, nonce)
 
-  for i = 1, blockCount, 1 do
-    local start = i - 1 << 6
-    local block = plaintext:sub(start + 1, start + 64)
+  for i = 1, #plaintext, 64 do
+    local block = plaintext:sub(i, i + 63)
     local paddedBlock = block
 
     if #block < 64 then
@@ -107,7 +105,7 @@ function lib.chacha20:encrypt(plaintext, key, nonce, counter)
     end
 
     local b1, b2, b3, b4, b5, b6, b7, b8 = i8x8:unpack(paddedBlock)
-    state[13] = counter + i - 1
+    state[13] = counter + (i >> 6)
     local k1, k2, k3, k4, k5, k6, k7, k8 = chacha20Block(state)
 
     local encryptedBlock = i8x8:pack(
@@ -128,12 +126,6 @@ function lib.chacha20:encrypt(plaintext, key, nonce, counter)
 end
 
 lib.chacha20.decrypt = lib.chacha20.encrypt
-
-local function clampKey(hi, lo)
-  return
-    hi & 0x0ffffffc0ffffffc,
-    lo & 0x0ffffffc0fffffff
-end
 
 local function poly1305Mac(self, message, key)
   assert(#key == self.KEY_SIZE)
