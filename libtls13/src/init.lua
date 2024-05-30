@@ -136,6 +136,7 @@ function lib.profiles.default.signatureAlgorithms()
       name = "ed25519",
       decodePublicKey = ed25519.decodePublicKey,
       verify = ed25519.verify,
+      sign = ed25519.sign,
     },
 
     lib.makeSignatureAlgorithm {

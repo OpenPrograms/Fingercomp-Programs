@@ -5,7 +5,7 @@ local curve25519 = require("tls13.crypto.curve25519")
 local lib = {}
 
 function lib.makeX25519(rng)
-  local keyGen = curve25519.makeKeyGen(rng)
+  local keyGen = curve25519.makeX25519KeyGen(rng)
 
   return {
     decodePublicKey = function(self, keyExchange)

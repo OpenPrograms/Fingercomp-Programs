@@ -41,8 +41,16 @@
 local util = require("tls13.util")
 
 local sha2 = require("tls13.crypto.hash.sha2")
+local constants = require("tls13.crypto.curve25519.constants")
 
 local lib = {}
+
+local l = constants.l
+local fieldSqrtm1 = constants.fieldSqrtm1
+local ed25519d = constants.ed25519d
+local ed25519d2 = constants.ed25519d2
+local basePrecomp = constants.basePrecomp
+local constBi = constants.constBi
 
 --------------------------------------------------------------------------------
 -- Computation in GF(2²⁵⁵ - 19), a prime field.
@@ -53,147 +61,6 @@ local function fieldCopy(h, f)
   table.move(f, 1, 10, 1, h)
 end
 
--- The order of the elliptic curve group (little-endian).
-local l = util.fromHex(
-  "edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010"
-)
-
--- File: src/libsodium/crypto_core/ed25519/ref10/fe_25_5/constants.h.
-
--- The square root of -1 in GF(2²⁵⁵ - 19).
-local fieldSqrtm1 = {
-  -32595792, -7943725, 9377950, 3500415, 12389472,
-  -272473, -25146209, -2005654, 326686, 11406482,
-}
-
--- d, a parameter of the twisted Edwards curve edwards25519.
-local ed25519d = {
-  -10913610, 13857413, -15372611, 6949391, 114729,
-  -8787816, -6275908, -3247719, -18696448, -12055116,
-}
-
--- 2 * d, where d is a parameter of the twisted Edwards curve edwards25519.
-local ed25519d2 = {
-  -21827239, -5839606, -30745221, 13898782, 229458,
-  15978800, -12551817, -6495438, 29715968, 9444199,
-}
-
--- File: src/libsodlium/crypto_core/ed25519/ref10/fe_25_5/base2.h.
-
-local constBi = {
-  {
-    ypx = {
-      25967493, -14356035, 29566456, 3660896, -12694345,
-      4014787, 27544626, -11754271, -6079156, 2047605,
-    },
-    ymx = {
-      -12545711, 934262, -2722910, 3049990, -727428,
-      9406986, 12720692, 5043384, 19500929, -15469378,
-    },
-    xy2d = {
-      -8738181, 4489570, 9688441, -14785194, 10184609,
-      -12363380, 29287919, 11864899, -24514362, -4438546,
-    }
-  },
-  {
-    ypx = {
-      15636291, -9688557, 24204773, -7912398, 616977,
-      -16685262, 27787600, -14772189, 28944400, -1550024,
-    },
-    ymx = {
-      16568933, 4717097, -11556148, -1102322, 15682896,
-      -11807043, 16354577, -11775962, 7689662, 11199574,
-    },
-    xy2d = {
-      30464156, -5976125, -11779434, -15670865, 23220365,
-      15915852, 7512774, 10017326, -17749093, -9920357,
-    }
-  },
-  {
-    ypx = {
-      10861363, 11473154, 27284546, 1981175, -30064349,
-      12577861, 32867885, 14515107, -15438304, 10819380,
-    },
-    ymx = {
-      4708026, 6336745, 20377586, 9066809, -11272109,
-      6594696, -25653668, 12483688, -12668491, 5581306,
-    },
-    xy2d = {
-      19563160, 16186464, -29386857, 4097519, 10237984,
-      -4348115, 28542350, 13850243, -23678021, -15815942,
-    }
-  },
-  {
-    ypx = {
-      5153746, 9909285, 1723747, -2777874, 30523605,
-      5516873, 19480852, 5230134, -23952439, -15175766,
-    },
-    ymx = {
-      -30269007, -3463509, 7665486, 10083793, 28475525,
-      1649722, 20654025, 16520125, 30598449, 7715701,
-    },
-    xy2d = {
-      28881845, 14381568, 9657904, 3680757, -20181635,
-      7843316, -31400660, 1370708, 29794553, -1409300,
-    }
-  },
-  {
-    ypx = {
-      -22518993, -6692182, 14201702, -8745502, -23510406,
-      8844726, 18474211, -1361450, -13062696, 13821877,
-    },
-    ymx = {
-      -6455177, -7839871, 3374702, -4740862, -27098617,
-      -10571707, 31655028, -7212327, 18853322, -14220951,
-    },
-    xy2d = {
-      4566830, -12963868, -28974889, -12240689, -7602672,
-      -2830569, -8514358, -10431137, 2207753, -3209784,
-    }
-  },
-  {
-    ypx = {
-      -25154831, -4185821, 29681144, 7868801, -6854661,
-      -9423865, -12437364, -663000, -31111463, -16132436,
-    },
-    ymx = {
-      25576264, -2703214, 7349804, -11814844, 16472782,
-      9300885, 3844789, 15725684, 171356, 6466918,
-    },
-    xy2d = {
-      23103977, 13316479, 9739013, -16149481, 817875,
-      -15038942, 8965339, -14088058, -30714912, 16193877,
-    }
-  },
-  {
-    ypx = {
-      -33521811, 3180713, -2394130, 14003687, -16903474,
-      -16270840, 17238398, 4729455, -18074513, 9256800,
-    },
-    ymx = {
-      -25182317, -4174131, 32336398, 5036987, -21236817,
-      11360617, 22616405, 9761698, -19827198, 630305,
-    },
-    xy2d = {
-      -13720693, 2639453, -24237460, -7406481, 9494427,
-      -5774029, -6554551, -15960994, -2449256, -14291300,
-    }
-  },
-  {
-    ypx = {
-      -3151181, -5046075, 9282714, 6866145, -31907062,
-      -863023, -18940575, 15033784, 25105118, -7894876,
-    },
-    ymx = {
-      -24326370, 15950226, -31801215, -14592823, -11662737,
-      -5090925, 1573892, -2625887, 2198790, -15804619,
-    },
-    xy2d = {
-      -3099351, 10324967, -2241613, 7453183, -5446979,
-      -2735503, -13812022, -16236442, -32461234, -12290683,
-    }
-  }
-}
 
 -- File: src/libsodium/include/sodium/private/ed25519_ref10_fe25_5.h.
 
@@ -352,7 +219,7 @@ local function fieldCswap(f, g, b)
   g[10] = g10 ~ x10
 end
 
-local fieldReduce, fieldFromBytes
+local fieldReduce, fieldFromBytes, fieldToBytes
 
 -- Returns `true` if `f` is congruent to zero.
 local function fieldIsZero(f)
@@ -1272,6 +1139,16 @@ local function groupCachedZero(h)
   return h
 end
 
+local function groupPrecompZero(h)
+  h = h or {}
+
+  h.ypx = field1()
+  h.ymx = field1()
+  h.xy2d = field0()
+
+  return h
+end
+
 -- Given a EC point p, expressed in extended coordinates, produces cached
 -- values (ypx = y + x, ymx = y - x, t2d = t * 2d) in projective coordinates.
 local function groupExtendedToCached(p)
@@ -1329,6 +1206,23 @@ local function groupProjDouble(r, p)
   fieldSub(r[3], r[3], r[1])
   fieldSub(r[1], t1, r[2])
   fieldSub(r[4], r[4], r[3])
+end
+
+-- Converts h to a 32-byte string.
+--
+-- h is an EC point in extended coordinates.
+local function groupExtendedToBytes(h)
+  local recip = field0()
+  local x = field0()
+  local y = field0()
+
+  fieldInvert(recip, h[3])
+  fieldMul(x, h[1], recip)
+  fieldMul(y, h[2], recip)
+  local s = fieldToBytes(y)
+  fieldReduce(x, x)
+
+  return s:sub(1, 31) .. string.char(s:byte(32) | (x[1] & 1) << 7)
 end
 
 -- Sets r to 2 * p.
@@ -1530,6 +1424,89 @@ local function groupDoubleScalarMul(r, a, pa, b)
   end
 end
 
+local function groupCmov(t, u, b)
+  fieldCmov(t.ypx, u.ypx, b)
+  fieldCmov(t.ymx, u.ymx, b)
+  fieldCmov(t.xy2d, u.xy2d, b)
+end
+
+local function groupCmov8(t, precomp, b)
+  local bnegative = b >> 63
+  local babs = b - ((-bnegative & b) << 1)
+
+  groupPrecompZero(t)
+  -- (a ~ b) - 1 >> 63 ≡ a == b and 1 or 0 except constant-time
+  groupCmov(t, precomp[1], (babs ~ 1) - 1 >> 63)
+  groupCmov(t, precomp[2], (babs ~ 2) - 1 >> 63)
+  groupCmov(t, precomp[3], (babs ~ 3) - 1 >> 63)
+  groupCmov(t, precomp[4], (babs ~ 4) - 1 >> 63)
+  groupCmov(t, precomp[5], (babs ~ 5) - 1 >> 63)
+  groupCmov(t, precomp[6], (babs ~ 6) - 1 >> 63)
+  groupCmov(t, precomp[7], (babs ~ 7) - 1 >> 63)
+  groupCmov(t, precomp[8], (babs ~ 8) - 1 >> 63)
+
+  local minust = groupPrecompZero()
+  fieldCopy(minust.ypx, t.ymx)
+  fieldCopy(minust.ymx, t.ypx)
+  fieldNeg(minust.xy2d, t.xy2d)
+  groupCmov(t, minust, bnegative)
+end
+
+local function groupCmov8Base(t, pos, b)
+  return groupCmov8(t, basePrecomp[pos], b)
+end
+
+-- Sets h to a * B.
+--
+-- a is a scalar, represented as a 32-byte string.
+-- h is expressed in extended coordinates.
+local function groupScalarMulBase(h, a)
+  local e = {}
+
+  for i = 1, 32, 1 do
+    e[(i << 1) - 1] = a:byte(i) & 0xf
+    e[(i << 1) - 0] = a:byte(i) >> 4 & 0xf
+  end
+
+  local carry = 0
+
+  for i = 1, 63, 1 do
+    local ei = e[i] + carry
+    carry = ei + 8 >> 4
+    carry = carry | -(carry & 1 << 63 >> 4)
+    ei = ei - (carry << 4)
+    e[i] = ei
+  end
+
+  e[64] = e[64] + carry
+
+  groupExtendedZero(h)
+  local r = groupProj2Zero()
+  local t = {}
+
+  for i = 2, 64, 2 do
+    groupCmov8Base(t, i + 1 >> 1, e[i])
+    groupAddPrecomp(r, h, t)
+    groupProj2ToExtended(h, r)
+  end
+
+  local s = groupProjZero()
+  groupExtendedDouble(r, h)
+  groupProj2ToProj(s, r)
+  groupProjDouble(r, s)
+  groupProj2ToProj(s, r)
+  groupProjDouble(r, s)
+  groupProj2ToProj(s, r)
+  groupProjDouble(r, s)
+  groupProj2ToExtended(h, r)
+
+  for i = 1, 64, 2 do
+    groupCmov8Base(t, i + 1 >> 1, e[i])
+    groupAddPrecomp(r, h, t)
+    groupProj2ToExtended(h, r)
+  end
+end
+
 -- Returns `true` iff s, as a 32-byte integer, is less than p.
 local function groupIsCanonical(s)
   assert(#s == 32)
@@ -1661,6 +1638,541 @@ local function groupHasSmallOrder(p)
   ret = ret | (fieldIsZero(c) and 1 or 0)
 
   return ret ~= 0
+end
+
+-- Given
+--   a, a 32-byte little-endian integer,
+--   b, a 32-byte little-endian integer,
+--   c, a 32-byte little-endian integer,
+-- computes (a × b + c) mod L and encodes it as a 32-byte little endian string.
+local function scalarMulAdd(a, b, c)
+  local a1 = 0x1fffff & ("<I3"):unpack(a, 1)
+  local a2 = 0x1fffff & ("<I4"):unpack(a, 3) >> 5
+  local a3 = 0x1fffff & ("<I3"):unpack(a, 6) >> 2
+  local a4 = 0x1fffff & ("<I4"):unpack(a, 8) >> 7
+  local a5 = 0x1fffff & ("<I4"):unpack(a, 11) >> 4
+  local a6 = 0x1fffff & ("<I3"):unpack(a, 14) >> 1
+  local a7 = 0x1fffff & ("<I4"):unpack(a, 16) >> 6
+  local a8 = 0x1fffff & ("<I3"):unpack(a, 19) >> 3
+  local a9 = 0x1fffff & ("<I3"):unpack(a, 22)
+  local a10 = 0x1fffff & ("<I4"):unpack(a, 24) >> 5
+  local a11 = 0x1fffff & ("<I3"):unpack(a, 27) >> 2
+  local a12 = ("<I4"):unpack(a, 29) >> 7
+
+  local b1 = 0x1fffff & ("<I3"):unpack(b, 1)
+  local b2 = 0x1fffff & ("<I4"):unpack(b, 3) >> 5
+  local b3 = 0x1fffff & ("<I3"):unpack(b, 6) >> 2
+  local b4 = 0x1fffff & ("<I4"):unpack(b, 8) >> 7
+  local b5 = 0x1fffff & ("<I4"):unpack(b, 11) >> 4
+  local b6 = 0x1fffff & ("<I3"):unpack(b, 14) >> 1
+  local b7 = 0x1fffff & ("<I4"):unpack(b, 16) >> 6
+  local b8 = 0x1fffff & ("<I3"):unpack(b, 19) >> 3
+  local b9 = 0x1fffff & ("<I3"):unpack(b, 22)
+  local b10 = 0x1fffff & ("<I4"):unpack(b, 24) >> 5
+  local b11 = 0x1fffff & ("<I3"):unpack(b, 27) >> 2
+  local b12 = ("<I4"):unpack(b, 29) >> 7
+
+  local c1 = 0x1fffff & ("<I3"):unpack(c, 1)
+  local c2 = 0x1fffff & ("<I4"):unpack(c, 3) >> 5
+  local c3 = 0x1fffff & ("<I3"):unpack(c, 6) >> 2
+  local c4 = 0x1fffff & ("<I4"):unpack(c, 8) >> 7
+  local c5 = 0x1fffff & ("<I4"):unpack(c, 11) >> 4
+  local c6 = 0x1fffff & ("<I3"):unpack(c, 14) >> 1
+  local c7 = 0x1fffff & ("<I4"):unpack(c, 16) >> 6
+  local c8 = 0x1fffff & ("<I3"):unpack(c, 19) >> 3
+  local c9 = 0x1fffff & ("<I3"):unpack(c, 22)
+  local c10 = 0x1fffff & ("<I4"):unpack(c, 24) >> 5
+  local c11 = 0x1fffff & ("<I3"):unpack(c, 27) >> 2
+  local c12 = ("<I4"):unpack(c, 29) >> 7
+
+  local s1 = c1 + a1 * b1
+  local s2 = c2 + a1 * b2 + a2 * b1
+  local s3 = c3 + a1 * b3 + a2 * b2 + a3 * b1
+  local s4 = c4 + a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1
+  local s5 = c5 + a1 * b5 + a2 * b4 + a3 * b3 + a4 * b2 + a5 * b1
+  local s6 = c6 + a1 * b6 + a2 * b5 + a3 * b4 + a4 * b3 + a5 * b2 + a6 * b1
+  local s7 = c7 + a1 * b7 + a2 * b6 + a3 * b5 + a4 * b4 + a5 * b3 + a6 * b2
+    + a7 * b1
+  local s8 = c8 + a1 * b8 + a2 * b7 + a3 * b6 + a4 * b5 + a5 * b4 + a6 * b3
+    + a7 * b2 + a8 * b1
+  local s9 = c9 + a1 * b9 + a2 * b8 + a3 * b7 + a4 * b6 + a5 * b5 + a6 * b4
+    + a7 * b3 + a8 * b2 + a9 * b1
+  local s10 = c10 + a1 * b10 + a2 * b9 + a3 * b8 + a4 * b7 + a5 * b6 + a6 * b5
+    + a7 * b4 + a8 * b3 + a9 * b2 + a10 * b1
+  local s11 = c11 + a1 * b11 + a2 * b10 + a3 * b9 + a4 * b8 + a5 * b7 + a6 * b6
+    + a7 * b5 + a8 * b4 + a9 * b3 + a10 * b2 + a11 * b1
+  local s12 = c12 + a1 * b12 + a2 * b11 + a3 * b10 + a4 * b9 + a5 * b8 + a6 * b7
+    + a7 * b6 + a8 * b5 + a9 * b4 + a10 * b3 + a11 * b2 + a12 * b1
+  local s13 = a2 * b12 + a3 * b11 + a4 * b10 + a5 * b9 + a6 * b8 + a7 * b7
+    + a8 * b6 + a9 * b5 + a10 * b4 + a11 * b3 + a12 * b2
+  local s14 = a3 * b12 + a4 * b11 + a5 * b10 + a6 * b9 + a7 * b8 + a8 * b7
+    + a9 * b6 + a10 * b5 + a11 * b4 + a12 * b3
+  local s15 = a4 * b12 + a5 * b11 + a6 * b10 + a7 * b9 + a8 * b8 + a9 * b7
+    + a10 * b6 + a11 * b5 + a12 * b4
+  local s16 = a5 * b12 + a6 * b11 + a7 * b10 + a8 * b9 + a9 * b8 + a10 * b7
+    + a11 * b6 + a12 * b5
+  local s17 = a6 * b12 + a7 * b11 + a8 * b10 + a9 * b9 + a10 * b8 + a11 * b7
+    + a12 * b6
+  local s18 = a7 * b12 + a8 * b11 + a9 * b10 + a10 * b9 + a11 * b8 + a12 * b7
+  local s19 = a8 * b12 + a9 * b11 + a10 * b10 + a11 * b9 + a12 * b8
+  local s20 = a9 * b12 + a10 * b11 + a11 * b10 + a12 * b9
+  local s21 = a10 * b12 + a11 * b11 + a12 * b10
+  local s22 = a11 * b12 + a12 * b11
+  local s23 = a12 * b12
+  local s24 = 0
+
+  local carry1 = s1 + (1 << 20) >> 21
+  carry1 = carry1 | -(carry1 & 1 << 63 >> 21)
+  s2 = s2 + carry1
+  s1 = s1 - (carry1 << 21)
+
+  local carry3 = s3 + (1 << 20) >> 21
+  carry3 = carry3 | -(carry3 & 1 << 63 >> 21)
+  s4 = s4 + carry3
+  s3 = s3 - (carry3 << 21)
+
+  local carry5 = s5 + (1 << 20) >> 21
+  carry5 = carry5 | -(carry5 & 1 << 63 >> 21)
+  s6 = s6 + carry5
+  s5 = s5 - (carry5 << 21)
+
+  local carry7 = s7 + (1 << 20) >> 21
+  carry7 = carry7 | -(carry7 & 1 << 63 >> 21)
+  s8 = s8 + carry7
+  s7 = s7 - (carry7 << 21)
+
+  local carry9 = s9 + (1 << 20) >> 21
+  carry9 = carry9 | -(carry9 & 1 << 63 >> 21)
+  s10 = s10 + carry9
+  s9 = s9 - (carry9 << 21)
+
+  local carry11 = s11 + (1 << 20) >> 21
+  carry11 = carry11 | -(carry11 & 1 << 63 >> 21)
+  s12 = s12 + carry11
+  s11 = s11 - (carry11 << 21)
+
+  local carry13 = s13 + (1 << 20) >> 21
+  carry13 = carry13 | -(carry13 & 1 << 63 >> 21)
+  s14 = s14 + carry13
+  s13 = s13 - (carry13 << 21)
+
+  local carry15 = s15 + (1 << 20) >> 21
+  carry15 = carry15 | -(carry15 & 1 << 63 >> 21)
+  s16 = s16 + carry15
+  s15 = s15 - (carry15 << 21)
+
+  local carry17 = s17 + (1 << 20) >> 21
+  carry17 = carry17 | -(carry17 & 1 << 63 >> 21)
+  s18 = s18 + carry17
+  s17 = s17 - (carry17 << 21)
+
+  local carry19 = s19 + (1 << 20) >> 21
+  carry19 = carry19 | -(carry19 & 1 << 63 >> 21)
+  s20 = s20 + carry19
+  s19 = s19 - (carry19 << 21)
+
+  local carry21 = s21 + (1 << 20) >> 21
+  carry21 = carry21 | -(carry21 & 1 << 63 >> 21)
+  s22 = s22 + carry21
+  s21 = s21 - (carry21 << 21)
+
+  local carry23 = s23 + (1 << 20) >> 21
+  carry23 = carry23 | -(carry23 & 1 << 63 >> 21)
+  s24 = s24 + carry23
+  s23 = s23 - (carry23 << 21)
+
+  local carry2 = s2 + (1 << 20) >> 21
+  carry2 = carry2 | -(carry2 & 1 << 63 >> 21)
+  s3 = s3 + carry2
+  s2 = s2 - (carry2 << 21)
+
+  local carry4 = s4 + (1 << 20) >> 21
+  carry4 = carry4 | -(carry4 & 1 << 63 >> 21)
+  s5 = s5 + carry4
+  s4 = s4 - (carry4 << 21)
+
+  local carry6 = s6 + (1 << 20) >> 21
+  carry6 = carry6 | -(carry6 & 1 << 63 >> 21)
+  s7 = s7 + carry6
+  s6 = s6 - (carry6 << 21)
+
+  local carry8 = s8 + (1 << 20) >> 21
+  carry8 = carry8 | -(carry8 & 1 << 63 >> 21)
+  s9 = s9 + carry8
+  s8 = s8 - (carry8 << 21)
+
+  local carry10 = s10 + (1 << 20) >> 21
+  carry10 = carry10 | -(carry10 & 1 << 63 >> 21)
+  s11 = s11 + carry10
+  s10 = s10 - (carry10 << 21)
+
+  local carry12 = s12 + (1 << 20) >> 21
+  carry12 = carry12 | -(carry12 & 1 << 63 >> 21)
+  s13 = s13 + carry12
+  s12 = s12 - (carry12 << 21)
+
+  local carry14 = s14 + (1 << 20) >> 21
+  carry14 = carry14 | -(carry14 & 1 << 63 >> 21)
+  s15 = s15 + carry14
+  s14 = s14 - (carry14 << 21)
+
+  local carry16 = s16 + (1 << 20) >> 21
+  carry16 = carry16 | -(carry16 & 1 << 63 >> 21)
+  s17 = s17 + carry16
+  s16 = s16 - (carry16 << 21)
+
+  local carry18 = s18 + (1 << 20) >> 21
+  carry18 = carry18 | -(carry18 & 1 << 63 >> 21)
+  s19 = s19 + carry18
+  s18 = s18 - (carry18 << 21)
+
+  local carry20 = s20 + (1 << 20) >> 21
+  carry20 = carry20 | -(carry20 & 1 << 63 >> 21)
+  s21 = s21 + carry20
+  s20 = s20 - (carry20 << 21)
+
+  local carry22 = s22 + (1 << 20) >> 21
+  carry22 = carry22 | -(carry22 & 1 << 63 >> 21)
+  s23 = s23 + carry22
+  s22 = s22 - (carry22 << 21)
+
+  s12 = s12 + s24 * 666643
+  s13 = s13 + s24 * 470296
+  s14 = s14 + s24 * 654183
+  s15 = s15 - s24 * 997805
+  s16 = s16 + s24 * 136657
+  s17 = s17 - s24 * 683901
+
+  s11 = s11 + s23 * 666643
+  s12 = s12 + s23 * 470296
+  s13 = s13 + s23 * 654183
+  s14 = s14 - s23 * 997805
+  s15 = s15 + s23 * 136657
+  s16 = s16 - s23 * 683901
+
+  s10 = s10 + s22 * 666643
+  s11 = s11 + s22 * 470296
+  s12 = s12 + s22 * 654183
+  s13 = s13 - s22 * 997805
+  s14 = s14 + s22 * 136657
+  s15 = s15 - s22 * 683901
+
+  s9 = s9 + s21 * 666643
+  s10 = s10 + s21 * 470296
+  s11 = s11 + s21 * 654183
+  s12 = s12 - s21 * 997805
+  s13 = s13 + s21 * 136657
+  s14 = s14 - s21 * 683901
+
+  s8 = s8 + s20 * 666643
+  s9 = s9 + s20 * 470296
+  s10 = s10 + s20 * 654183
+  s11 = s11 - s20 * 997805
+  s12 = s12 + s20 * 136657
+  s13 = s13 - s20 * 683901
+
+  s7 = s7 + s19 * 666643
+  s8 = s8 + s19 * 470296
+  s9 = s9 + s19 * 654183
+  s10 = s10 - s19 * 997805
+  s11 = s11 + s19 * 136657
+  s12 = s12 - s19 * 683901
+
+  local carry7 = s7 + (1 << 20) >> 21
+  carry7 = carry7 | -(carry7 & 1 << 63 >> 21)
+  s8 = s8 + carry7
+  s7 = s7 - (carry7 << 21)
+
+  local carry9 = s9 + (1 << 20) >> 21
+  carry9 = carry9 | -(carry9 & 1 << 63 >> 21)
+  s10 = s10 + carry9
+  s9 = s9 - (carry9 << 21)
+
+  local carry11 = s11 + (1 << 20) >> 21
+  carry11 = carry11 | -(carry11 & 1 << 63 >> 21)
+  s12 = s12 + carry11
+  s11 = s11 - (carry11 << 21)
+
+  local carry13 = s13 + (1 << 20) >> 21
+  carry13 = carry13 | -(carry13 & 1 << 63 >> 21)
+  s14 = s14 + carry13
+  s13 = s13 - (carry13 << 21)
+
+  local carry15 = s15 + (1 << 20) >> 21
+  carry15 = carry15 | -(carry15 & 1 << 63 >> 21)
+  s16 = s16 + carry15
+  s15 = s15 - (carry15 << 21)
+
+  local carry17 = s17 + (1 << 20) >> 21
+  carry17 = carry17 | -(carry17 & 1 << 63 >> 21)
+  s18 = s18 + carry17
+  s17 = s17 - (carry17 << 21)
+
+  local carry8 = s8 + (1 << 20) >> 21
+  carry8 = carry8 | -(carry8 & 1 << 63 >> 21)
+  s9 = s9 + carry8
+  s8 = s8 - (carry8 << 21)
+
+  local carry10 = s10 + (1 << 20) >> 21
+  carry10 = carry10 | -(carry10 & 1 << 63 >> 21)
+  s11 = s11 + carry10
+  s10 = s10 - (carry10 << 21)
+
+  local carry12 = s12 + (1 << 20) >> 21
+  carry12 = carry12 | -(carry12 & 1 << 63 >> 21)
+  s13 = s13 + carry12
+  s12 = s12 - (carry12 << 21)
+
+  local carry14 = s14 + (1 << 20) >> 21
+  carry14 = carry14 | -(carry14 & 1 << 63 >> 21)
+  s15 = s15 + carry14
+  s14 = s14 - (carry14 << 21)
+
+  local carry16 = s16 + (1 << 20) >> 21
+  carry16 = carry16 | -(carry16 & 1 << 63 >> 21)
+  s17 = s17 + carry16
+  s16 = s16 - (carry16 << 21)
+
+  s6 = s6 + s18 * 666643
+  s7 = s7 + s18 * 470296
+  s8 = s8 + s18 * 654183
+  s9 = s9 - s18 * 997805
+  s10 = s10 + s18 * 136657
+  s11 = s11 - s18 * 683901
+
+  s5 = s5 + s17 * 666643
+  s6 = s6 + s17 * 470296
+  s7 = s7 + s17 * 654183
+  s8 = s8 - s17 * 997805
+  s9 = s9 + s17 * 136657
+  s10 = s10 - s17 * 683901
+
+  s4 = s4 + s16 * 666643
+  s5 = s5 + s16 * 470296
+  s6 = s6 + s16 * 654183
+  s7 = s7 - s16 * 997805
+  s8 = s8 + s16 * 136657
+  s9 = s9 - s16 * 683901
+
+  s3 = s3 + s15 * 666643
+  s4 = s4 + s15 * 470296
+  s5 = s5 + s15 * 654183
+  s6 = s6 - s15 * 997805
+  s7 = s7 + s15 * 136657
+  s8 = s8 - s15 * 683901
+
+  s2 = s2 + s14 * 666643
+  s3 = s3 + s14 * 470296
+  s4 = s4 + s14 * 654183
+  s5 = s5 - s14 * 997805
+  s6 = s6 + s14 * 136657
+  s7 = s7 - s14 * 683901
+
+  s1 = s1 + s13 * 666643
+  s2 = s2 + s13 * 470296
+  s3 = s3 + s13 * 654183
+  s4 = s4 - s13 * 997805
+  s5 = s5 + s13 * 136657
+  s6 = s6 - s13 * 683901
+
+  s13 = 0
+
+  local carry1 = s1 + (1 << 20) >> 21
+  carry1 = carry1 | -(carry1 & 1 << 63 >> 21)
+  s2 = s2 + carry1
+  s1 = s1 - (carry1 << 21)
+
+  local carry3 = s3 + (1 << 20) >> 21
+  carry3 = carry3 | -(carry3 & 1 << 63 >> 21)
+  s4 = s4 + carry3
+  s3 = s3 - (carry3 << 21)
+
+  local carry5 = s5 + (1 << 20) >> 21
+  carry5 = carry5 | -(carry5 & 1 << 63 >> 21)
+  s6 = s6 + carry5
+  s5 = s5 - (carry5 << 21)
+
+  local carry7 = s7 + (1 << 20) >> 21
+  carry7 = carry7 | -(carry7 & 1 << 63 >> 21)
+  s8 = s8 + carry7
+  s7 = s7 - (carry7 << 21)
+
+  local carry9 = s9 + (1 << 20) >> 21
+  carry9 = carry9 | -(carry9 & 1 << 63 >> 21)
+  s10 = s10 + carry9
+  s9 = s9 - (carry9 << 21)
+
+  local carry11 = s11 + (1 << 20) >> 21
+  carry11 = carry11 | -(carry11 & 1 << 63 >> 21)
+  s12 = s12 + carry11
+  s11 = s11 - (carry11 << 21)
+
+  local carry2 = s2 + (1 << 20) >> 21
+  carry2 = carry2 | -(carry2 & 1 << 63 >> 21)
+  s3 = s3 + carry2
+  s2 = s2 - (carry2 << 21)
+
+  local carry4 = s4 + (1 << 20) >> 21
+  carry4 = carry4 | -(carry4 & 1 << 63 >> 21)
+  s5 = s5 + carry4
+  s4 = s4 - (carry4 << 21)
+
+  local carry6 = s6 + (1 << 20) >> 21
+  carry6 = carry6 | -(carry6 & 1 << 63 >> 21)
+  s7 = s7 + carry6
+  s6 = s6 - (carry6 << 21)
+
+  local carry8 = s8 + (1 << 20) >> 21
+  carry8 = carry8 | -(carry8 & 1 << 63 >> 21)
+  s9 = s9 + carry8
+  s8 = s8 - (carry8 << 21)
+
+  local carry10 = s10 + (1 << 20) >> 21
+  carry10 = carry10 | -(carry10 & 1 << 63 >> 21)
+  s11 = s11 + carry10
+  s10 = s10 - (carry10 << 21)
+
+  local carry12 = s12 + (1 << 20) >> 21
+  carry12 = carry12 | -(carry12 & 1 << 63 >> 21)
+  s13 = s13 + carry12
+  s12 = s12 - (carry12 << 21)
+
+  s1 = s1 + s13 * 666643
+  s2 = s2 + s13 * 470296
+  s3 = s3 + s13 * 654183
+  s4 = s4 - s13 * 997805
+  s5 = s5 + s13 * 136657
+  s6 = s6 - s13 * 683901
+  s13 = 0
+
+  local carry1 = s1 >> 21
+  carry1 = carry1 | -(carry1 & 1 << 63 >> 21)
+  s2 = s2 + carry1
+  s1 = s1 - (carry1 << 21)
+
+  local carry2 = s2 >> 21
+  carry2 = carry2 | -(carry2 & 1 << 63 >> 21)
+  s3 = s3 + carry2
+  s2 = s2 - (carry2 << 21)
+
+  local carry3 = s3 >> 21
+  carry3 = carry3 | -(carry3 & 1 << 63 >> 21)
+  s4 = s4 + carry3
+  s3 = s3 - (carry3 << 21)
+
+  local carry4 = s4 >> 21
+  carry4 = carry4 | -(carry4 & 1 << 63 >> 21)
+  s5 = s5 + carry4
+  s4 = s4 - (carry4 << 21)
+
+  local carry5 = s5 >> 21
+  carry5 = carry5 | -(carry5 & 1 << 63 >> 21)
+  s6 = s6 + carry5
+  s5 = s5 - (carry5 << 21)
+
+  local carry6 = s6 >> 21
+  carry6 = carry6 | -(carry6 & 1 << 63 >> 21)
+  s7 = s7 + carry6
+  s6 = s6 - (carry6 << 21)
+
+  local carry7 = s7 >> 21
+  carry7 = carry7 | -(carry7 & 1 << 63 >> 21)
+  s8 = s8 + carry7
+  s7 = s7 - (carry7 << 21)
+
+  local carry8 = s8 >> 21
+  carry8 = carry8 | -(carry8 & 1 << 63 >> 21)
+  s9 = s9 + carry8
+  s8 = s8 - (carry8 << 21)
+
+  local carry9 = s9 >> 21
+  carry9 = carry9 | -(carry9 & 1 << 63 >> 21)
+  s10 = s10 + carry9
+  s9 = s9 - (carry9 << 21)
+
+  local carry10 = s10 >> 21
+  carry10 = carry10 | -(carry10 & 1 << 63 >> 21)
+  s11 = s11 + carry10
+  s10 = s10 - (carry10 << 21)
+
+  local carry11 = s11 >> 21
+  carry11 = carry11 | -(carry11 & 1 << 63 >> 21)
+  s12 = s12 + carry11
+  s11 = s11 - (carry11 << 21)
+
+  local carry12 = s12 >> 21
+  carry12 = carry12 | -(carry12 & 1 << 63 >> 21)
+  s13 = s13 + carry12
+  s12 = s12 - (carry12 << 21)
+
+  s1 = s1 + s13 * 666643
+  s2 = s2 + s13 * 470296
+  s3 = s3 + s13 * 654183
+  s4 = s4 - s13 * 997805
+  s5 = s5 + s13 * 136657
+  s6 = s6 - s13 * 683901
+
+  local carry1 = s1 >> 21
+  carry1 = carry1 | -(carry1 & 1 << 63 >> 21)
+  s2 = s2 + carry1
+  s1 = s1 - (carry1 << 21)
+
+  local carry2 = s2 >> 21
+  carry2 = carry2 | -(carry2 & 1 << 63 >> 21)
+  s3 = s3 + carry2
+  s2 = s2 - (carry2 << 21)
+
+  local carry3 = s3 >> 21
+  carry3 = carry3 | -(carry3 & 1 << 63 >> 21)
+  s4 = s4 + carry3
+  s3 = s3 - (carry3 << 21)
+
+  local carry4 = s4 >> 21
+  carry4 = carry4 | -(carry4 & 1 << 63 >> 21)
+  s5 = s5 + carry4
+  s4 = s4 - (carry4 << 21)
+
+  local carry5 = s5 >> 21
+  carry5 = carry5 | -(carry5 & 1 << 63 >> 21)
+  s6 = s6 + carry5
+  s5 = s5 - (carry5 << 21)
+
+  local carry6 = s6 >> 21
+  carry6 = carry6 | -(carry6 & 1 << 63 >> 21)
+  s7 = s7 + carry6
+  s6 = s6 - (carry6 << 21)
+
+  local carry7 = s7 >> 21
+  carry7 = carry7 | -(carry7 & 1 << 63 >> 21)
+  s8 = s8 + carry7
+  s7 = s7 - (carry7 << 21)
+
+  local carry8 = s8 >> 21
+  carry8 = carry8 | -(carry8 & 1 << 63 >> 21)
+  s9 = s9 + carry8
+  s8 = s8 - (carry8 << 21)
+
+  local carry9 = s9 >> 21
+  carry9 = carry9 | -(carry9 & 1 << 63 >> 21)
+  s10 = s10 + carry9
+  s9 = s9 - (carry9 << 21)
+
+  local carry10 = s10 >> 21
+  carry10 = carry10 | -(carry10 & 1 << 63 >> 21)
+  s11 = s11 + carry10
+  s10 = s10 - (carry10 << 21)
+
+  local carry11 = s11 >> 21
+  carry11 = carry11 | -(carry11 & 1 << 63 >> 21)
+  s12 = s12 + carry11
+  s11 = s11 - (carry11 << 21)
+
+  return ("<I8I8I8I8"):pack(
+    s1 | s2 << 21 | s3 << 42 | s4 << 63,
+    s4 >> 1 | s5 << 20 | s6 << 41 | s7 << 62,
+    s7 >> 2 | s8 << 19 | s9 << 40 | s10 << 61,
+    s10 >> 3 | s11 << 18 | s12 << 39
+  )
 end
 
 local function scalarIsCanonical(s)
@@ -2201,7 +2713,8 @@ function fieldReduce(h, f)
 end
 
 -- Converts h to a 32-byte string.
-local function fieldToBytes(h)
+-- (local defined earlier.)
+function fieldToBytes(h)
   local t = {}
   fieldReduce(t, h)
 
@@ -2286,16 +2799,16 @@ lib.x25519 = x25519
 local nine = "\9" .. ("\0"):rep(31)
 lib.nine = nine
 
-function lib.publicKeyFromPrivate(privKey)
+function lib.x25519PublicKeyFromPrivate(privKey)
   assert(#privKey == 32)
 
   return x25519(privKey, nine)
 end
 
-function lib.makeKeyGen(rng)
+function lib.makeX25519KeyGen(rng)
   local function generateKeyPair()
     local privKey = rng(32)
-    local pubKey = lib.publicKeyFromPrivate(privKey)
+    local pubKey = lib.x25519PublicKeyFromPrivate(privKey)
 
     return {
       public = pubKey,
@@ -2325,6 +2838,70 @@ end
 --------------------------------------------------------------------------------
 -- Ed25519
 --------------------------------------------------------------------------------
+
+local function clampPrivKeyHash(hash)
+  return
+    string.char(hash:byte(1) & 0xf8)
+      .. hash:sub(2, 31)
+      .. string.char(hash:byte(32) & 0x7f | 0x40)
+end
+
+local function getEd25519PubKeyFromS(s)
+  local pa = groupExtendedZero()
+  groupScalarMulBase(pa, s)
+
+  return groupExtendedToBytes(pa)
+end
+
+function lib.ed25519PublicKeyFromPrivate(privKey)
+  assert(#privKey == 32)
+  local s = clampPrivKeyHash(sha2.sha512():update(privKey):finish())
+
+  return getEd25519PubKeyFromS(s)
+end
+
+function lib.makeEd25519KeyGen(rng)
+  local function generateKeyPair()
+    local privKey = rng(32)
+    local pubKey = lib.ed25519PublicKeyFromPrivate(privKey)
+
+    return {
+      public = pubKey,
+      private = privKey,
+    }
+  end
+
+  return generateKeyPair
+end
+
+-- File: src/libsodium/crypto_sign/ed25519/ref10/sign.c
+
+function lib.signEd25519(privKey, message)
+  assert(#privKey == 32)
+
+  local h = sha2.sha512():update(privKey):finish()
+  local s = clampPrivKeyHash(h:sub(1, 32))
+  local prefix = h:sub(33)
+  local pubKey = getEd25519PubKeyFromS(s)
+
+  local nonce = sha2.sha512()
+    :update(prefix)
+    :update(message)
+    :finish()
+  local nonce = scalarReduce(nonce)
+  local pr = groupExtendedZero()
+  groupScalarMulBase(pr, nonce)
+  local r = groupExtendedToBytes(pr)
+
+  local k = sha2.sha512()
+    :update(r)
+    :update(pubKey)
+    :update(message)
+    :finish()
+  local k = scalarReduce(k)
+
+  return r .. scalarMulAdd(k, s, nonce)
+end
 
 -- File: src/libsodium/crypto_sign/ed25519/ref10/open.c.
 

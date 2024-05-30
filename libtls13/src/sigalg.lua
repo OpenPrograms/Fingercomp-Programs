@@ -206,6 +206,10 @@ function lib.makeEd25519SigAlg()
     verify = function(self, publicKey, signedMessage, signature)
       return curve25519.verifyEd25519(publicKey, signedMessage, signature)
     end,
+
+    sign = function(self, privateKey, message)
+      return curve25519.signEd25519(privateKey, message)
+    end,
   }
 end
 
@@ -298,6 +302,9 @@ function lib.makeEcdsaSecp384r1SigAlg()
 
       return success and true or false
     end,
+
+    -- not implemented
+    sign = nil,
   }
 end
 
