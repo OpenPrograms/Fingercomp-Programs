@@ -65,3 +65,11 @@ Programs I have no interest in maintaining.
   * IRC-like OpenPeripheral glasses chat.
 * `smap`
   * A *s*imple *M*inecraft *a*udio *p*layer.
+
+## License
+This repository's files, unless subject to the exceptions below, are licensed under the [Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0.txt).
+The exceptions are as follows:
+- The software listed above as repackaged.
+- Files bearing copyright notices.
+  - Such files are provided under the terms of the license specified therein.
+- Files in a directory containing a `LICENSE` file, or a subdirectory thereof.
