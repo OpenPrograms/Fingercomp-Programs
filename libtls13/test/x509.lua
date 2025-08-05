@@ -53,6 +53,40 @@ context("X.509 certificate parser tests #x509", function()
     end
   end)
 
+  test("RSASSA-PSS signature certificate", function()
+    local oid = require("tls13.asn.oid")
+
+    local cert = loadPemFile("test/data/rsassa-pss.pem")[1][2]
+    local decode = spy.new(asn.decode)
+    local certAsn = decode(cert)
+    assert.spy(decode).returned.with(match.is.table())
+
+    local parse = spy.new(x509.parseCertificateFromAsn)
+    local result = parse(certAsn)
+
+    assert:set_parameter("TableFormatLevel", -1)
+    assert.is_not.nil_(result.tbsCertificate)
+    assert.is_not.nil_(result.tbsCertificate.signature)
+    assert.same({
+      algorithm = oid.pkcs1.rsassaPss,
+      parameters = {
+        hashAlgorithm = {
+          algorithm = oid.hashalgs.sha512,
+          parameters = false,
+        },
+        maskGenAlgorithm = {
+          algorithm = oid.pkcs1.mgf1,
+          parameters = {
+            algorithm = oid.hashalgs.sha512,
+            parameters = false,
+          },
+        },
+        saltLength = 64,
+        trailerField = 1,
+      },
+    }, result.tbsCertificate.signature)
+  end)
+
   test("Let's Encrypt certificate", function()
     local bitstring = require("tls13.asn.bitstring")
     local oid = require("tls13.asn.oid")

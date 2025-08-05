@@ -106,6 +106,9 @@ end
 
 lib.recognizedSignatureAlgorithms[oid.pkcs1.rsassaPss] =
   lib.makeSigAlg("RSASSA-PSS", function(parser, value, hasSignatureValue)
+    -- RFC4056, §2.2: “When the id-RSASSA-PSS algorithm identifier is used for a
+    -- signature, the AlgorithmIdentifier parameters field MUST contain
+    -- RSASSA-PSS-params”.
     if not value and hasSignatureValue then
       return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
     end
@@ -230,5 +233,23 @@ lib.recognizedSignatureAlgorithms[oid.pkcs1.sha512WithRSAEncryption] =
 lib.recognizedSignatureAlgorithms[oid.x25519] = lib.makeNoParamSigAlg("X25519")
 lib.recognizedSignatureAlgorithms[oid.edDSA25519] =
   lib.makeNoParamSigAlg("edDSA25519")
+
+-- none of the below are signature algorithms either.
+-- makes me want to rename this file tbh.
+lib.recognizedSignatureAlgorithms[oid.hashalgs.sha256] =
+  lib.makeNoOrNullParamSigAlg("sha-256")
+lib.recognizedSignatureAlgorithms[oid.hashalgs.sha384] =
+  lib.makeNoOrNullParamSigAlg("sha-384")
+lib.recognizedSignatureAlgorithms[oid.hashalgs.sha512] =
+  lib.makeNoOrNullParamSigAlg("sha-512")
+
+lib.recognizedSignatureAlgorithms[oid.pkcs1.mgf1] =
+  lib.makeSigAlg("pcks1-MGF1", function(parser, value, hasSignatureValue)
+    if not value then
+      return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
+    end
+
+    return parser:parseAlgorithmIdentifier(value)
+  end)
 
 return lib
