@@ -1,4 +1,4 @@
--- Recognized X.509 certificate signature algorithms.
+-- Recognized X.509 certificate algorithms.
 
 local asn = require("tls13.asn")
 local errors = require("tls13.error")
@@ -8,9 +8,9 @@ local utilMap = require("tls13.util.map")
 
 local lib = {}
 
-lib.recognizedSignatureAlgorithms = utilMap.makeProjectionMap(tostring)
+lib.recognizedAlgorithms = utilMap.makeProjectionMap(tostring)
 
-function lib.makeSigAlg(name, parser)
+function lib.makeAlg(name, parser)
   return {
     getName = function()
       return name
@@ -22,8 +22,8 @@ function lib.makeSigAlg(name, parser)
   }
 end
 
-function lib.makeNoParamSigAlg(name)
-  return lib.makeSigAlg(name, function(parser, value)
+function lib.makeNoParamAlg(name)
+  return lib.makeAlg(name, function(parser, value)
     if value then
       return nil, parser:makeError(
         errors.x509.algorithmParametersPresent,
@@ -35,8 +35,8 @@ function lib.makeNoParamSigAlg(name)
   end)
 end
 
-function lib.makeNullParamSigAlg(name)
-  return lib.makeSigAlg(name, function(parser, value)
+function lib.makeNullParamAlg(name)
+  return lib.makeAlg(name, function(parser, value)
     if not value then
       return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
     end
@@ -51,8 +51,8 @@ function lib.makeNullParamSigAlg(name)
   end)
 end
 
-function lib.makeNoOrNullParamSigAlg(name)
-  return lib.makeSigAlg(name, function(parser, value)
+function lib.makeNoOrNullParamAlg(name)
+  return lib.makeAlg(name, function(parser, value)
     if not value then
       return false
     end
@@ -67,19 +67,18 @@ function lib.makeNoOrNullParamSigAlg(name)
   end)
 end
 
-lib.recognizedSignatureAlgorithms[
+lib.recognizedAlgorithms[
   oid.ansiX962.signatures.ecdsaWithSHA2.ecdsaWithSHA256
-] = lib.makeNoParamSigAlg("ecdsa-with-SHA256")
-lib.recognizedSignatureAlgorithms[
+] = lib.makeNoParamAlg("ecdsa-with-SHA256")
+lib.recognizedAlgorithms[
   oid.ansiX962.signatures.ecdsaWithSHA2.ecdsaWithSHA384
-] = lib.makeNoParamSigAlg("ecdsa-with-SHA384")
-lib.recognizedSignatureAlgorithms[
+] = lib.makeNoParamAlg("ecdsa-with-SHA384")
+lib.recognizedAlgorithms[
   oid.ansiX962.signatures.ecdsaWithSHA2.ecdsaWithSHA512
-] = lib.makeNoParamSigAlg("ecdsa-with-SHA512")
+] = lib.makeNoParamAlg("ecdsa-with-SHA512")
 
--- not really a signature algorithm, but eh.
-lib.recognizedSignatureAlgorithms[oid.ansiX962.keyType.ecPublicKey] =
-  lib.makeSigAlg("ecPublicKey", function(parser, value)
+lib.recognizedAlgorithms[oid.ansiX962.keyType.ecPublicKey] =
+  lib.makeAlg("ecPublicKey", function(parser, value)
     local result, err = {}
     result.namedCurve, err = parser:parseOid(value)
 
@@ -91,8 +90,8 @@ lib.recognizedSignatureAlgorithms[oid.ansiX962.keyType.ecPublicKey] =
   end)
 
 -- this one neither.
-lib.recognizedSignatureAlgorithms[oid.pkcs1.rsaEncryption] =
-  lib.makeNullParamSigAlg("rsaEncryption")
+lib.recognizedAlgorithms[oid.pkcs1.rsaEncryption] =
+  lib.makeNullParamAlg("rsaEncryption")
 
 local function parseExplicit(parser, value, f, ...)
   local value, err = parser:checkExplicitTag(value)
@@ -104,8 +103,8 @@ local function parseExplicit(parser, value, f, ...)
   return f(parser, value, ...)
 end
 
-lib.recognizedSignatureAlgorithms[oid.pkcs1.rsassaPss] =
-  lib.makeSigAlg("RSASSA-PSS", function(parser, value, hasSignatureValue)
+lib.recognizedAlgorithms[oid.pkcs1.rsassaPss] =
+  lib.makeAlg("RSASSA-PSS", function(parser, value, hasSignatureValue)
     -- RFC4056, §2.2: “When the id-RSASSA-PSS algorithm identifier is used for a
     -- signature, the AlgorithmIdentifier parameters field MUST contain
     -- RSASSA-PSS-params”.
@@ -221,30 +220,28 @@ lib.recognizedSignatureAlgorithms[oid.pkcs1.rsassaPss] =
     return result
   end)
 
-lib.recognizedSignatureAlgorithms[oid.pkcs1.sha1WithRSAEncryption] =
-  lib.makeNoOrNullParamSigAlg("sha1WithRSAEncryption")
-lib.recognizedSignatureAlgorithms[oid.pkcs1.sha256WithRSAEncryption] =
-  lib.makeNoOrNullParamSigAlg("sha256WithRSAEncryption")
-lib.recognizedSignatureAlgorithms[oid.pkcs1.sha384WithRSAEncryption] =
-  lib.makeNoOrNullParamSigAlg("sha384WithRSAEncryption")
-lib.recognizedSignatureAlgorithms[oid.pkcs1.sha512WithRSAEncryption] =
-  lib.makeNoOrNullParamSigAlg("sha512WithRSAEncryption")
+lib.recognizedAlgorithms[oid.pkcs1.sha1WithRSAEncryption] =
+  lib.makeNoOrNullParamAlg("sha1WithRSAEncryption")
+lib.recognizedAlgorithms[oid.pkcs1.sha256WithRSAEncryption] =
+  lib.makeNoOrNullParamAlg("sha256WithRSAEncryption")
+lib.recognizedAlgorithms[oid.pkcs1.sha384WithRSAEncryption] =
+  lib.makeNoOrNullParamAlg("sha384WithRSAEncryption")
+lib.recognizedAlgorithms[oid.pkcs1.sha512WithRSAEncryption] =
+  lib.makeNoOrNullParamAlg("sha512WithRSAEncryption")
 
-lib.recognizedSignatureAlgorithms[oid.x25519] = lib.makeNoParamSigAlg("X25519")
-lib.recognizedSignatureAlgorithms[oid.edDSA25519] =
-  lib.makeNoParamSigAlg("edDSA25519")
+lib.recognizedAlgorithms[oid.x25519] = lib.makeNoParamAlg("X25519")
+lib.recognizedAlgorithms[oid.edDSA25519] =
+  lib.makeNoParamAlg("edDSA25519")
 
--- none of the below are signature algorithms either.
--- makes me want to rename this file tbh.
-lib.recognizedSignatureAlgorithms[oid.hashalgs.sha256] =
-  lib.makeNoOrNullParamSigAlg("sha-256")
-lib.recognizedSignatureAlgorithms[oid.hashalgs.sha384] =
-  lib.makeNoOrNullParamSigAlg("sha-384")
-lib.recognizedSignatureAlgorithms[oid.hashalgs.sha512] =
-  lib.makeNoOrNullParamSigAlg("sha-512")
+lib.recognizedAlgorithms[oid.hashalgs.sha256] =
+  lib.makeNoOrNullParamAlg("sha-256")
+lib.recognizedAlgorithms[oid.hashalgs.sha384] =
+  lib.makeNoOrNullParamAlg("sha-384")
+lib.recognizedAlgorithms[oid.hashalgs.sha512] =
+  lib.makeNoOrNullParamAlg("sha-512")
 
-lib.recognizedSignatureAlgorithms[oid.pkcs1.mgf1] =
-  lib.makeSigAlg("pcks1-MGF1", function(parser, value, hasSignatureValue)
+lib.recognizedAlgorithms[oid.pkcs1.mgf1] =
+  lib.makeAlg("pcks1-MGF1", function(parser, value, hasSignatureValue)
     if not value then
       return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
     end

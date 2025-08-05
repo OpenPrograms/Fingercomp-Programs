@@ -11,8 +11,7 @@ local lib = {}
 -- re-exports
 lib.recognizedAttributes = require("tls13.x509.attr").recognizedAttributes
 lib.recognizedExtensions = require("tls13.x509.ext").recognizedExtensions
-lib.recognizedSignatureAlgorithms =
-  require("tls13.x509.sigalg").recognizedSignatureAlgorithms
+lib.recognizedAlgorithms = require("tls13.x509.alg").recognizedAlgorithms
 
 do
   local meta = {
@@ -292,6 +291,7 @@ do
           return nil, err
         end
 
+        -- FIXME: does not check algorithm parameters.
         if tbsCertificate.signature.algorithm ~= result.algorithm then
           return nil, self:makeError(
             errors.x509.signatureAlgorithmsDiffer,
@@ -317,12 +317,11 @@ do
           return nil, err
         end
 
-        local recognizedAlgorithm =
-          lib.recognizedSignatureAlgorithms[result.algorithm]
+        local recognizedAlgorithm = lib.recognizedAlgorithms[result.algorithm]
 
         if not recognizedAlgorithm then
           return nil, self:makeError(
-            errors.x509.unrecognizedSignatureAlgorithm,
+            errors.x509.unrecognizedAlgorithm,
             result.algorithm
           )
         end

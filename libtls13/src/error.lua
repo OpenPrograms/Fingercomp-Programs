@@ -184,9 +184,9 @@ addError(
     which is different from tbsCertificate.signature's %s"
 )
 addError(
-  "x509", "unrecognizedSignatureAlgorithm",
-  "signature algorithm is not recognized",
-  "%s: signature algorithm %s is not recognized"
+  "x509", "unrecognizedAlgorithm",
+  "algorithm is not recognized",
+  "%s: algorithm %s is not recognized"
 )
 addError(
   "x509", "sequenceEmpty", "sequence must not be empty",
