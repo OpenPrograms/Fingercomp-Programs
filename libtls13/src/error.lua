@@ -183,6 +183,11 @@ addError(
   "%s: field signatureAlgorithm contains algorithm id %s, \z
     which is different from tbsCertificate.signature's %s"
 )
+lib.x509.signatureAlgorithmsDiffer.parameters =
+  lib.x509.signatureAlgorithmsDiffer:copied(
+    "%s: algorithm parameters in field signatureAlgorithm are \z
+      different from tbsCertificate.signature's"
+  )
 addError(
   "x509", "unrecognizedAlgorithm",
   "algorithm is not recognized",

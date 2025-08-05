@@ -10,7 +10,7 @@ local lib = {}
 
 lib.recognizedAlgorithms = utilMap.makeProjectionMap(tostring)
 
-function lib.makeAlg(name, parser)
+function lib.makeAlg(name, parser, areParametersEqual)
   return {
     getName = function()
       return name
@@ -19,52 +19,88 @@ function lib.makeAlg(name, parser)
     parseParameters = function(self, p, value, hasSignatureValue)
       return parser(p, value, hasSignatureValue)
     end,
+
+    areParametersEqual = function(self, lhs, rhs)
+      return areParametersEqual(lhs, rhs)
+    end,
   }
 end
 
-function lib.makeNoParamAlg(name)
-  return lib.makeAlg(name, function(parser, value)
-    if value then
-      return nil, parser:makeError(
-        errors.x509.algorithmParametersPresent,
-        value.TAG
-      )
-    end
+function lib.areAlgorithmsEqual(lhs, rhs)
+  return lhs.algorithm == rhs.algorithm
+    and lib.recognizedAlgorithms[lhs.algorithm]:areParametersEqual(
+      lhs.parameters,
+      rhs.parameters
+    )
+end
 
-    return false
-  end)
+function lib.makeNoParamAlg(name)
+  return lib.makeAlg(
+    name,
+
+    function(parser, value)
+      if value then
+        return nil, parser:makeError(
+          errors.x509.algorithmParametersPresent,
+          value.TAG
+        )
+      end
+
+      return false
+    end,
+
+    function(lhs, rhs)
+      return true
+    end
+  )
 end
 
 function lib.makeNullParamAlg(name)
-  return lib.makeAlg(name, function(parser, value)
-    if not value then
-      return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
+  return lib.makeAlg(
+    name,
+
+    function(parser, value)
+      if not value then
+        return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
+      end
+
+      local value, err = parser:checkTag(value, asn.asnTags.universal.null)
+
+      if not value then
+        return nil, err
+      end
+
+      return false
+    end,
+
+    function(lhs, rhs)
+      return true
     end
-
-    local value, err = parser:checkTag(value, asn.asnTags.universal.null)
-
-    if not value then
-      return nil, err
-    end
-
-    return false
-  end)
+  )
 end
 
 function lib.makeNoOrNullParamAlg(name)
-  return lib.makeAlg(name, function(parser, value)
-    if not value then
+  return lib.makeAlg(
+    name,
+
+    function(parser, value)
+      if not value then
+        return false
+      end
+
+      local value, err = parser:checkTag(value, asn.asnTags.universal.null)
+
+      if not value then
+        return nil, err
+      end
+
       return false
+    end,
+
+    function(lhs, rhs)
+      return true
     end
-
-    local value, err = parser:checkTag(value, asn.asnTags.universal.null)
-
-    if not value then
-      return nil, err
-    end
-
-    return false
-  end)
+  )
 end
 
 lib.recognizedAlgorithms[
@@ -77,8 +113,10 @@ lib.recognizedAlgorithms[
   oid.ansiX962.signatures.ecdsaWithSHA2.ecdsaWithSHA512
 ] = lib.makeNoParamAlg("ecdsa-with-SHA512")
 
-lib.recognizedAlgorithms[oid.ansiX962.keyType.ecPublicKey] =
-  lib.makeAlg("ecPublicKey", function(parser, value)
+lib.recognizedAlgorithms[oid.ansiX962.keyType.ecPublicKey] = lib.makeAlg(
+  "ecPublicKey",
+
+  function(parser, value)
     local result, err = {}
     result.namedCurve, err = parser:parseOid(value)
 
@@ -87,7 +125,12 @@ lib.recognizedAlgorithms[oid.ansiX962.keyType.ecPublicKey] =
     end
 
     return result
-  end)
+  end,
+
+  function(lhs, rhs)
+    return lhs.namedCurve == rhs.namedCurve
+  end
+)
 
 -- this one neither.
 lib.recognizedAlgorithms[oid.pkcs1.rsaEncryption] =
@@ -103,8 +146,10 @@ local function parseExplicit(parser, value, f, ...)
   return f(parser, value, ...)
 end
 
-lib.recognizedAlgorithms[oid.pkcs1.rsassaPss] =
-  lib.makeAlg("RSASSA-PSS", function(parser, value, hasSignatureValue)
+lib.recognizedAlgorithms[oid.pkcs1.rsassaPss] = lib.makeAlg(
+  "RSASSA-PSS",
+
+  function(parser, value, hasSignatureValue)
     -- RFC4056, §2.2: “When the id-RSASSA-PSS algorithm identifier is used for a
     -- signature, the AlgorithmIdentifier parameters field MUST contain
     -- RSASSA-PSS-params”.
@@ -218,7 +263,15 @@ lib.recognizedAlgorithms[oid.pkcs1.rsassaPss] =
     end
 
     return result
-  end)
+  end,
+
+  function(lhs, rhs)
+    return lib.areAlgorithmsEqual(lhs.hashAlgorithm, rhs.hashAlgorithm)
+      and lib.areAlgorithmsEqual(lhs.maskGenAlgorithm, rhs.maskGenAlgorithm)
+      and lhs.saltLength == rhs.saltLength
+      and lhs.trailerField == rhs.trailerField
+  end
+)
 
 lib.recognizedAlgorithms[oid.pkcs1.sha1WithRSAEncryption] =
   lib.makeNoOrNullParamAlg("sha1WithRSAEncryption")
@@ -240,13 +293,18 @@ lib.recognizedAlgorithms[oid.hashalgs.sha384] =
 lib.recognizedAlgorithms[oid.hashalgs.sha512] =
   lib.makeNoOrNullParamAlg("sha-512")
 
-lib.recognizedAlgorithms[oid.pkcs1.mgf1] =
-  lib.makeAlg("pcks1-MGF1", function(parser, value, hasSignatureValue)
+lib.recognizedAlgorithms[oid.pkcs1.mgf1] = lib.makeAlg(
+  "pcks1-MGF1",
+
+  function(parser, value, hasSignatureValue)
     if not value then
       return nil, parser:makeError(errors.x509.algorithmParametersOmitted)
     end
 
     return parser:parseAlgorithmIdentifier(value)
-  end)
+  end,
+
+  lib.areAlgorithmsEqual
+)
 
 return lib

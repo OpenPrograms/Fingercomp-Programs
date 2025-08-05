@@ -63,6 +63,7 @@ context("X.509 certificate parser tests #x509", function()
 
     local parse = spy.new(x509.parseCertificateFromAsn)
     local result = parse(certAsn)
+    assert.spy(parse).returned.with(match.is.table())
 
     assert:set_parameter("TableFormatLevel", -1)
     assert.is_not.nil_(result.tbsCertificate)
@@ -94,7 +95,10 @@ context("X.509 certificate parser tests #x509", function()
 
     local cert = loadPemFile("test/data/lencr-org.pem")[1][2]
     local certAsn = asn.decode(cert)
-    local result = x509.parseCertificateFromAsn(certAsn)
+
+    local parse = spy.new(x509.parseCertificateFromAsn)
+    local result = parse(certAsn)
+    assert.spy(parse).returned.with(match.is.table())
 
     assert:set_parameter("TableFormatLevel", -1)
     assert.same({

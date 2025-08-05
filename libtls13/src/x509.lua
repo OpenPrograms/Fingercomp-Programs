@@ -5,13 +5,14 @@ local oid = require("tls13.asn.oid")
 local errors = require("tls13.error")
 local util = require("tls13.util")
 local utilMap = require("tls13.util.map")
+local x509Alg = require("tls13.x509.alg")
 
 local lib = {}
 
 -- re-exports
 lib.recognizedAttributes = require("tls13.x509.attr").recognizedAttributes
 lib.recognizedExtensions = require("tls13.x509.ext").recognizedExtensions
-lib.recognizedAlgorithms = require("tls13.x509.alg").recognizedAlgorithms
+lib.recognizedAlgorithms = x509Alg.recognizedAlgorithms
 
 do
   local meta = {
@@ -291,11 +292,16 @@ do
           return nil, err
         end
 
-        -- FIXME: does not check algorithm parameters.
         if tbsCertificate.signature.algorithm ~= result.algorithm then
           return nil, self:makeError(
             errors.x509.signatureAlgorithmsDiffer,
             result.algorithm, tbsCertificate.signature.algorithm
+          )
+        end
+
+        if not x509Alg.areAlgorithmsEqual(tbsCertificate.signature, result) then
+          return nil, self:makeError(
+            errors.x509.signatureAlgorithmsDiffer.parameters
           )
         end
 
