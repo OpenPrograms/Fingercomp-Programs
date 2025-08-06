@@ -238,7 +238,7 @@ lib.recognizedAlgorithms[oid.pkcs1.rsassaPss] = lib.makeAlg(
         value,
         fieldIdx:next(),
         "trailerField",
-        parserExplicit,
+        parseExplicit,
         function(parser, trailerField)
           local trailerField, err = parser:parseShortInteger(trailerField, true)
 

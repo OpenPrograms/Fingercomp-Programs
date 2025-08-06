@@ -236,8 +236,8 @@ function lib.makePublicKeyFromHex(modulusHex, exponentHex)
 end
 
 function lib.makePublicKeyFromBytes(modulusBytes, exponentBytes)
-  local modulusBigint = montgomery.fromBytes(modulusHex)
-  local exponentBigint = montgomery.fromBytes(exponentHex)
+  local modulusBigint = montgomery.fromBytes(modulusBytes)
+  local exponentBigint = montgomery.fromBytes(exponentBytes)
 
   return lib.makePublicKey(modulusBigint, exponentBigint)
 end
