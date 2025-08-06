@@ -1107,7 +1107,7 @@ lib.recognizedExtensions[oid.ce.cRLDistributionPoints] = {
 
   parseReasons = function(self, parser, reasons)
     local reasons, err =
-      parser:checkImplicitTag(reason, asn.asnTags.universal.bitString)
+      parser:checkImplicitTag(reasons, asn.asnTags.universal.bitString)
 
     if not reasons then
       return nil, err

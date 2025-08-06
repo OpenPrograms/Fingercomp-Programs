@@ -103,13 +103,13 @@ function lib.encode(data, alphabet)
       result[i + 2] = alphabet[bits >> 6 & 0x3f]
       result[i + 3] = alphabet[bits & 0x3f]
     elseif i + 1 <= #data then
-      bits = (">I2"):unpack(data, i)
+      local bits = (">I2"):unpack(data, i)
       result[i + 0] = alphabet[bits >> 10]
       result[i + 1] = alphabet[bits >> 4 & 0x3f]
       result[i + 2] = alphabet[bits << 2 & 0x3f]
       result[i + 3] = "="
     else
-      bits = data:byte(i)
+      local bits = data:byte(i)
       result[i + 0] = alphabet[bits >> 2]
       result[i + 1] = alphabet[bits << 4 & 0x3f]
       result[i + 2] = "="

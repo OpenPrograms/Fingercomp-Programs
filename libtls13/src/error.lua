@@ -1,7 +1,5 @@
 -- The definitions of error objects used throughout the library.
 
-local utilMap = require("tls13.util.map")
-
 local lib = {}
 
 local acceptedMetas, errorMeta

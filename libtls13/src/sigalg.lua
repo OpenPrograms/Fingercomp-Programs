@@ -214,7 +214,6 @@ function lib.makeEd25519SigAlg()
 end
 
 function lib.decodeEcdsaSignature(signature)
-  local result = {}
   local decoded, err = asn.decode(signature)
 
   if not decoded then

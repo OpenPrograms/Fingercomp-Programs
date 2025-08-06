@@ -153,7 +153,7 @@ local function decodeSignatureAlgorithms(self, signatureAlgorithmCodes)
         table.insert(supportedSignatureAlgorithms, signatureAlgorithm)
       else
         table.insert(supportedSignatureAlgorithms, {
-          code = code,
+          code = err,
           unknown = true,
         })
       end
@@ -1046,7 +1046,7 @@ local meta = {
 
       if not signatureAlgorithm then
         if allowUnknown then
-          return false
+          return false, code
         else
           return self:sendAlert(
             errors.alert.illegalParameter.signatureAlgorithm(code)

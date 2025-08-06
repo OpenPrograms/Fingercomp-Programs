@@ -102,6 +102,7 @@ local meta = {
       end
 
       local records = {}
+      local err
 
       for i, part in ipairs(parts) do
         records[i], err = self:_protect({
@@ -280,7 +281,7 @@ local meta = {
       end
 
       if record.content ~= "\x01" then
-        return seld:sendAlert(
+        return self:sendAlert(
           errors.alert.unexpectedMessage.changeCipherSpecContent()
         )
       end
@@ -297,9 +298,7 @@ local meta = {
       end
 
       local level, alertCode = ("BB"):unpack(record.content)
-      local alertKey =
-        errors.alertEncoding[alertCode]
-        or "unknownAlert"
+      local alertKey = errors.alertEncoding[alertCode] or "unknownAlert"
       local alert = errors.alert[alertKey]()
 
       if lib.closureAlerts[alertCode] then

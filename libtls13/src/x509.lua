@@ -1,7 +1,6 @@
 -- An X.509 certificate parser.
 
 local asn = require("tls13.asn")
-local oid = require("tls13.asn.oid")
 local errors = require("tls13.error")
 local util = require("tls13.util")
 local utilMap = require("tls13.util.map")
@@ -54,7 +53,10 @@ do
 
       checkField = function(self, obj, key, fieldName)
         if not obj[key] then
-          return nil, self:makeError(errors.x509.requiredFieldMissing, key)
+          return nil, self:makeError(
+            errors.x509.requiredFieldMissing,
+            fieldName
+          )
         end
 
         return obj[key]
@@ -117,7 +119,7 @@ do
         if outerTagSpec and value.TAG ~= outerTagSpec then
           return nil, self:makeError(
             errors.x509.invalidType,
-            values.TAG, outerTagSpec
+            value.TAG, outerTagSpec
           )
         end
 
@@ -344,9 +346,8 @@ do
             "parameters",
             function(parser, params)
               return recognizedAlgorithm:parseParameters(
-                self,
+                parser,
                 params,
-                algorithmId,
                 hasSignatureValue
               )
             end
@@ -358,9 +359,8 @@ do
         else
           result.parameters, err = self:withPath("parameters", function(parser)
             return recognizedAlgorithm:parseParameters(
-              self,
+              parser,
               nil,
-              algorithmId,
               hasSignatureValue
             )
           end)
@@ -502,9 +502,9 @@ do
 
         result.value, err = self:withField(attr, 2, "value", function(_, value)
           if recognizedAttribute then
-            return recognizedAttribute:parse(self, value, attr.type)
+            return recognizedAttribute:parse(self, value, result.type)
           else
-            return self:parseUnrecognizedAttribute(value, attr.type)
+            return self:parseUnrecognizedAttribute(value, result.type)
           end
         end)
 
@@ -834,7 +834,8 @@ do
           )
         end
 
-        local extensions, err = utilMap.makeProjectionMap(tostring)
+        local err
+        local extensions = utilMap.makeProjectionMap(tostring)
         extensionSeq, err = self:checkExplicitTag(
           extensionSeq,
           asn.makeTagSpec("contextSpecific", 3),

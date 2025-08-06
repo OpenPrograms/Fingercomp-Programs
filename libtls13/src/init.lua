@@ -10,7 +10,6 @@ local handshake = require("tls13.handshake")
 local hmac = require("tls13.crypto.hmac")
 local oid = require("tls13.asn.oid")
 local record = require("tls13.record")
-local rsa = require("tls13.crypto.rsa")
 local sha2 = require("tls13.crypto.hash.sha2")
 local sigalg = require("tls13.sigalg")
 local tlsIo = require("tls13.io")
@@ -375,7 +374,7 @@ function lib.wrapRaw(f, profile, options)
         name = {hostname = name}
       end
 
-      table.insert(serverNames)
+      table.insert(serverNames, name)
     end
   end
 

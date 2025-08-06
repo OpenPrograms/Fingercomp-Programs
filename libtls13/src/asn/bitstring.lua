@@ -286,7 +286,7 @@ local meta = {
   end,
 }
 
-local function makeBitstring(words, paddingBits)
+function makeBitstring(words, paddingBits)
   return setmetatable({
     __words = words,
     __padding = paddingBits,

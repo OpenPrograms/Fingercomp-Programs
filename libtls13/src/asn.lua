@@ -506,7 +506,6 @@ function lib.parseAsnValue(buf)
   end
 
   local tagSpec = lib.asnTags[class][tagNumber]
-  local shortName
 
   if not tagSpec then
     tagSpec = lib.makeTagSpec(class, tagNumber)
