@@ -89,17 +89,35 @@ context("X.509 certificate parser tests #x509", function()
   end)
 
   test("AMD SEV certificate", function()
+    local extOid = asn.makeOid(1, 3, 6, 1, 4, 1, 3704, 1, 4)
+    local recognizedExtensions = require("tls13.x509.ext").recognizedExtensions
+
     local cert = loadPemFile("test/data/amd-sev.pem")[1][2]
     local decode = spy.new(asn.decode)
     local certAsn = decode(cert)
     assert.spy(decode).returned.with(match.is.table())
 
     local parse = spy.new(x509.parseCertificateFromAsn)
-    local result = parse(certAsn)
+
+    recognizedExtensions[extOid] = {
+      getName = function()
+        return "AMD VCEK hwID"
+      end,
+
+      parse = function(_, _, value)
+        return value
+      end,
+
+      nonDerEncodedValue = true,
+    }
+
+    local success, result = xpcall(parse, debug.traceback, certAsn)
+    recognizedExtensions[extOid] = nil
+    assert(success, result)
+
     assert.spy(parse).returned.with(match.is.table())
 
     local exts = result.tbsCertificate.extensions
-    local extOid = asn.makeOid(1, 3, 6, 1, 4, 1, 3704, 1, 4)
     local ext = exts[extOid]
 
     assert.same(

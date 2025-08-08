@@ -929,16 +929,13 @@ do
 
         if recognizedExtension then
           result.extnValue, err = self:withPath("extnValue", function()
-            local decodedValue, err =
-              asn.decode(result.extnValue, false, self.__path)
+            if not recognizedExtension.nonDerEncodedValue then
+              result.extnValue, err =
+                asn.decode(result.extnValue, false, self.__path)
 
-            if decodedValue then
-              result.extnValue = decodedValue
-            else
-              -- apparently some extensions just put whatever in here, so we
-              -- can't just fail. we'll record the failure for forensic purposes
-              -- but otherwise ignore it.
-              result._extnDecodeErr = err
+              if not result.extnValue then
+                return nil, err
+              end
             end
 
             return recognizedExtension:parse(self, result.extnValue)

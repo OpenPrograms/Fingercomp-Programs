@@ -8,6 +8,9 @@ local utilMap = require("tls13.util.map")
 
 local lib = {}
 
+-- Values are expected to have two fields: `getName` and `parse`.
+-- In addition, `nonDerEncodedValue` may be set to a truthy value to avoid
+-- decoding the contents of extnValue with DER before parsing.
 lib.recognizedExtensions = utilMap.makeProjectionMap(tostring)
 
 local function makeExtension(name, parser)
