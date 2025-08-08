@@ -88,6 +88,27 @@ context("X.509 certificate parser tests #x509", function()
     }, result.tbsCertificate.signature)
   end)
 
+  test("AMD SEV certificate", function()
+    local cert = loadPemFile("test/data/amd-sev.pem")[1][2]
+    local decode = spy.new(asn.decode)
+    local certAsn = decode(cert)
+    assert.spy(decode).returned.with(match.is.table())
+
+    local parse = spy.new(x509.parseCertificateFromAsn)
+    local result = parse(certAsn)
+    assert.spy(parse).returned.with(match.is.table())
+
+    local exts = result.tbsCertificate.extensions
+    local extOid = asn.makeOid(1, 3, 6, 1, 4, 1, 3704, 1, 4)
+    local ext = exts[extOid]
+
+    assert.same(
+      "9dc99962c063029e430b6f7b734075ec542f4f3ec639e657e14585d3fe559b38532bc42\z
+        d037d618317694ad6634d2507964e276c8eedeac4978c7006bf89f8e1",
+      util.toHex(ext.extnValue)
+    )
+  end)
+
   test("Let's Encrypt certificate", function()
     local bitstring = require("tls13.asn.bitstring")
     local oid = require("tls13.asn.oid")
