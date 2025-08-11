@@ -110,7 +110,7 @@ function lib.makeRsaPkcs1SigAlg(hash, hashOid)
 end
 
 function lib.decodeRsaPssPublicKey(pkInfo, hashOid, saltLength)
-  if pkInfo.algorithm.algorithm ~= oid then
+  if pkInfo.algorithm.algorithm ~= oid.pkcs1.rsassaPss then
     return nil, errors.x509.publicKeyInvalid.subject(
       "unsupported algorithm OID"
     )
