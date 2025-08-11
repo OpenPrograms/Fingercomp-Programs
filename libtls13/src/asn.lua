@@ -186,9 +186,9 @@ lib.tagParsers[lib.asnTags.universal.boolean] = function(buf, context)
   end
 
   if byte == 0x00 then
-    return context:makeValue({false})
+    return context:makeValue({false}, buf:pos())
   elseif byte == 0xff then
-    return context:makeValue({true})
+    return context:makeValue({true}, buf:pos())
   end
 
   return nil, buf:makeParserError(errors.asn.invalidBooleanValue, byte)
@@ -222,7 +222,7 @@ lib.tagParsers[lib.asnTags.universal.integer] = function(buf, context)
     long = type(int) == "table",
 
     int,
-  })
+  }, buf:pos())
 end
 
 lib.tagParsers[lib.asnTags.universal.bitString] = function(buf, context)
@@ -259,7 +259,7 @@ lib.tagParsers[lib.asnTags.universal.bitString] = function(buf, context)
 
   local bigint = bitstring.fromBytes(bytes, unusedBitCount)
 
-  return context:makeValue({bigint})
+  return context:makeValue({bigint}, buf:pos())
 end
 
 lib.tagParsers[lib.asnTags.universal.octetString] = function(buf, context)
@@ -275,7 +275,7 @@ lib.tagParsers[lib.asnTags.universal.octetString] = function(buf, context)
     return nil, err
   end
 
-  return context:makeValue({bytes})
+  return context:makeValue({bytes}, buf:pos())
 end
 
 lib.tagParsers[lib.asnTags.universal.null] = function(buf, context)
@@ -285,7 +285,7 @@ lib.tagParsers[lib.asnTags.universal.null] = function(buf, context)
     )
   end
 
-  return context:makeValue({})
+  return context:makeValue({}, buf:pos())
 end
 
 lib.tagParsers[lib.asnTags.universal.objectIdentifier] = function(buf, context)
@@ -316,7 +316,7 @@ lib.tagParsers[lib.asnTags.universal.objectIdentifier] = function(buf, context)
     components[1], components[2] = 2, components[2] - 80
   end
 
-  return context:makeValue({lib.makeOid(components)})
+  return context:makeValue({lib.makeOid(components)}, buf:pos())
 end
 
 lib.tagParsers[lib.asnTags.universal.enumerated] =
@@ -344,7 +344,7 @@ lib.tagParsers[lib.asnTags.universal.sequence] = function(buf, context)
     table.insert(values, value)
   end
 
-  return context:makeValue(values)
+  return context:makeValue(values, buf:pos())
 end
 
 lib.tagParsers[lib.asnTags.universal.set] =
@@ -380,7 +380,7 @@ function lib.defaultTagParser(buf, context)
       CONTENTS = contents,
 
       contents,
-    })
+    }, buf:pos())
   end
 
   local components = {}
@@ -399,16 +399,18 @@ function lib.defaultTagParser(buf, context)
 
   components.CONTENTS = contents
 
-  return context:makeValue(components)
+  return context:makeValue(components, buf:pos())
 end
 
 local makeContext do
   local meta = {
     __index = {
-      makeValue = function(self, value)
+      makeValue = function(self, value, pos)
         value.TAG = self.tagSpec
         value.ENCODING = self.encoding
         value.LENGTH = self.length
+        value.START = self.start
+        value.END = pos - 1
 
         return value
       end,
@@ -531,6 +533,7 @@ function lib.parseAsnValue(buf)
         tagSpec = tagSpec,
         encoding = encoding,
         length = length,
+        start = pos,
       }
 
       return tagParser(buf, context)
@@ -564,6 +567,7 @@ function lib.parseImplicitTag(tag, tagSpec, context)
     tagSpec = tagSpec,
     encoding = tag.ENCODING,
     length = tag.LENGTH,
+    start = tag.START,
   }
   local tagParser = lib.tagParsers[tagSpec] or lib.defaultTagParser
 
